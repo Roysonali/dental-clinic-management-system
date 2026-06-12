@@ -216,3 +216,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node / React
+node_modules/
+dist/
+build/
+npm-debug.log*
+
+# Environment Variables
+.env
+.env.local
+.env.production
+
+# VS Code
+.vscode/
+
+# OS Files
+.DS_Store
+Thumbs.db
