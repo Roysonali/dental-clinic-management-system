@@ -4,6 +4,7 @@ from sqlalchemy import String
 
 from app.database.base import Base
 from sqlalchemy import Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 
 class Role(Base):
     __tablename__ = "roles"
@@ -14,6 +15,11 @@ class Role(Base):
         String(50),
         nullable=False,
         unique=True
+    )
+
+    users = relationship(
+        "User",
+        back_populates="role"
     )
 
 class User(Base):
@@ -37,12 +43,25 @@ class User(Base):
         nullable=False
     )
 
+    status = Column(
+        String(20),
+        nullable=False,
+        default="pending"
+    )
+
     is_active = Column(
         Boolean,
-        default=True
+        nullable=False,
+        default=False
     )
 
     role_id = Column(
         Integer,
-        ForeignKey("roles.id")
+        ForeignKey("roles.id"),
+        nullable=True
+    )
+
+    role = relationship(
+        "Role",
+        back_populates="users"
     )
