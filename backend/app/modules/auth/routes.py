@@ -7,21 +7,7 @@ from app.database.session import get_db
 
 from app.modules.auth.schemas import (
     UserRegister,
-    RegisterResponse
-)
-
-from app.modules.auth.service import (
-    register_user,
-    authenticate_user
-)
-from typing import List
-
-from app.modules.auth.service import (
-    fetch_pending_users,
-    approve_user,
-    deactivate_user
-)
-from app.modules.auth.schemas import (
+    RegisterResponse,
     LoginResponse,
     CurrentUserResponse,
     UserApprovalResponse,
@@ -29,17 +15,23 @@ from app.modules.auth.schemas import (
     PendingUserResponse
 )
 
+from app.modules.auth.service import (
+    register_user,
+    authenticate_user,
+    fetch_pending_users,
+    approve_user,
+    deactivate_user
+)
+from typing import List
+
 from app.dependencies.auth import (
     get_current_user
 )
 
-from app.modules.auth.dependencies import (
-    require_admin
-)
 
 from app.modules.auth.models import User
 from fastapi.security import OAuth2PasswordRequestForm
-
+from app.modules.rbac.permissions import require_admin
 
 
 router = APIRouter(
@@ -55,7 +47,7 @@ router = APIRouter(
 def register(
     user_data: UserRegister,
     db: Session = Depends(get_db)
-):
+) -> RegisterResponse:
     register_user(
         db,
         user_data
@@ -69,10 +61,11 @@ def register(
 @router.get(
     "/users/pending",
     response_model=List[PendingUserResponse]
+    
 )
 def get_pending_users_route(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_admin: User = Depends(require_admin)
 ):
     return fetch_pending_users(db)
 
@@ -85,7 +78,7 @@ def approve_user_route(
     user_id: int,
     approval_data: UserApprovalRequest,
     db: Session = Depends(get_db),
-    current_user:User = Depends(require_admin)
+    current_admin:User = Depends(require_admin)
 ):
     approve_user(
         db,
@@ -106,7 +99,7 @@ def approve_user_route(
 def deactivate_user_route(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user : User = Depends(require_admin)
+    current_admin : User = Depends(require_admin)
 ):
     deactivate_user(
         db,
@@ -126,7 +119,7 @@ def deactivate_user_route(
 def login(
     form_data:  OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
-):
+) -> LoginResponse:
 
     access_token = authenticate_user(
         db,
@@ -147,5 +140,6 @@ def get_me(
     current_user: User = Depends(
         get_current_user
     )
-):
+) ->CurrentUserResponse:
     return current_user
+
