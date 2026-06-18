@@ -34,7 +34,9 @@ def require_roles(
     def role_checker(
         current_user: User = Depends(get_current_user)
     ) -> User:
-
+        
+        print("ROLE NAME =", current_user.role.name)
+        print("ALLOWED =", allowed_roles)
         if not current_user.role:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -50,3 +52,4 @@ def require_roles(
         return current_user
 
     return role_checker
+

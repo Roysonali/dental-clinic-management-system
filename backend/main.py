@@ -5,6 +5,10 @@ from app.modules.users.routes import (
     router as users_router
 )
 
+from app.modules.patients.routes import (
+    router as patient_router,
+)
+
 app = FastAPI(
     title="DensCare API",
     version="1.0.0"
@@ -12,6 +16,7 @@ app = FastAPI(
 
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router( patient_router)
 
 # CORS configuration
 app.add_middleware(
