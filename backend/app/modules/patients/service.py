@@ -241,10 +241,7 @@ class PatientService:
 
             response = PatientMapper.to_response(patient)
 
-            return {
-                "patient": response,
-                "warnings": warnings,
-            }
+            return PatientMapper.to_response(patient)
 
         except DuplicatePatientDetected:
             self.db.rollback()
@@ -407,10 +404,7 @@ class PatientService:
                 )
             )
 
-            return {
-                "patient": response,
-                "warnings": warnings,
-            }
+            return PatientMapper.to_response(patient)
     
         except PatientNotFound:
             self.db.rollback()

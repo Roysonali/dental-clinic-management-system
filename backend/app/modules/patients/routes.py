@@ -4,20 +4,18 @@ from fastapi import (
     APIRouter,
     Depends,
     Query,
+    status,
 )
-
 from sqlalchemy.orm import Session
 
-from app.database.session import (
-    get_db,
-)
-
-from app.dependencies.auth import (
-    get_current_user,
-)
+from app.database.session import get_db
 
 from app.modules.patients.schemas import (
     PatientCreate,
+    PatientListResponse,
+    PatientProfileResponse,
+    PatientResponse,
+    PatientStatusResponse,
     PatientUpdate,
 )
 
@@ -29,7 +27,6 @@ from app.modules.rbac.permissions import (
     require_roles,
 )
 
-
 router = APIRouter(
     prefix="/patients",
     tags=["Patients"],
@@ -37,18 +34,21 @@ router = APIRouter(
 
 
 def get_patient_service(
-    db: Session = Depends(
-        get_db
-    ),
-):
+    db: Session = Depends(get_db),
+) -> PatientService:
 
-    return PatientService(
-        db
-    )
+    return PatientService(db)
 
+
+# ==========================================================
+# CREATE PATIENT
+# ==========================================================
 
 @router.post(
     "",
+    response_model=PatientResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Patient",
 )
 def create_patient(
     payload: PatientCreate,
@@ -67,40 +67,42 @@ def create_patient(
     ),
 ):
 
-    return (
-        service
-        .create_patient(
-
-            payload,
-
-            current_user.id,
-        )
+    return service.create_patient(
+        payload,
+        current_user.id,
     )
 
 
-# ======================================
-# LIST
-# ======================================
+# ==========================================================
+# LIST PATIENTS
+# ==========================================================
 
 @router.get(
     "",
+    response_model=PatientListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List Patients",
 )
 def list_patients(
 
     page: int = Query(
-        1,
+        default=1,
         ge=1,
     ),
 
     page_size: int = Query(
-        20,
+        default=20,
         ge=1,
         le=100,
     ),
 
-    search: str | None = None,
+    search: str | None = Query(
+        default=None,
+    ),
 
-    is_active: bool | None = None,
+    is_active: bool | None = Query(
+        default=None,
+    ),
 
     _: object = Depends(
         require_roles(
@@ -113,31 +115,27 @@ def list_patients(
     ),
 
     service: PatientService = Depends(
-        get_patient_service
+        get_patient_service,
     ),
 ):
 
-    return (
-        service
-        .list_patients(
-
-            page=page,
-
-            page_size=page_size,
-
-            search=search,
-
-            is_active=is_active,
-        )
+    return service.list_patients(
+        page=page,
+        page_size=page_size,
+        search=search,
+        is_active=is_active,
     )
 
 
-# ======================================
-# GET
-# ======================================
+# ==========================================================
+# GET PATIENT
+# ==========================================================
 
 @router.get(
     "/{patient_id}",
+    response_model=PatientResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Patient",
 )
 def get_patient(
 
@@ -154,24 +152,24 @@ def get_patient(
     ),
 
     service: PatientService = Depends(
-        get_patient_service
+        get_patient_service,
     ),
 ):
 
-    return (
-        service
-        .get_patient(
-            patient_id
-        )
+    return service.get_patient(
+        patient_id
     )
 
 
-# ======================================
-# UPDATE
-# ======================================
+# ==========================================================
+# UPDATE PATIENT
+# ==========================================================
 
 @router.patch(
     "/{patient_id}",
+    response_model=PatientResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update Patient",
 )
 def update_patient(
 
@@ -189,27 +187,25 @@ def update_patient(
     ),
 
     service: PatientService = Depends(
-        get_patient_service
+        get_patient_service,
     ),
 ):
 
-    return (
-        service
-        .update_patient(
-
-            patient_id,
-
-            payload,
-        )
+    return service.update_patient(
+        patient_id,
+        payload,
     )
 
 
-# ======================================
-# ACTIVATE
-# ======================================
+# ==========================================================
+# ACTIVATE PATIENT
+# ==========================================================
 
 @router.patch(
     "/{patient_id}/activate",
+    response_model=PatientResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Activate Patient",
 )
 def activate_patient(
 
@@ -224,25 +220,25 @@ def activate_patient(
     ),
 
     service: PatientService = Depends(
-        get_patient_service
+        get_patient_service,
     ),
 ):
 
-    return (
-        service
-        .change_patient_status(
-            patient_id,
-            True,
-        )
+    return service.change_patient_status(
+        patient_id,
+        True,
     )
 
 
-# ======================================
-# DEACTIVATE
-# ======================================
+# ==========================================================
+# DEACTIVATE PATIENT
+# ==========================================================
 
 @router.patch(
     "/{patient_id}/deactivate",
+    response_model=PatientResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Deactivate Patient",
 )
 def deactivate_patient(
 
@@ -257,22 +253,25 @@ def deactivate_patient(
     ),
 
     service: PatientService = Depends(
-        get_patient_service
+        get_patient_service,
     ),
 ):
 
-    return (
-        service
-        .change_patient_status(
-            patient_id,
-            False,
-        )
+    return service.change_patient_status(
+        patient_id,
+        False,
     )
 
 
+# ==========================================================
+# PATIENT PROFILE
+# ==========================================================
 
 @router.get(
     "/{patient_id}/profile",
+    response_model=PatientProfileResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Patient Profile",
 )
 def patient_profile(
 
@@ -289,13 +288,10 @@ def patient_profile(
     ),
 
     service: PatientService = Depends(
-        get_patient_service
+        get_patient_service,
     ),
 ):
 
-    return (
-        service
-        .get_patient_profile(
-            patient_id
-        )
+    return service.get_patient_profile(
+        patient_id
     )

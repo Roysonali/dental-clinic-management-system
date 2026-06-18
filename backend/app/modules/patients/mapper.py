@@ -76,7 +76,7 @@ class PatientMapper:
 
         return PatientResponse(
 
-            str( patient.id),
+            id = str( patient.id),
 
             patient_code=patient.patient_code,
 
@@ -129,7 +129,7 @@ class PatientMapper:
 
         return PatientListItem(
 
-            str( patient.id),
+            id = str( patient.id),
 
             patient_code=patient.patient_code,
 

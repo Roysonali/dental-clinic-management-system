@@ -13,6 +13,9 @@ from app.core.constants import GenderEnum
 
 
 class PatientBase(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid"
+)
 
     first_name: str = Field(
         min_length=2,
@@ -34,21 +37,29 @@ class PatientBase(BaseModel):
     gender: GenderEnum
 
     primary_contact_number: str = Field(
-        min_length=7,
-        max_length=30,
+        min_length=10,
+        max_length=15,
+        pattern=r"^\+?[0-9]{10,15}$",
     )
 
     emergency_contact_number: Optional[str] = Field(
         default=None,
-        min_length=7,
-        max_length=30,
+        min_length=10,
+        max_length=15,
+        pattern=r"^\+?[0-9]{10,15}$",
     )
 
     email: Optional[EmailStr] = None
 
-    address: Optional[str] = None
+    address: Optional[str] = Field(
+        default=None,
+        max_length=500,
+    )
 
-    remarks: Optional[str] = None
+    remarks: Optional[str] = Field(
+        default=None,
+        max_length=1000,
+    )
 
     @field_validator(
         "first_name",
@@ -62,7 +73,18 @@ class PatientBase(BaseModel):
         if value is None:
             return value
 
-        return value.strip()
+        value = value.strip()
+        allowed = {" ", "-", "'"}
+        if value and not all(
+            c.isalpha() or c.isspace()
+            for c in value
+        ):
+            raise ValueError(
+                "Name should contain only alphabets."
+            )
+
+        return value
+        
 
     @field_validator(
         "date_of_birth"
@@ -70,14 +92,72 @@ class PatientBase(BaseModel):
     @classmethod
     def validate_dob(cls, value):
 
-        if value > date.today():
+        today = date.today()
+
+        if value > today:
 
             raise ValueError(
                 "date_of_birth cannot be in future"
             )
+        if value.year < 1900:
+
+            raise ValueError(
+                "Invalid date of birth."
+            )
 
         return value
+    
 
+    @field_validator(
+        "address",
+        "remarks",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text(
+        cls,
+        value,
+    ):
+
+        if value is None:
+            return value
+
+        return value.strip()
+    
+    @field_validator(
+        "email",
+        mode="before",
+    )
+    @classmethod
+    def normalize_email(
+        cls,
+        value,
+    ):
+
+        if value is None:
+            return value
+
+        return value.strip().lower()
+    
+    @field_validator(
+        "primary_contact_number",
+        "emergency_contact_number",
+        mode="before",
+    )
+    @classmethod
+    def normalize_phone(
+        cls,
+        value,
+    ):
+        if value is None:
+            return value
+
+        return (
+            str(value)
+            .replace(" ", "")
+            .replace("-", "")
+            .strip()
+        )
 
 
 class PatientCreate(
@@ -89,7 +169,9 @@ class PatientCreate(
 class PatientUpdate(
     BaseModel
 ):
-
+    model_config = ConfigDict(
+        extra="forbid"
+)
     first_name: Optional[str] = Field(
         default=None,
         min_length=2,
@@ -113,28 +195,31 @@ class PatientUpdate(
 
     primary_contact_number: Optional[str] = Field(
         default=None,
-        min_length=7,
-        max_length=30,
+        min_length=10,
+        max_length=15,
+        pattern=r"^\+?[0-9]{10,15}$",
     )
 
     emergency_contact_number: Optional[str] = Field(
         default=None,
-        min_length=7,
-        max_length=30,
+        min_length=10,
+        max_length=15,
+        pattern=r"^\+?[0-9]{10,15}$",
     )
 
     email: Optional[
         EmailStr
     ] = None
 
-    address: Optional[
-        str
-    ] = None
+    address: Optional[str] = Field(
+        default=None,
+        max_length=500,
+    )
 
-    remarks: Optional[
-        str
-    ] = None
-
+    remarks: Optional[str] = Field(
+        default=None,
+        max_length=1000,
+    )
     @field_validator(
         "date_of_birth"
     )
@@ -143,17 +228,99 @@ class PatientUpdate(
         cls,
         value,
     ):
+        today = date.today()
+        
+        if value:
 
-        if (
-            value
-            and value > date.today()
+            if value > today:
+                raise ValueError(
+                    "Date of birth cannot be in future."
+                )
+
+            if value.year < 1900:
+                raise ValueError(
+                    "Invalid date of birth."
+                )
+
+
+        return value
+    
+
+    @field_validator(
+        "first_name",
+        "middle_name",
+        "last_name",
+        mode="before",
+    )
+    @classmethod
+    def normalize_names(cls, value):
+
+        if value is None:
+            return value
+
+        value = value.strip()
+        allowed = {" ", "-", "'"}
+        if value and not all(
+            c.isalpha() or c.isspace()
+            for c in value
         ):
-
             raise ValueError(
-                "date_of_birth cannot be in future"
+                "Name should contain only alphabets."
             )
 
         return value
+    
+
+    @field_validator(
+        "address",
+        "remarks",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text(
+        cls,
+        value,
+    ):
+
+        if value is None:
+            return value
+
+        return value.strip()
+    
+    @field_validator(
+        "email",
+        mode="before",
+    )
+    @classmethod
+    def normalize_email(
+        cls,
+        value,
+    ):
+
+        if value is None:
+            return value
+
+        return value.strip().lower()
+    
+    @field_validator(
+        "primary_contact_number",
+        "emergency_contact_number",
+        mode="before",
+    )
+    @classmethod
+    def normalize_phone(
+        cls,
+        value,
+    ):
+        if value is None:
+            return value
+
+        return (
+            str(value)
+            .replace(" ", "")
+            .replace("-", "")
+            .strip()
+        )
 
 
 class PatientResponse(
@@ -172,9 +339,9 @@ class PatientResponse(
 
     date_of_birth: date
 
-    age: int
+    age: Optional[int]
 
-    gender: str
+    gender: Optional[str]
 
     primary_contact_number: str
 
@@ -182,9 +349,15 @@ class PatientResponse(
 
     email: Optional[str]
 
-    address: Optional[str]
+    address: Optional[str] = Field(
+        default=None,
+        max_length=500,
+    )
 
-    remarks: Optional[str]
+    remarks: Optional[str] = Field(
+        default=None,
+        max_length=1000,
+    )
 
     is_active: bool
 
@@ -203,9 +376,9 @@ class PatientListItem(
 
     full_name: str
 
-    age: int
+    age: Optional[int]
 
-    gender: str
+    gender: Optional[str]
 
     primary_contact_number: str
 
@@ -243,11 +416,3 @@ class PatientStatusResponse(
 
     message: str
 
-
-class DuplicatePatientWarning(
-    BaseModel
-):
-
-    possible_duplicate: bool
-
-    matches: list[str]
