@@ -112,7 +112,8 @@ class PatientRepository:
         Retrieve a paginated, filterable list of patients.
 
         Supports:
-        - Full-text search across code, name, and phone
+        - Search across patient_code, names (first, middle, last, full),
+          phone, and email
         - Active/inactive status filtering
         - Cursorless pagination via offset/limit
 
@@ -143,11 +144,40 @@ class PatientRepository:
                     f"%{search}%"
                 ),
 
+                Patient.middle_name.ilike(
+                    f"%{search}%"
+                ),
+
                 Patient.last_name.ilike(
                     f"%{search}%"
                 ),
 
+                # Full name match: "first + last"
+                func.concat(
+                    Patient.first_name,
+                    " ",
+                    Patient.last_name,
+                ).ilike(
+                    f"%{search}%"
+                ),
+
+                # Full name match: "first + middle + last"
+                # Uses concat_ws (concat with separator) which properly
+                # skips NULL values without leaving orphaned spaces.
+                func.concat_ws(
+                    " ",
+                    Patient.first_name,
+                    Patient.middle_name,
+                    Patient.last_name,
+                ).ilike(
+                    f"%{search}%"
+                ),
+
                 Patient.primary_contact_number.ilike(
+                    f"%{search}%"
+                ),
+
+                Patient.email.ilike(
                     f"%{search}%"
                 ),
             )
