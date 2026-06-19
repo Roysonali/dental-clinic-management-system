@@ -1,6 +1,7 @@
 import re
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import EmailStr
 from pydantic import Field
 from pydantic import field_validator
@@ -8,6 +9,10 @@ from pydantic import field_validator
 
 class UserRegister(BaseModel):
     """Request schema for new user registration."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
 
     full_name: str = Field(
         ...,
@@ -32,9 +37,9 @@ class UserRegister(BaseModel):
         title="Password",
         description=(
             "8–128 characters. Must contain at least one uppercase letter, "
-            "one lowercase letter, and one digit."
+            "one lowercase letter, one digit, and one special character."
         ),
-        examples=["SecurePass1"],
+        examples=["Secure@Pass1"],
     )
 
     @field_validator("full_name")
@@ -43,10 +48,16 @@ class UserRegister(BaseModel):
         """Strip leading/trailing whitespace and collapse internal whitespace."""
         return " ".join(value.strip().split())
 
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        """Normalize email to lowercase and strip surrounding whitespace."""
+        return value.strip().lower()
+
     @field_validator("password")
     @classmethod
     def validate_password_complexity(cls, value: str) -> str:
-        """Enforce password strength: upper, lower, and digit required."""
+        """Enforce password strength: upper, lower, digit, and special char."""
         if not re.search(r"[A-Z]", value):
             raise ValueError(
                 "Password must contain at least one uppercase letter"
@@ -59,11 +70,17 @@ class UserRegister(BaseModel):
             raise ValueError(
                 "Password must contain at least one digit"
             )
+        if not re.search(r"[^a-zA-Z0-9]", value):
+            raise ValueError(
+                "Password must contain at least one special character"
+            )
         return value
 
 
 class RegisterResponse(BaseModel):
     """Response returned after a successful registration request."""
+
+    model_config = ConfigDict(frozen=True)
 
     message: str = Field(
         ...,
@@ -75,6 +92,8 @@ class RegisterResponse(BaseModel):
 
 class UserApprovalRequest(BaseModel):
     """Request payload for approving a pending user."""
+
+    model_config = ConfigDict(extra="forbid")
 
     role_id: int = Field(
         ...,
@@ -88,6 +107,8 @@ class UserApprovalRequest(BaseModel):
 class UserApprovalResponse(BaseModel):
     """Response returned after approving or deactivating a user."""
 
+    model_config = ConfigDict(frozen=True)
+
     message: str = Field(
         ...,
         title="Response Message",
@@ -98,6 +119,11 @@ class UserApprovalResponse(BaseModel):
 
 class PendingUserResponse(BaseModel):
     """Summary of a pending user visible to admins."""
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        frozen=True,
+    )
 
     id: int = Field(
         ...,
@@ -124,11 +150,11 @@ class PendingUserResponse(BaseModel):
         examples=["pending"],
     )
 
-    model_config = {"from_attributes": True}
-
 
 class LoginResponse(BaseModel):
     """Response containing a JWT access token after successful authentication."""
+
+    model_config = ConfigDict(frozen=True)
 
     access_token: str = Field(
         ...,
@@ -146,6 +172,11 @@ class LoginResponse(BaseModel):
 
 class CurrentUserResponse(BaseModel):
     """Profile information for the currently authenticated user."""
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        frozen=True,
+    )
 
     id: int = Field(
         ...,
@@ -171,5 +202,3 @@ class CurrentUserResponse(BaseModel):
         description="Current account lifecycle status.",
         examples=["active"],
     )
-
-    model_config = {"from_attributes": True}

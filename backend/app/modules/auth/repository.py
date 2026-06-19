@@ -2,7 +2,9 @@ import logging
 
 from typing import Optional
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import selectinload
 
 from app.modules.auth.models import Role
 from app.modules.auth.models import User
@@ -41,19 +43,27 @@ def get_user_by_email(
     db: Session,
     email: str,
 ) -> Optional[User]:
-    """Look up a user by their email address (case-sensitive).
+    """Look up a user by their email address.
+
+    Eager-loads the ``role`` relationship to avoid an N+1 query
+    when the caller accesses ``user.role`` (e.g. RBAC dependencies).
 
     Args:
         db: Active database session.
-        email: The email to search for.
+        email: The email to search for (case-sensitive).
 
     Returns:
-        The matching User, or None if not found.
+        The matching User (with role loaded), or None if not found.
     """
+    stmt = (
+        select(User)
+        .options(selectinload(User.role))
+        .where(User.email == email)
+    )
+
     return (
-        db.query(User)
-        .filter(User.email == email)
-        .first()
+        db.execute(stmt)
+        .scalar_one_or_none()
     )
 
 
@@ -68,9 +78,14 @@ def get_pending_users(
     Returns:
         List of pending User instances.
     """
+    stmt = (
+        select(User)
+        .where(User.status == "pending")
+    )
+
     return (
-        db.query(User)
-        .filter(User.status == "pending")
+        db.execute(stmt)
+        .scalars()
         .all()
     )
 
@@ -88,10 +103,14 @@ def get_user_by_id(
     Returns:
         The matching User, or None if not found.
     """
+    stmt = (
+        select(User)
+        .where(User.id == user_id)
+    )
+
     return (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
+        db.execute(stmt)
+        .scalar_one_or_none()
     )
 
 
@@ -108,8 +127,12 @@ def get_role_by_id(
     Returns:
         The matching Role, or None if not found.
     """
+    stmt = (
+        select(Role)
+        .where(Role.id == role_id)
+    )
+
     return (
-        db.query(Role)
-        .filter(Role.id == role_id)
-        .first()
+        db.execute(stmt)
+        .scalar_one_or_none()
     )
