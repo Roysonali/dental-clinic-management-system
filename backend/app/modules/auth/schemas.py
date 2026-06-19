@@ -1,43 +1,175 @@
-from pydantic import BaseModel, EmailStr, Field
+import re
+
+from pydantic import BaseModel
+from pydantic import EmailStr
+from pydantic import Field
+from pydantic import field_validator
 
 
 class UserRegister(BaseModel):
-    full_name: str = Field(..., min_length=2, max_length=100)
+    """Request schema for new user registration."""
 
-    email: EmailStr
+    full_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        title="Full Name",
+        description="User's full display name (2–100 characters).",
+        examples=["Juan Dela Cruz"],
+    )
 
-    password: str = Field(..., min_length=8)
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="Valid email address used for login.",
+        examples=["juan@example.com"],
+    )
+
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        title="Password",
+        description=(
+            "8–128 characters. Must contain at least one uppercase letter, "
+            "one lowercase letter, and one digit."
+        ),
+        examples=["SecurePass1"],
+    )
+
+    @field_validator("full_name")
+    @classmethod
+    def normalize_full_name(cls, value: str) -> str:
+        """Strip leading/trailing whitespace and collapse internal whitespace."""
+        return " ".join(value.strip().split())
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, value: str) -> str:
+        """Enforce password strength: upper, lower, and digit required."""
+        if not re.search(r"[A-Z]", value):
+            raise ValueError(
+                "Password must contain at least one uppercase letter"
+            )
+        if not re.search(r"[a-z]", value):
+            raise ValueError(
+                "Password must contain at least one lowercase letter"
+            )
+        if not re.search(r"\d", value):
+            raise ValueError(
+                "Password must contain at least one digit"
+            )
+        return value
 
 
 class RegisterResponse(BaseModel):
-    message: str
+    """Response returned after a successful registration request."""
+
+    message: str = Field(
+        ...,
+        title="Response Message",
+        description="Human-readable confirmation message.",
+        examples=["Registration submitted. Waiting for admin approval."],
+    )
+
+
+class UserApprovalRequest(BaseModel):
+    """Request payload for approving a pending user."""
+
+    role_id: int = Field(
+        ...,
+        title="Role ID",
+        description="Numeric identifier of the role to assign.",
+        ge=1,
+        examples=[1],
+    )
 
 
 class UserApprovalResponse(BaseModel):
-    message: str
+    """Response returned after approving or deactivating a user."""
 
-class UserApprovalRequest(BaseModel):
-    role_id: int
+    message: str = Field(
+        ...,
+        title="Response Message",
+        description="Human-readable confirmation message.",
+        examples=["User approved successfully."],
+    )
+
 
 class PendingUserResponse(BaseModel):
-    id: int
-    full_name: str
-    email: EmailStr
-    status: str
+    """Summary of a pending user visible to admins."""
 
-    class Config:
-        from_attributes = True
+    id: int = Field(
+        ...,
+        title="User ID",
+        description="Unique numeric identifier of the user.",
+        examples=[1],
+    )
+    full_name: str = Field(
+        ...,
+        title="Full Name",
+        description="User's full display name.",
+        examples=["Juan Dela Cruz"],
+    )
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="User's email address.",
+        examples=["juan@example.com"],
+    )
+    status: str = Field(
+        ...,
+        title="Account Status",
+        description="Current account lifecycle status.",
+        examples=["pending"],
+    )
+
+    model_config = {"from_attributes": True}
+
 
 class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str
+    """Response containing a JWT access token after successful authentication."""
+
+    access_token: str = Field(
+        ...,
+        title="Access Token",
+        description="JWT access token for authenticated requests.",
+        examples=["eyJhbGciOiJIUzI1NiIs..."],
+    )
+    token_type: str = Field(
+        ...,
+        title="Token Type",
+        description="Type of the token (always 'bearer').",
+        examples=["bearer"],
+    )
+
 
 class CurrentUserResponse(BaseModel):
-    id: int
-    full_name: str
-    email: EmailStr
-    status: str
+    """Profile information for the currently authenticated user."""
 
-    class Config:
-        from_attributes = True
+    id: int = Field(
+        ...,
+        title="User ID",
+        description="Unique numeric identifier of the user.",
+        examples=[1],
+    )
+    full_name: str = Field(
+        ...,
+        title="Full Name",
+        description="User's full display name.",
+        examples=["Juan Dela Cruz"],
+    )
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="User's email address.",
+        examples=["juan@example.com"],
+    )
+    status: str = Field(
+        ...,
+        title="Account Status",
+        description="Current account lifecycle status.",
+        examples=["active"],
+    )
 
+    model_config = {"from_attributes": True}
