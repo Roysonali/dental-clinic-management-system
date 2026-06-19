@@ -20,12 +20,22 @@ def require_admin(
     """Require the current user to have the ``ROLE_ADMIN`` role."""
 
     if not current_user.role:
+        logger.warning(
+            "Forbidden access: user_id=%s has no role assigned",
+            current_user.id,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Role not assigned",
         )
 
     if current_user.role.name != ROLE_ADMIN:
+        logger.warning(
+            "Forbidden access: user_id=%s, role=%s, required=%s",
+            current_user.id,
+            current_user.role.name,
+            ROLE_ADMIN,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",

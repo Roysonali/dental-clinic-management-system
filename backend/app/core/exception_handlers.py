@@ -40,7 +40,7 @@ _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {
     PatientNotFound: status.HTTP_404_NOT_FOUND,
     DuplicatePatientDetected: status.HTTP_409_CONFLICT,
     InvalidPatientOperation: status.HTTP_400_BAD_REQUEST,
-    PatientValidationFailed: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    PatientValidationFailed: status.HTTP_422_UNPROCESSABLE_CONTENT,
     PatientCreationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
     PatientUpdateFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
@@ -100,7 +100,7 @@ async def validation_exception_handler(
     return _error_response(
         message="Request validation failed",
         details=errors,
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     )
 
 
