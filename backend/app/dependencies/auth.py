@@ -1,7 +1,7 @@
 import logging
 
+from jose import ExpiredSignatureError
 from jose import JWTError
-from jose import jwt
 
 from fastapi import Depends
 from fastapi import HTTPException
@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.security import decode_access_token
 from app.database.session import get_db
 from app.modules.auth.models import User
 from app.modules.auth.repository import get_user_by_email
@@ -50,11 +50,7 @@ def get_current_user(
     )
 
     try:
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET,
-            algorithms=[settings.JWT_ALGORITHM],
-        )
+        payload = decode_access_token(token)
 
         email: str | None = payload.get("sub")
 
@@ -65,9 +61,16 @@ def get_current_user(
             )
             raise credentials_exception
 
+    except ExpiredSignatureError:
+        logger.warning(
+            "JWT expired: token_prefix=%s...",
+            token[:10],
+        )
+        raise credentials_exception
+
     except JWTError:
         logger.warning(
-            "JWT decode failed: token_prefix=%s...",
+            "JWT decode failed (malformed/invalid): token_prefix=%s...",
             token[:10],
         )
         raise credentials_exception
