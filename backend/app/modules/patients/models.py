@@ -1,4 +1,5 @@
 import uuid
+
 from sqlalchemy import (
     Column,
     String,
@@ -9,7 +10,8 @@ from sqlalchemy import (
     Index,
     Enum,
     Text,
-    Integer
+    Integer,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -20,6 +22,13 @@ from app.core.constants import GenderEnum
 
 
 class Patient(Base):
+    """
+    Represents a dental patient in the clinic management system.
+
+    Stores demographic information, contact details, and audit
+    metadata. Patient records are soft-deleted via is_active flag.
+    """
+
     __tablename__ = "patients"
 
     id = Column(
@@ -121,29 +130,43 @@ class Patient(Base):
     )
 
     __table_args__ = (
-        Index(
-            "ix_patients_patient_code",
-            "patient_code",
-        ),
+        # patient_code has unique=True, which already creates a unique index.
+        # An explicit Index would be redundant — omitted intentionally.
 
         Index(
             "ix_patients_phone",
             "primary_contact_number",
         ),
 
+        # Partial index: only index non-null emails.
+        # Saves space and write overhead since null-email lookups never occur.
         Index(
             "ix_patients_email",
             "email",
+            postgresql_where=text("email IS NOT NULL"),
         ),
 
+        # Descending index to match ORDER BY created_at DESC in list queries.
+        # Allows PostgreSQL to read the index in the correct order without
+        # performing a backward scan.
         Index(
             "ix_patients_created_at",
-            "created_at",
+            created_at.desc(),
         ),
 
+        # Composite index for name-based lookups (duplicate detection, search).
+        # The leftmost prefix also covers last_name-only queries.
         Index(
             "ix_patients_name",
             "last_name",
             "first_name",
         ),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Patient(id={self.id}, "
+            f"code={self.patient_code}, "
+            f"name={self.first_name} {self.last_name}, "
+            f"active={self.is_active})>"
+        )

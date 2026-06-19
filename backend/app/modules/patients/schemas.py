@@ -13,9 +13,11 @@ from app.core.constants import GenderEnum
 
 
 class PatientBase(BaseModel):
+    """Base schema with shared fields and normalization logic for patient operations."""
+
     model_config = ConfigDict(
         extra="forbid"
-)
+    )
 
     first_name: str = Field(
         min_length=2,
@@ -69,44 +71,39 @@ class PatientBase(BaseModel):
     )
     @classmethod
     def normalize_names(cls, value):
-
         if value is None:
             return value
 
         value = value.strip()
+        # Allow alphabetic characters, spaces, hyphens, and apostrophes
         allowed = {" ", "-", "'"}
         if value and not all(
-            c.isalpha() or c.isspace()
+            c.isalpha() or c in allowed
             for c in value
         ):
             raise ValueError(
-                "Name should contain only alphabets."
+                "Name should contain only alphabetic characters, spaces, hyphens, and apostrophes."
             )
 
         return value
-        
 
     @field_validator(
         "date_of_birth"
     )
     @classmethod
     def validate_dob(cls, value):
-
         today = date.today()
 
         if value > today:
-
             raise ValueError(
                 "date_of_birth cannot be in future"
             )
         if value.year < 1900:
-
             raise ValueError(
                 "Invalid date of birth."
             )
 
         return value
-    
 
     @field_validator(
         "address",
@@ -118,12 +115,11 @@ class PatientBase(BaseModel):
         cls,
         value,
     ):
-
         if value is None:
             return value
 
         return value.strip()
-    
+
     @field_validator(
         "email",
         mode="before",
@@ -133,12 +129,11 @@ class PatientBase(BaseModel):
         cls,
         value,
     ):
-
         if value is None:
             return value
 
         return value.strip().lower()
-    
+
     @field_validator(
         "primary_contact_number",
         "emergency_contact_number",
@@ -163,15 +158,19 @@ class PatientBase(BaseModel):
 class PatientCreate(
     PatientBase
 ):
+    """Schema for creating a new patient. Inherits all validations from PatientBase."""
     pass
 
 
 class PatientUpdate(
     BaseModel
 ):
+    """Schema for updating an existing patient. All fields are optional for partial updates."""
+
     model_config = ConfigDict(
         extra="forbid"
-)
+    )
+
     first_name: Optional[str] = Field(
         default=None,
         min_length=2,
@@ -220,6 +219,7 @@ class PatientUpdate(
         default=None,
         max_length=1000,
     )
+
     @field_validator(
         "date_of_birth"
     )
@@ -229,7 +229,7 @@ class PatientUpdate(
         value,
     ):
         today = date.today()
-        
+
         if value:
 
             if value > today:
@@ -242,9 +242,7 @@ class PatientUpdate(
                     "Invalid date of birth."
                 )
 
-
         return value
-    
 
     @field_validator(
         "first_name",
@@ -254,22 +252,20 @@ class PatientUpdate(
     )
     @classmethod
     def normalize_names(cls, value):
-
         if value is None:
             return value
 
         value = value.strip()
         allowed = {" ", "-", "'"}
         if value and not all(
-            c.isalpha() or c.isspace()
+            c.isalpha() or c in allowed
             for c in value
         ):
             raise ValueError(
-                "Name should contain only alphabets."
+                "Name should contain only alphabetic characters, spaces, hyphens, and apostrophes."
             )
 
         return value
-    
 
     @field_validator(
         "address",
@@ -281,12 +277,11 @@ class PatientUpdate(
         cls,
         value,
     ):
-
         if value is None:
             return value
 
         return value.strip()
-    
+
     @field_validator(
         "email",
         mode="before",
@@ -296,12 +291,11 @@ class PatientUpdate(
         cls,
         value,
     ):
-
         if value is None:
             return value
 
         return value.strip().lower()
-    
+
     @field_validator(
         "primary_contact_number",
         "emergency_contact_number",
@@ -326,6 +320,7 @@ class PatientUpdate(
 class PatientResponse(
     BaseModel
 ):
+    """Complete patient details returned in single-patient API responses."""
 
     model_config = ConfigDict(
         from_attributes=True
@@ -369,6 +364,11 @@ class PatientResponse(
 class PatientListItem(
     BaseModel
 ):
+    """Lightweight patient summary for list views."""
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     id: str
 
@@ -388,6 +388,11 @@ class PatientListItem(
 class PatientListResponse(
     BaseModel
 ):
+    """Paginated list of patient summaries with metadata."""
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     items: list[
         PatientListItem
@@ -403,16 +408,21 @@ class PatientListResponse(
 class PatientProfileResponse(
     PatientResponse
 ):
+    """Full patient profile. Extends PatientResponse for future profile-specific fields."""
     pass
 
 
 class PatientStatusResponse(
     BaseModel
 ):
+    """Response returned after activating or deactivating a patient."""
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     id: str
 
     is_active: bool
 
     message: str
-

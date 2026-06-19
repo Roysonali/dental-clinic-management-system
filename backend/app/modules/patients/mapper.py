@@ -19,6 +19,7 @@ class PatientMapper:
     def build_full_name(
         patient: Patient,
     ) -> str:
+        """Construct a patient's full name from first, middle, and last names."""
 
         parts = filter(None, [
 
@@ -30,21 +31,18 @@ class PatientMapper:
         ])
 
         return " ".join(
-            [
-                p.strip()
-                for p in parts
-                if p
-            ]
+            parts
         )
 
     @staticmethod
     def calculate_age(
         dob: date | None,
-    ) -> int |None:
+    ) -> int | None:
+        """Calculate age from date of birth. Returns None if DOB is None."""
 
         if dob is None:
             return None
-        
+
         today = date.today()
 
         age = (

@@ -239,8 +239,6 @@ class PatientService:
 
             self.db.commit()
 
-            response = PatientMapper.to_response(patient)
-
             return PatientMapper.to_response(patient)
 
         except DuplicatePatientDetected:
@@ -250,11 +248,6 @@ class PatientService:
         except Exception as e:
 
             self.db.rollback()
-
-            print(
-                "PATIENT CREATE ERROR:",
-                repr(e)
-            )
 
             raise PatientCreationFailed(
                 details=str(e)
@@ -396,13 +389,6 @@ class PatientService:
             )
 
             self.db.commit()
-
-            response = (
-             PatientMapper
-                .to_response(
-                    patient
-                )
-            )
 
             return PatientMapper.to_response(patient)
     

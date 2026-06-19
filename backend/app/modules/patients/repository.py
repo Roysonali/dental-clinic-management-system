@@ -1,7 +1,9 @@
+from datetime import date
 from uuid import UUID
 from typing import Optional
 
 from sqlalchemy import (
+    false as sql_false,
     func,
     or_,
     select,
@@ -13,6 +15,12 @@ from app.modules.patients.models import Patient
 
 
 class PatientRepository:
+    """
+    Data access layer for Patient entities.
+
+    Encapsulates all SQLAlchemy query logic and exposes
+    clean method signatures for the service layer to consume.
+    """
 
     def __init__(
         self,
@@ -24,6 +32,7 @@ class PatientRepository:
         self,
         patient: Patient,
     ) -> Patient:
+        """Persist a new patient record and return the refreshed instance."""
 
         self.db.add(
             patient
@@ -43,6 +52,7 @@ class PatientRepository:
         self,
         patient_id: UUID,
     ) -> Optional[Patient]:
+        """Retrieve a single patient by UUID primary key."""
 
         stmt = (
             select(
@@ -67,6 +77,7 @@ class PatientRepository:
         self,
         patient_code: str,
     ) -> Optional[Patient]:
+        """Retrieve a single patient by their unique patient code (e.g. PAT-000001)."""
 
         stmt = (
             select(
@@ -96,8 +107,17 @@ class PatientRepository:
         is_active: Optional[
             bool
         ] = None,
-    ):
+    ) -> tuple[list[Patient], int]:
+        """
+        Retrieve a paginated, filterable list of patients.
 
+        Supports:
+        - Full-text search across code, name, and phone
+        - Active/inactive status filtering
+        - Cursorless pagination via offset/limit
+
+        Returns a tuple of (items, total_count).
+        """
         stmt = select(
             Patient
         )
@@ -210,6 +230,7 @@ class PatientRepository:
         patient: Patient,
         updates: dict,
     ) -> Patient:
+        """Apply field-level updates to a patient record and return the refreshed instance."""
 
         for (
             field,
@@ -237,6 +258,7 @@ class PatientRepository:
         patient: Patient,
         status: bool,
     ) -> Patient:
+        """Toggle a patient's is_active flag and return the refreshed instance."""
 
         patient.is_active = (
             status
@@ -255,19 +277,26 @@ class PatientRepository:
         self,
         first_name: str,
         last_name: str,
-        date_of_birth,
+        date_of_birth: date,
         phone: str,
         email: Optional[str] = None,
     ) -> Optional[Patient]:
         """
-        Returns a patient only when ALL important identifying
-        fields match.
+        Detect an exact duplicate patient.
 
-        Exact Duplicate Rule:
-        Name + DOB + Phone
+        An exact match requires:
+            Name + DOB + Phone
         OR
-        Name + DOB + Email
+            Name + DOB + Email (when email is provided)
+
+        Returns the matched patient or None.
         """
+
+        email_condition = (
+            Patient.email == email
+            if email
+            else sql_false()
+        )
 
         stmt = (
             select(Patient)
@@ -277,7 +306,7 @@ class PatientRepository:
                 Patient.date_of_birth == date_of_birth,
                 or_(
                     Patient.primary_contact_number == phone,
-                    Patient.email == email if email else False,
+                    email_condition,
                 ),
             )
         )
@@ -289,13 +318,19 @@ class PatientRepository:
     
     def find_exact_duplicate_for_update(
         self,
-        patient_id,
+        patient_id: UUID,
         first_name: str,
         last_name: str,
-        date_of_birth,
+        date_of_birth: date,
         phone: str,
-        email: str | None,
-    ):
+        email: Optional[str] = None,
+    ) -> Optional[Patient]:
+        """
+        Detect an exact duplicate excluding the current patient.
+
+        Used during update to avoid flagging the patient being updated.
+        Matches on Name + DOB + Phone (+ email if provided).
+        """
 
         stmt = (
             select(Patient)
@@ -322,10 +357,11 @@ class PatientRepository:
     def find_by_phone(
         self,
         phone: str,
-    ):
+    ) -> list[Patient]:
         """
-        Returns all patients having the same phone number.
-        Used only for warnings.
+        Find all patients sharing the given phone number.
+
+        Used for warning-level duplicate detection (non-blocking).
         """
 
         stmt = (
@@ -343,9 +379,14 @@ class PatientRepository:
     
     def find_by_phone_for_update(
         self,
-        patient_id,
+        patient_id: UUID,
         phone: str,
-    ):
+    ) -> Optional[Patient]:
+        """
+        Find the first patient (excluding current) sharing the given phone.
+
+        Used for warning-level duplicate detection during updates.
+        """
 
         stmt = (
             select(Patient)
@@ -357,17 +398,19 @@ class PatientRepository:
 
         return (
             self.db.execute(stmt)
-            .scalar_one_or_none()
+            .scalars()
+            .first()
         )
 
 
     def find_by_email(
         self,
         email: str,
-    ):
+    ) -> list[Patient]:
         """
-        Returns all patients having the same email.
-        Used only for warnings.
+        Find all patients sharing the given email address.
+
+        Used for warning-level duplicate detection (non-blocking).
         """
 
         stmt = (
@@ -385,9 +428,14 @@ class PatientRepository:
 
     def find_by_email_for_update(
         self,
-        patient_id,
+        patient_id: UUID,
         email: str,
-    ):
+    ) -> Optional[Patient]:
+        """
+        Find the first patient (excluding current) sharing the given email.
+
+        Used for warning-level duplicate detection during updates.
+        """
 
         stmt = (
             select(Patient)
@@ -399,18 +447,20 @@ class PatientRepository:
 
         return (
             self.db.execute(stmt)
-            .scalar_one_or_none()
+            .scalars()
+            .first()
         )
 
     def find_by_name_dob(
         self,
         first_name: str,
         last_name: str,
-        date_of_birth,
-    ):
+        date_of_birth: date,
+    ) -> list[Patient]:
         """
-        Returns patients with same name and DOB.
-        Used only for warnings.
+        Find all patients with the same name and date of birth.
+
+        Used for warning-level duplicate detection (non-blocking).
         """
 
         stmt = (
@@ -430,11 +480,16 @@ class PatientRepository:
 
     def find_by_name_dob_for_update(
         self,
-        patient_id,
-        first_name,
-        last_name,
-        dob,
-    ):
+        patient_id: UUID,
+        first_name: str,
+        last_name: str,
+        date_of_birth: date,
+    ) -> Optional[Patient]:
+        """
+        Find the first patient (excluding current) with the same name and DOB.
+
+        Used for warning-level duplicate detection during updates.
+        """
 
         stmt = (
             select(Patient)
@@ -442,19 +497,25 @@ class PatientRepository:
                 Patient.id != patient_id,
                 Patient.first_name == first_name,
                 Patient.last_name == last_name,
-                Patient.date_of_birth == dob,
+                Patient.date_of_birth == date_of_birth,
             )
         )
 
         return (
             self.db.execute(stmt)
-            .scalar_one_or_none()
+            .scalars()
+            .first()
         )
     
 
     def get_next_patient_sequence(
         self,
     ) -> int:
+        """
+        Retrieve the next value from the patient_code_seq PostgreSQL sequence.
+
+        Returns the raw integer used to format patient codes (e.g. PAT-000001).
+        """
 
         stmt = text(
             """
