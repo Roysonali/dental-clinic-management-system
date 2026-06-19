@@ -4,6 +4,9 @@ from fastapi import HTTPException
 from fastapi import status
 from sqlalchemy.orm import Session
 
+from app.core.constants import USER_STATUS_ACTIVE
+from app.core.constants import USER_STATUS_INACTIVE
+from app.core.constants import USER_STATUS_PENDING
 from app.core.security import create_access_token
 from app.core.security import hash_password
 from app.core.security import verify_password
@@ -38,37 +41,52 @@ def register_user(
     Raises:
         HTTPException 409: If the email is already registered.
     """
-    existing_user = get_user_by_email(db, user_data.email)
+    try:
+        existing_user = get_user_by_email(db, user_data.email)
 
-    if existing_user:
-        logger.warning(
-            "Duplicate registration attempt: email=%s",
+        if existing_user:
+            logger.warning(
+                "Duplicate registration attempt: email=%s",
+                user_data.email,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+
+        hashed_password = hash_password(user_data.password)
+
+        user = User(
+            full_name=user_data.full_name,
+            email=user_data.email,
+            password_hash=hashed_password,
+            status=USER_STATUS_PENDING,
+            is_active=False,
+        )
+
+        created_user = create_user(db, user)
+
+        logger.info(
+            "User registered: id=%s, email=%s",
+            created_user.id,
+            created_user.email,
+        )
+
+        return created_user
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during user registration: email=%s",
             user_data.email,
         )
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed. Please try again later.",
         )
-
-    hashed_password = hash_password(user_data.password)
-
-    user = User(
-        full_name=user_data.full_name,
-        email=user_data.email,
-        password_hash=hashed_password,
-        status="pending",
-        is_active=False,
-    )
-
-    created_user = create_user(db, user)
-
-    logger.info(
-        "User registered: id=%s, email=%s",
-        created_user.id,
-        created_user.email,
-    )
-
-    return created_user
 
 
 def fetch_pending_users(
@@ -104,55 +122,71 @@ def approve_user(
         HTTPException 404: If the user or role is not found.
         HTTPException 400: If the user is already active.
     """
-    user = get_user_by_id(db, user_id)
+    try:
+        user = get_user_by_id(db, user_id)
 
-    if not user:
-        logger.warning(
-            "User not found for approval: user_id=%s",
+        if not user:
+            logger.warning(
+                "User not found for approval: user_id=%s",
+                user_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        if user.is_active:
+            logger.warning(
+                "User already active: user_id=%s, status=%s",
+                user_id,
+                user.status,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is already active",
+            )
+
+        role = get_role_by_id(db, role_id)
+
+        if not role:
+            logger.warning(
+                "Role not found for approval: role_id=%s",
+                role_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found",
+            )
+
+        user.role_id = role.id
+        user.status = USER_STATUS_ACTIVE
+        user.is_active = True
+
+        db.commit()
+        db.refresh(user)
+
+        logger.info(
+            "User approved: id=%s, role=%s",
+            user.id,
+            role.name,
+        )
+
+        return user
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during user approval: user_id=%s, role_id=%s",
             user_id,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    if user.is_active:
-        logger.warning(
-            "User already active: user_id=%s, status=%s",
-            user_id,
-            user.status,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is already active",
-        )
-
-    role = get_role_by_id(db, role_id)
-
-    if not role:
-        logger.warning(
-            "Role not found for approval: role_id=%s",
             role_id,
         )
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Approval failed. Please try again later.",
         )
-
-    user.role_id = role.id
-    user.status = "active"
-    user.is_active = True
-
-    db.commit()
-    db.refresh(user)
-
-    logger.info(
-        "User approved: id=%s, role=%s",
-        user.id,
-        role.name,
-    )
-
-    return user
 
 
 def deactivate_user(
@@ -172,40 +206,55 @@ def deactivate_user(
         HTTPException 404: If the user is not found.
         HTTPException 400: If the user is already inactive.
     """
-    user = get_user_by_id(db, user_id)
+    try:
+        user = get_user_by_id(db, user_id)
 
-    if not user:
-        logger.warning(
-            "User not found for deactivation: user_id=%s",
+        if not user:
+            logger.warning(
+                "User not found for deactivation: user_id=%s",
+                user_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        if user.status == USER_STATUS_INACTIVE:
+            logger.warning(
+                "User already inactive: user_id=%s",
+                user_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is already inactive",
+            )
+
+        user.status = USER_STATUS_INACTIVE
+        user.is_active = False
+
+        db.commit()
+        db.refresh(user)
+
+        logger.info(
+            "User deactivated: id=%s",
+            user.id,
+        )
+
+        return user
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during user deactivation: user_id=%s",
             user_id,
         )
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Deactivation failed. Please try again later.",
         )
-
-    if user.status == "inactive":
-        logger.warning(
-            "User already inactive: user_id=%s",
-            user_id,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is already inactive",
-        )
-
-    user.status = "inactive"
-    user.is_active = False
-
-    db.commit()
-    db.refresh(user)
-
-    logger.info(
-        "User deactivated: id=%s",
-        user.id,
-    )
-
-    return user
 
 
 def authenticate_user(
@@ -215,11 +264,12 @@ def authenticate_user(
 ) -> str:
     """Authenticate a user by email and password.
 
-    Validates credentials and returns a signed JWT access token.
+    Normalizes the email to lowercase so that login is case-insensitive,
+    then validates credentials. Returns a signed JWT access token on success.
 
     Args:
         db: Active database session.
-        email: User's email address.
+        email: User's email address (case-insensitive).
         password: Raw (unhashed) password.
 
     Returns:
@@ -227,14 +277,16 @@ def authenticate_user(
 
     Raises:
         HTTPException 401: If credentials are invalid.
-        HTTPException 403: If the account is inactive / not activated.
+        HTTPException 403: If the account is inactive.
     """
-    user = get_user_by_email(db, email)
+    normalized_email = email.strip().lower()
+
+    user = get_user_by_email(db, normalized_email)
 
     if not user:
         logger.warning(
             "Login attempt for unknown email: %s",
-            email,
+            normalized_email,
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -244,7 +296,7 @@ def authenticate_user(
     if not verify_password(password, user.password_hash):
         logger.warning(
             "Failed login (bad password): email=%s",
-            email,
+            normalized_email,
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -254,7 +306,7 @@ def authenticate_user(
     if not user.is_active:
         logger.warning(
             "Login attempt on inactive account: email=%s, status=%s",
-            email,
+            normalized_email,
             user.status,
         )
         raise HTTPException(
@@ -266,7 +318,7 @@ def authenticate_user(
 
     logger.info(
         "User authenticated: email=%s",
-        email,
+        normalized_email,
     )
 
     return access_token
