@@ -78,26 +78,6 @@ class DuplicatePatientDetected(
         )
 
 
-
-class PatientInactive(
-    PatientException
-):
-
-    def __init__(
-        self,
-    ):
-
-        super().__init__(
-
-            code="PATIENT_INACTIVE",
-
-            message=(
-                "Patient is inactive"
-            ),
-        )
-
-
-
 class PatientValidationFailed(
     PatientException
 ):

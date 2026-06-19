@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Sequence
 
 from app.modules.patients.models import Patient
 from app.modules.patients.schemas import (
@@ -10,6 +11,12 @@ from app.modules.patients.schemas import (
 
 
 class PatientMapper:
+    """Maps Patient ORM instances to Pydantic response schemas.
+
+    Keeps serialization logic isolated from both the domain layer
+    (models) and the presentation layer (schemas), providing a
+    single place to control how data is transformed for API output.
+    """
 
     # ==========================================
     # Utilities
@@ -22,17 +29,12 @@ class PatientMapper:
         """Construct a patient's full name from first, middle, and last names."""
 
         parts = filter(None, [
-
             patient.first_name,
-
             patient.middle_name,
-
             patient.last_name,
         ])
 
-        return " ".join(
-            parts
-        )
+        return " ".join(parts)
 
     @staticmethod
     def calculate_age(
@@ -57,7 +59,6 @@ class PatientMapper:
             dob.month,
             dob.day,
         ):
-
             age -= 1
 
         return age
@@ -71,10 +72,11 @@ class PatientMapper:
         cls,
         patient: Patient,
     ) -> PatientResponse:
+        """Map a Patient ORM instance to a full PatientResponse schema."""
 
         return PatientResponse(
 
-            id = str( patient.id),
+            id=str(patient.id),
 
             patient_code=patient.patient_code,
 
@@ -88,7 +90,7 @@ class PatientMapper:
                 patient.date_of_birth
             ),
 
-           gender=(
+            gender=(
                 patient.gender.value
                 if patient.gender
                 else None
@@ -124,10 +126,11 @@ class PatientMapper:
         cls,
         patient: Patient,
     ) -> PatientListItem:
+        """Map a Patient ORM instance to a lightweight PatientListItem schema."""
 
         return PatientListItem(
 
-            id = str( patient.id),
+            id=str(patient.id),
 
             patient_code=patient.patient_code,
 
@@ -159,20 +162,19 @@ class PatientMapper:
     @classmethod
     def to_list_response(
         cls,
-        patients,
+        patients: Sequence[Patient],
         total: int,
         page: int,
         page_size: int,
     ) -> PatientListResponse:
+        """Map a list of Patient ORM instances to a paginated list response."""
 
         return PatientListResponse(
 
             items=[
-
                 cls.to_list_item(
                     patient
                 )
-
                 for patient
                 in patients
             ],
@@ -193,6 +195,7 @@ class PatientMapper:
         cls,
         patient: Patient,
     ) -> PatientProfileResponse:
+        """Map a Patient ORM instance to a full patient profile response."""
 
         return PatientProfileResponse(
             **cls.to_response(

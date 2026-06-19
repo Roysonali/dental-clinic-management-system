@@ -552,18 +552,3 @@ class PatientProfileResponse(
     """Full patient profile. Extends PatientResponse for future profile-specific fields."""
     pass
 
-
-class PatientStatusResponse(
-    BaseModel
-):
-    """Response returned after activating or deactivating a patient."""
-
-    model_config = ConfigDict(
-        from_attributes=True
-    )
-
-    id: str
-
-    is_active: bool
-
-    message: str

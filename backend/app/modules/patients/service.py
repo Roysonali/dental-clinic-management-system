@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -20,6 +21,9 @@ from app.modules.patients.exceptions import (
     PatientNotFound,
     PatientUpdateFailed,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class PatientService:
@@ -109,6 +113,13 @@ class PatientService:
 
         if exact_duplicate:
 
+            logger.warning(
+                "Exact duplicate blocked: code=%s, name=%s %s",
+                exact_duplicate.patient_code,
+                exact_duplicate.first_name,
+                exact_duplicate.last_name,
+            )
+
             raise DuplicatePatientDetected(
                 details={
                     "patient_code": exact_duplicate.patient_code,
@@ -128,6 +139,11 @@ class PatientService:
                 "Primary contact number already exists."
             )
 
+            logger.info(
+                "Duplicate phone warning: number=%s",
+                payload.primary_contact_number,
+            )
+
         # --------------------------------------------------
         # Email warning
         # --------------------------------------------------
@@ -138,6 +154,11 @@ class PatientService:
 
                 warnings.append(
                     "Email address already exists."
+                )
+
+                logger.info(
+                    "Duplicate email warning: email=%s",
+                    email,
                 )
 
         # --------------------------------------------------
@@ -152,6 +173,13 @@ class PatientService:
 
             warnings.append(
                 "Patient with same name and date of birth already exists."
+            )
+
+            logger.info(
+                "Duplicate name+DOB warning: name=%s %s, dob=%s",
+                first_name,
+                last_name,
+                payload.date_of_birth,
             )
 
         return warnings
@@ -239,15 +267,29 @@ class PatientService:
 
             self.db.commit()
 
+            logger.info(
+                "Patient created: code=%s, id=%s",
+                patient.patient_code,
+                patient.id,
+            )
+
             return PatientMapper.to_response(patient)
 
         except DuplicatePatientDetected:
             self.db.rollback()
+            logger.info(
+                "Patient creation blocked by duplicate detection.",
+            )
             raise
 
         except Exception as e:
 
             self.db.rollback()
+
+            logger.exception(
+                "Patient creation failed: %s",
+                str(e),
+            )
 
             raise PatientCreationFailed(
                 details=str(e)
@@ -269,6 +311,11 @@ class PatientService:
         )
 
         if not patient:
+
+            logger.warning(
+                "Patient not found: id=%s",
+                patient_id,
+            )
 
             raise (
                 PatientNotFound()
@@ -390,19 +437,39 @@ class PatientService:
 
             self.db.commit()
 
+            logger.info(
+                "Patient updated: id=%s, fields=%s",
+                patient.id,
+                list(updates.keys()),
+            )
+
             return PatientMapper.to_response(patient)
     
         except PatientNotFound:
             self.db.rollback()
+            logger.warning(
+                "Patient update failed - not found: id=%s",
+                patient_id,
+            )
             raise
 
         except DuplicatePatientDetected:
             self.db.rollback()
+            logger.info(
+                "Patient update blocked by duplicate detection: id=%s",
+                patient_id,
+            )
             raise
 
         except Exception as e:
 
             self.db.rollback()
+
+            logger.exception(
+                "Patient update failed: id=%s, error=%s",
+                patient_id,
+                str(e),
+            )
 
             raise PatientUpdateFailed(
             details=str(e)
@@ -430,6 +497,12 @@ class PatientService:
 
         if patient.is_active == active:
 
+            logger.warning(
+                "Status change skipped - already %s: id=%s",
+                "active" if active else "inactive",
+                patient_id,
+            )
+
             raise (
                 InvalidPatientOperation(
                     details=(
@@ -447,6 +520,13 @@ class PatientService:
         )
 
         self.db.commit()
+
+        logger.info(
+            "Patient status changed to %s: id=%s, code=%s",
+            "active" if active else "inactive",
+            patient.id,
+            patient.patient_code,
+        )
 
         return (
             PatientMapper
@@ -469,6 +549,11 @@ class PatientService:
         )
 
         if not patient:
+
+            logger.warning(
+                "Patient profile requested but not found: id=%s",
+                patient_id,
+            )
 
             raise (
                 PatientNotFound()
@@ -531,6 +616,12 @@ class PatientService:
 
         if exact:
 
+            logger.warning(
+                "Exact duplicate blocked during update: id=%s, matched_code=%s",
+                patient.id,
+                exact.patient_code,
+            )
+
             raise DuplicatePatientDetected(
                 details={
                     "patient_code": exact.patient_code,
@@ -547,6 +638,12 @@ class PatientService:
                 "Primary contact number already exists."
             )
 
+            logger.info(
+                "Update phone warning: patient_id=%s, phone=%s",
+                patient.id,
+                phone,
+            )
+
         if email:
 
             if self.repository.find_by_email_for_update(
@@ -557,6 +654,12 @@ class PatientService:
                     "Email address already exists."
                 )
 
+                logger.info(
+                    "Update email warning: patient_id=%s, email=%s",
+                    patient.id,
+                    email,
+                )
+
         if self.repository.find_by_name_dob_for_update(
             patient.id,
             first_name,
@@ -565,6 +668,11 @@ class PatientService:
         ):
             warnings.append(
                 "Patient with same name and date of birth already exists."
+            )
+
+            logger.info(
+                "Update name+DOB warning: patient_id=%s",
+                patient.id,
             )
 
         return warnings
