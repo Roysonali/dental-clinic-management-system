@@ -1,3 +1,5 @@
+from enum import Enum
+
 ROLE_ADMIN = "Administrative Officer"
 ROLE_CHIEF_DOCTOR = "Chief Doctor"
 ROLE_GENERAL_DOCTOR = "General Doctor"
@@ -12,3 +14,8 @@ USER_STATUS_PENDING = "pending"
 USER_STATUS_ACTIVE = "active"
 
 USER_STATUS_INACTIVE = "inactive"
+
+class GenderEnum(str, Enum):
+    male = "male"
+    female = "female"
+    other = "other"

@@ -5,6 +5,14 @@ from app.modules.users.routes import (
     router as users_router
 )
 
+from app.modules.patients.routes import (
+    router as patient_router,
+)
+
+from app.core.exception_handlers import (
+    register_exception_handlers,
+)
+
 app = FastAPI(
     title="DensCare API",
     version="1.0.0"
@@ -12,6 +20,10 @@ app = FastAPI(
 
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router( patient_router)
+
+# Register global exception handlers
+register_exception_handlers(app)
 
 # CORS configuration
 app.add_middleware(
