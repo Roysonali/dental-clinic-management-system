@@ -1,6 +1,9 @@
 # app/modules/appointments/model.py
 
+import uuid
+
 from sqlalchemy import (
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -11,10 +14,11 @@ from sqlalchemy import (
     String,
     Text,
     Time,
-    func,
 )
 
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.database.base import Base
 
@@ -26,34 +30,41 @@ from app.modules.appointments.enums import (
 
 class Appointment(Base):
     """
-    Appointment entity.
+    Represents a dental appointment.
 
-    Stores scheduling information only.
-    Business validation belongs elsewhere.
+    This model stores scheduling information only.
+
+    Business rules such as:
+    - working hour validation
+    - overlap detection
+    - active patient checks
+    - active dentist checks
+    - status transitions
+
+    are intentionally implemented outside the model.
     """
 
     __tablename__ = "appointments"
 
     id = Column(
-        Integer,
+        UUID(as_uuid=True),
         primary_key=True,
-        index=True,
+        default=uuid.uuid4,
     )
 
     appointment_number = Column(
-        String(30),
+        String(20),
         nullable=False,
         unique=True,
     )
 
     patient_id = Column(
-        Integer,
+        UUID(as_uuid=True),
         ForeignKey(
             "patients.id",
             ondelete="RESTRICT",
         ),
         nullable=False,
-        index=True,
     )
 
     dentist_id = Column(
@@ -63,13 +74,11 @@ class Appointment(Base):
             ondelete="RESTRICT",
         ),
         nullable=False,
-        index=True,
     )
 
     appointment_date = Column(
         Date,
         nullable=False,
-        index=True,
     )
 
     start_time = Column(
@@ -101,7 +110,7 @@ class Appointment(Base):
             name="appointment_status_enum",
         ),
         nullable=False,
-        default=AppointmentStatus.SCHEDULED,
+        server_default=AppointmentStatus.SCHEDULED.value,
     )
 
     reason_for_visit = Column(
@@ -118,16 +127,16 @@ class Appointment(Base):
         Integer,
         ForeignKey(
             "users.id",
-            ondelete="RESTRICT",
+            ondelete="SET NULL",
         ),
-        nullable=False,
+        nullable=True,
     )
 
     updated_by = Column(
         Integer,
         ForeignKey(
             "users.id",
-            ondelete="RESTRICT",
+            ondelete="SET NULL",
         ),
         nullable=True,
     )
@@ -147,34 +156,50 @@ class Appointment(Base):
 
     patient = relationship(
         "Patient",
-        back_populates="appointments",
+        passive_deletes=True,
     )
 
     dentist = relationship(
         "User",
         foreign_keys=[dentist_id],
-    )
-
-    creator = relationship(
-        "User",
-        foreign_keys=[created_by],
-    )
-
-    updater = relationship(
-        "User",
-        foreign_keys=[updated_by],
+        passive_deletes=True,
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "duration_minutes > 0",
+            name="ck_appointments_duration_positive",
+        ),
+
         Index(
-            "idx_appointment_schedule",
+            "ix_appointments_date",
+            "appointment_date",
+        ),
+
+        Index(
+            "ix_appointments_dentist_schedule",
             "dentist_id",
             "appointment_date",
             "start_time",
         ),
+
         Index(
-            "idx_patient_schedule",
+            "ix_appointments_patient_schedule",
             "patient_id",
             "appointment_date",
         ),
+
+        Index(
+            "ix_appointments_status",
+            "status",
+        ),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Appointment("
+            f"id={self.id}, "
+            f"number={self.appointment_number}, "
+            f"status={self.status}"
+            f")>"
+        )
