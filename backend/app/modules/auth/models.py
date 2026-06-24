@@ -114,6 +114,12 @@ class User(Base):
         passive_deletes=True,
     )
 
+    last_login_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="Timestamp (UTC) of the most recent successful login. Null until first login.",
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

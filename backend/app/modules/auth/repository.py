@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import logging
 
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.orm import Load
 from sqlalchemy.orm import Session
-from sqlalchemy.orm import selectinload
 
 from app.modules.auth.models import Role
 from app.modules.auth.models import User
@@ -17,7 +19,12 @@ def create_user(
     db: Session,
     user: User,
 ) -> User:
-    """Persist a new user record and return the refreshed ORM instance.
+    """Stage a new user record and return the refreshed instance.
+
+    .. note::
+
+        This method flushes but does **not** commit the transaction.
+        The caller (service layer) owns the commit lifecycle.
 
     Args:
         db: Active database session.
@@ -27,7 +34,7 @@ def create_user(
         The persisted User with an assigned id.
     """
     db.add(user)
-    db.commit()
+    db.flush()
     db.refresh(user)
 
     logger.info(
@@ -42,24 +49,42 @@ def create_user(
 def get_user_by_email(
     db: Session,
     email: str,
+    *,
+    load_options: Optional[list[Load]] = None,
 ) -> Optional[User]:
     """Look up a user by their email address.
 
-    Eager-loads the ``role`` relationship to avoid an N+1 query
-    when the caller accesses ``user.role`` (e.g. RBAC dependencies).
+    By default this is a simple equality lookup with **no** eager
+    loading. Callers that need the ``role`` relationship (or other
+    relationships) should pass the relevant loader strategies via
+    the ``load_options`` keyword argument.
+
+    Example::
+
+        from sqlalchemy.orm import selectinload
+
+        user = get_user_by_email(
+            db,
+            email,
+            load_options=[selectinload(User.role)],
+        )
 
     Args:
         db: Active database session.
         email: The email to search for (case-sensitive).
+        load_options: Optional list of SQLAlchemy loader options
+            (e.g. ``selectinload()``, ``joinedload()``) to apply.
 
     Returns:
-        The matching User (with role loaded), or None if not found.
+        The matching User, or None if not found.
     """
     stmt = (
         select(User)
-        .options(selectinload(User.role))
         .where(User.email == email)
     )
+
+    if load_options:
+        stmt = stmt.options(*load_options)
 
     return (
         db.execute(stmt)

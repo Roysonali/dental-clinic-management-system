@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
-from app.modules.auth.dependencies import require_admin
+from app.modules.rbac.permissions import require_admin
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     CurrentUserResponse,

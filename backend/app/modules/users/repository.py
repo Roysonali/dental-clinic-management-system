@@ -83,10 +83,24 @@ def update_user_role(
     user: User,
     role_id: int
 ):
+    """Update a user's role and return the refreshed instance.
+
+    .. note::
+
+        Flushes but does **not** commit — the service layer owns
+        the transaction lifecycle.
+
+    Args:
+        db: Active database session.
+        user: The User ORM instance to update.
+        role_id: New role ID to assign.
+
+    Returns:
+        The updated User with the new role_id applied.
+    """
     user.role_id = role_id
 
-    db.commit()
-
+    db.flush()
     db.refresh(user)
 
     return user
@@ -97,11 +111,26 @@ def update_user_status(
     status: str,
     is_active: bool
 ):
+    """Update a user's status flags and return the refreshed instance.
+
+    .. note::
+
+        Flushes but does **not** commit — the service layer owns
+        the transaction lifecycle.
+
+    Args:
+        db: Active database session.
+        user: The User ORM instance to update.
+        status: New lifecycle status (active/inactive/pending).
+        is_active: New active flag.
+
+    Returns:
+        The updated User with the new status applied.
+    """
     user.status = status
     user.is_active = is_active
 
-    db.commit()
-
+    db.flush()
     db.refresh(user)
 
     return user

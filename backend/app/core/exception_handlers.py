@@ -6,6 +6,19 @@ from fastapi import status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.modules.auth.exceptions import (
+    ApprovalFailed,
+    AuthException,
+    DeactivationFailed,
+    EmailAlreadyRegistered,
+    InactiveAccount,
+    InvalidCredentials,
+    RegistrationFailed,
+    RoleNotFound,
+    UserAlreadyActive,
+    UserAlreadyInactive,
+    UserNotFound,
+)
 from app.modules.patients.exceptions import (
     DuplicatePatientDetected,
     InvalidPatientOperation,
@@ -36,6 +49,19 @@ def _error_response(
     )
 
 
+_AUTH_EXCEPTION_MAP: dict[type[AuthException], int] = {
+    InvalidCredentials: status.HTTP_401_UNAUTHORIZED,
+    InactiveAccount: status.HTTP_403_FORBIDDEN,
+    EmailAlreadyRegistered: status.HTTP_409_CONFLICT,
+    UserNotFound: status.HTTP_404_NOT_FOUND,
+    UserAlreadyActive: status.HTTP_400_BAD_REQUEST,
+    UserAlreadyInactive: status.HTTP_400_BAD_REQUEST,
+    RoleNotFound: status.HTTP_404_NOT_FOUND,
+    RegistrationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ApprovalFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    DeactivationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+}
+
 _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {
     PatientNotFound: status.HTTP_404_NOT_FOUND,
     DuplicatePatientDetected: status.HTTP_409_CONFLICT,
@@ -44,6 +70,28 @@ _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {
     PatientCreationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
     PatientUpdateFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
+
+
+async def auth_exception_handler(
+    request: Request,
+    exc: AuthException,
+) -> JSONResponse:
+    """Handle any AuthException subclass and map it to the correct HTTP status."""
+    http_status = _AUTH_EXCEPTION_MAP.get(
+        type(exc),
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    logger.warning(
+        "Auth exception handled: code=%s, status=%d, path=%s",
+        exc.code,
+        http_status,
+        request.url.path,
+    )
+    return _error_response(
+        message=exc.message,
+        details=exc.details,
+        status_code=http_status,
+    )
 
 
 async def patient_exception_handler(
@@ -123,6 +171,10 @@ async def unhandled_exception_handler(
 
 def register_exception_handlers(app) -> None:
     """Register all exception handlers on the given FastAPI application."""
+    app.add_exception_handler(
+        AuthException,
+        auth_exception_handler,
+    )
     app.add_exception_handler(
         PatientException,
         patient_exception_handler,

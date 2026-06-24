@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from fastapi import status
@@ -8,6 +10,11 @@ from app.modules.users.repository import (
     update_user_status
 
 )
+
+
+logger = logging.getLogger(__name__)
+
+from app.core.constants import USER_STATUS_ACTIVE, USER_STATUS_INACTIVE
 
 from app.modules.users.schemas import (
     UserListItem,
@@ -92,100 +99,155 @@ def change_user_role_service(
     role_id: int
 ) -> UserActionResponse:
 
-    user = get_user_by_id(
-        db=db,
-        user_id=user_id
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+    try:
+        user = get_user_by_id(
+            db=db,
+            user_id=user_id
         )
 
-    role = get_role_by_id(
-        db=db,
-        role_id=role_id
-    )
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
 
-    if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found"
+        role = get_role_by_id(
+            db=db,
+            role_id=role_id
         )
 
-    update_user_role(
-        db=db,
-        user=user,
-        role_id=role_id
-    )
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found"
+            )
 
-    return UserActionResponse(
-        message="Role updated successfully"
-    )
+        update_user_role(
+            db=db,
+            user=user,
+            role_id=role_id
+        )
+
+        db.commit()
+
+        return UserActionResponse(
+            message="Role updated successfully"
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during role change: user_id=%s, role_id=%s",
+            user_id,
+            role_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Role change failed. Please try again later.",
+        )
 
 def activate_user_service(
     db: Session,
     user_id: int
 ) -> UserActionResponse:
 
-    user = get_user_by_id(
-        db=db,
-        user_id=user_id
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+    try:
+        user = get_user_by_id(
+            db=db,
+            user_id=user_id
         )
 
-    if user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is already active"
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        if user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is already active"
+            )
+
+        update_user_status(
+            db=db,
+            user=user,
+            status=USER_STATUS_ACTIVE,
+            is_active=True
         )
 
-    update_user_status(
-        db=db,
-        user=user,
-        status=USER_STATUS_ACTIVE,
-        is_active=True
-    )
+        db.commit()
 
-    return UserActionResponse(
-        message="User activated successfully"
-    )
+        return UserActionResponse(
+            message="User activated successfully"
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during user activation: user_id=%s",
+            user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Activation failed. Please try again later.",
+        )
 
 def deactivate_user_service(
     db: Session,
     user_id: int
 ) -> UserActionResponse:
 
-    user = get_user_by_id(
-        db=db,
-        user_id=user_id
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+    try:
+        user = get_user_by_id(
+            db=db,
+            user_id=user_id
         )
 
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is already inactive"
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is already inactive"
+            )
+
+        update_user_status(
+            db=db,
+            user=user,
+            status=USER_STATUS_INACTIVE,
+            is_active=False
         )
 
-    update_user_status(
-        db=db,
-        user=user,
-        status=USER_STATUS_INACTIVE,
-        is_active=False
-    )
+        db.commit()
 
-    return UserActionResponse(
-        message="User deactivated successfully"
-    )
+        return UserActionResponse(
+            message="User deactivated successfully"
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during user deactivation: user_id=%s",
+            user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Deactivation failed. Please try again later.",
+        )

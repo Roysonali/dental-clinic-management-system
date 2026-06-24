@@ -32,7 +32,7 @@ from app.modules.appointments.service import (
     AppointmentService,
 )
 
-from app.modules.auth.dependencies import (
+from app.dependencies.auth import (
     get_current_user,
 )
 
