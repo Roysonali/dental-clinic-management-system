@@ -23,9 +23,15 @@ class AppointmentCreate(BaseModel):
     Request schema for creating appointment.
     """
 
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
     patient_id: UUID
 
-    dentist_id: int
+    dentist_id: int = Field(
+        gt=0,
+    )
 
     appointment_date: date
 
@@ -54,6 +60,10 @@ class AppointmentUpdate(BaseModel):
     Editable appointment fields.
     """
 
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
     appointment_date: Optional[date] = None
 
     start_time: Optional[time] = None
@@ -63,7 +73,10 @@ class AppointmentUpdate(BaseModel):
         ge=1,
     )
 
-    dentist_id: Optional[int] = None
+    dentist_id: Optional[int] = Field(
+        default=None,
+        gt=0,
+    )
 
     appointment_type: Optional[AppointmentType] = None
 
@@ -84,6 +97,10 @@ class AppointmentStatusUpdate(BaseModel):
     Status update request.
     """
 
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
     status: AppointmentStatus
 
 
@@ -94,6 +111,7 @@ class AppointmentResponse(BaseModel):
 
     model_config = ConfigDict(
         from_attributes=True,
+        extra="forbid",
     )
 
     id: UUID

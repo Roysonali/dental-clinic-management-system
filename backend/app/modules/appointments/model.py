@@ -100,6 +100,7 @@ class Appointment(Base):
         Enum(
             AppointmentType,
             name="appointment_type_enum",
+            values_callable=lambda ec: [m.value for m in ec],
         ),
         nullable=False,
     )
@@ -108,6 +109,7 @@ class Appointment(Base):
         Enum(
             AppointmentStatus,
             name="appointment_status_enum",
+            values_callable=lambda ec: [m.value for m in ec],
         ),
         nullable=False,
         server_default=AppointmentStatus.SCHEDULED.value,
@@ -171,6 +173,11 @@ class Appointment(Base):
             name="ck_appointments_duration_positive",
         ),
 
+        CheckConstraint(
+            "end_time > start_time",
+            name="ck_appointments_end_after_start",
+        ),
+
         Index(
             "ix_appointments_date",
             "appointment_date",
@@ -187,6 +194,7 @@ class Appointment(Base):
             "ix_appointments_patient_schedule",
             "patient_id",
             "appointment_date",
+            "start_time",
         ),
 
         Index(

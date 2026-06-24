@@ -1,5 +1,3 @@
-# app/modules/appointments/enums.py
-
 from enum import Enum
 
 
@@ -24,7 +22,7 @@ class AppointmentType(str, Enum):
     """
 
     CONSULTATION = "Consultation"
-    FOLLOW_UP = "Follow-up"
+    FOLLOW_UP = "Follow-Up"
     EMERGENCY = "Emergency"
     PROCEDURE = "Procedure"
     REVIEW = "Review"
