@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import time
 
 """
 Application-wide constants.
@@ -41,19 +42,67 @@ DOCTOR_ROLES = (
     ROLE_CONSULTING_DOCTOR,
 )
 
-# ==========================================================
-# User Status
-# ==========================================================
 
 USER_STATUS_PENDING = "pending"
 USER_STATUS_ACTIVE = "active"
 USER_STATUS_INACTIVE = "inactive"
 
-# ==========================================================
-# Shared Enums
-# ==========================================================
 
 class GenderEnum(str, Enum):
     male = "male"
     female = "female"
     other = "other"
+
+
+# ==========================================================
+# APPOINTMENT MODULE
+# ==========================================================
+
+# Monday=0 → Saturday=5
+CLINIC_WORKING_DAYS = {
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+}
+
+
+# Morning Session
+CLINIC_MORNING_START = time(
+    hour=10,
+    minute=0,
+)
+
+CLINIC_MORNING_END = time(
+    hour=13,
+    minute=0,
+)
+
+
+# Evening Session
+CLINIC_EVENING_START = time(
+    hour=17,
+    minute=0,
+)
+
+CLINIC_EVENING_END = time(
+    hour=21,
+    minute=0,
+)
+
+
+# Allowed durations
+ALLOWED_APPOINTMENT_DURATIONS = (
+    15,
+    30,
+    45,
+    60,
+)
+
+
+DEFAULT_APPOINTMENT_DURATION = 30
+
+
+APPOINTMENT_NUMBER_PREFIX = "APT"

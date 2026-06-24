@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from app.modules.auth.models import User, Role
 from app.modules.patients.models import Patient
+from app.modules.appointments.model import Appointment
 from alembic import context
 import sys
 import os
