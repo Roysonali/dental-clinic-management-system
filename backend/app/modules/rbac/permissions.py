@@ -24,31 +24,12 @@ def require_admin(
 
     Admin roles are :data:`~app.core.constants.ROLE_ADMIN` and
     :data:`~app.core.constants.ROLE_CHIEF_DOCTOR`.
+
+    Delegates to :func:`require_roles` to avoid duplicating
+    authorization logic.
     """
-
-    if not current_user.role:
-        logger.warning(
-            "Forbidden access: user_id=%s has no role assigned",
-            current_user.id,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Role not assigned",
-        )
-
-    if current_user.role.name not in _ADMIN_ROLES:
-        logger.warning(
-            "Forbidden access: user_id=%s, role=%s, required one of %s",
-            current_user.id,
-            current_user.role.name,
-            sorted(_ADMIN_ROLES),
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
-
-    return current_user
+    role_checker = require_roles(list(_ADMIN_ROLES))
+    return role_checker(current_user=current_user)
 
 
 def require_roles(

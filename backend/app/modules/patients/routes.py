@@ -24,6 +24,8 @@ from app.modules.patients.service import (
     PatientService,
 )
 
+from app.core.constants import DOCTOR_ROLES
+
 from app.modules.rbac.permissions import (
     require_roles,
 )
@@ -129,7 +131,7 @@ def list_patients(
             [
                 "ADMIN",
                 "RECEPTIONIST",
-                "DOCTOR",
+                *DOCTOR_ROLES,
             ]
         )
     ),
@@ -171,7 +173,7 @@ def get_patient(
             [
                 "ADMIN",
                 "RECEPTIONIST",
-                "DOCTOR",
+                *DOCTOR_ROLES,
             ]
         )
     ),
@@ -334,7 +336,7 @@ def patient_profile(
             [
                 "ADMIN",
                 "RECEPTIONIST",
-                "DOCTOR",
+                *DOCTOR_ROLES,
             ]
         )
     ),
