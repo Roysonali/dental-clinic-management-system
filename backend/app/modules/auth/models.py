@@ -120,6 +120,16 @@ class User(Base):
         doc="Timestamp (UTC) of the most recent successful login. Null until first login.",
     )
 
+    updated_by = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        doc="Foreign key to the user who last modified this record (null until first modification).",
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

@@ -29,6 +29,21 @@ from app.modules.patients.exceptions import (
     PatientValidationFailed,
 )
 
+from app.modules.users.exceptions import (
+    ActivationFailed,
+    DeactivationFailed,
+    LastAdminCannotBeModified,
+    RoleChangeFailed,
+    RoleNotFound as UserRoleNotFound,
+    SelfActivationNotAllowed,
+    SelfDeactivationNotAllowed,
+    SelfRoleChangeNotAllowed,
+    UserAlreadyActive as UserAlreadyActiveException,
+    UserAlreadyInactive as UserAlreadyInactiveException,
+    UserException,
+    UserNotFound as UserNotFoundException,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +77,20 @@ _AUTH_EXCEPTION_MAP: dict[type[AuthException], int] = {
     DeactivationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
+_USER_EXCEPTION_MAP: dict[type[UserException], int] = {
+    UserNotFoundException: status.HTTP_404_NOT_FOUND,
+    UserAlreadyActiveException: status.HTTP_400_BAD_REQUEST,
+    UserAlreadyInactiveException: status.HTTP_400_BAD_REQUEST,
+    UserRoleNotFound: status.HTTP_404_NOT_FOUND,
+    SelfRoleChangeNotAllowed: status.HTTP_400_BAD_REQUEST,
+    SelfDeactivationNotAllowed: status.HTTP_400_BAD_REQUEST,
+    SelfActivationNotAllowed: status.HTTP_400_BAD_REQUEST,
+    LastAdminCannotBeModified: status.HTTP_409_CONFLICT,
+    RoleChangeFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ActivationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    DeactivationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+}
+
 _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {
     PatientNotFound: status.HTTP_404_NOT_FOUND,
     DuplicatePatientDetected: status.HTTP_409_CONFLICT,
@@ -83,6 +112,28 @@ async def auth_exception_handler(
     )
     logger.warning(
         "Auth exception handled: code=%s, status=%d, path=%s",
+        exc.code,
+        http_status,
+        request.url.path,
+    )
+    return _error_response(
+        message=exc.message,
+        details=exc.details,
+        status_code=http_status,
+    )
+
+
+async def user_exception_handler(
+    request: Request,
+    exc: UserException,
+) -> JSONResponse:
+    """Handle any UserException subclass and map it to the correct HTTP status."""
+    http_status = _USER_EXCEPTION_MAP.get(
+        type(exc),
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    logger.warning(
+        "User exception handled: code=%s, status=%d, path=%s",
         exc.code,
         http_status,
         request.url.path,
@@ -174,6 +225,10 @@ def register_exception_handlers(app) -> None:
     app.add_exception_handler(
         AuthException,
         auth_exception_handler,
+    )
+    app.add_exception_handler(
+        UserException,
+        user_exception_handler,
     )
     app.add_exception_handler(
         PatientException,

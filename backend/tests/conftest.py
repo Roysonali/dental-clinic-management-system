@@ -85,7 +85,11 @@ def app():
 
 @pytest.fixture(scope="function")
 def db():
-    """Provide a DB session for direct queries in tests."""
+    """Provide a DB session for direct queries in tests.
+
+    Creates the User and Role tables fresh, yields a session,
+    then tears down the tables so each test starts clean.
+    """
     User.__table__.create(bind=engine, checkfirst=True)
     Role.__table__.create(bind=engine, checkfirst=True)
     session = TestingSessionLocal()

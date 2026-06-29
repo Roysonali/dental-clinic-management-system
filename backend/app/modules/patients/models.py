@@ -111,6 +111,15 @@ class Patient(Base):
         nullable=True,
     )
 
+    updated_by = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -126,6 +135,13 @@ class Patient(Base):
 
     creator = relationship(
         "User",
+        foreign_keys=[created_by],
+        passive_deletes=True,
+    )
+
+    updater = relationship(
+        "User",
+        foreign_keys=[updated_by],
         passive_deletes=True,
     )
 

@@ -376,6 +376,7 @@ class PatientService:
         self,
         patient_id: UUID,
         payload: PatientUpdate,
+        updated_by: int | None = None,
     ):
 
         try:
@@ -432,6 +433,7 @@ class PatientService:
                 .update(
                     patient,
                     updates,
+                    updated_by=updated_by,
                 )
             )
 
@@ -480,6 +482,7 @@ class PatientService:
         self,
         patient_id: UUID,
         active: bool,
+        updated_by: int | None = None,
     ):
 
         patient = (
@@ -516,6 +519,7 @@ class PatientService:
             .set_active_status(
                 patient,
                 active,
+                updated_by=updated_by,
             )
         )
 
