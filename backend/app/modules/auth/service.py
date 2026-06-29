@@ -22,6 +22,10 @@ from app.modules.auth.exceptions import (
     UserAlreadyInactive,
     UserNotFound,
 )
+
+from app.modules.users.repository import count_admin_users
+
+from app.modules.users.exceptions import LastAdminCannotBeModified
 from app.modules.auth.models import User
 from app.modules.auth.repository import create_user
 from app.modules.auth.repository import get_pending_users
@@ -116,13 +120,19 @@ def approve_user(
     db: Session,
     user_id: int,
     role_id: int,
+    approved_by: int | None = None,
 ) -> User:
     """Approve a pending user by assigning a role and activating the account.
+
+    Populates both ``created_by`` and ``updated_by`` audit fields with
+    the approving admin's user ID.
 
     Args:
         db: Active database session.
         user_id: Numeric ID of the user to approve.
         role_id: Numeric ID of the role to assign.
+        approved_by: The admin user ID performing the approval.
+            Sets ``created_by`` (if null) and ``updated_by`` on the user.
 
     Returns:
         The updated User ORM instance.
@@ -164,13 +174,23 @@ def approve_user(
         user.status = USER_STATUS_ACTIVE
         user.is_active = True
 
+        # ── Audit trail ──────────────────────────────────────────────
+        # Record who approved this user. created_by is only set on the
+        # first approval; subsequent approvals via the user module will
+        # update updated_by but leave created_by intact.
+        if approved_by is not None:
+            if user.created_by is None:
+                user.created_by = approved_by
+            user.updated_by = approved_by
+
         db.commit()
         db.refresh(user)
 
         logger.info(
-            "User approved: id=%s, role=%s",
+            "User approved: id=%s, role=%s, approved_by=%s",
             user.id,
             role.name,
+            approved_by,
         )
 
         return user
@@ -191,12 +211,23 @@ def approve_user(
 def deactivate_user(
     db: Session,
     user_id: int,
+    deactivated_by: int | None = None,
 ) -> User:
     """Deactivate a user by setting status to 'inactive'.
+
+    Includes last-admin protection — the sole remaining admin cannot
+    be deactivated. Populates ``updated_by`` for audit trail.
+
+    .. note::
+
+        Self-deactivation is checked at the route level (see
+        :func:`~app.modules.auth.routes.deactivate_user_route`).
 
     Args:
         db: Active database session.
         user_id: Numeric ID of the user to deactivate.
+        deactivated_by: The admin user ID performing the deactivation.
+            Sets ``updated_by`` on the user for audit trail.
 
     Returns:
         The updated User ORM instance.
@@ -204,6 +235,7 @@ def deactivate_user(
     Raises:
         UserNotFound: If no user exists with the given ID.
         UserAlreadyInactive: If the user is already inactive.
+        LastAdminCannotBeModified: If deactivating the sole remaining admin.
         DeactivationFailed: If an unexpected error occurs.
     """
     try:
@@ -223,20 +255,33 @@ def deactivate_user(
             )
             raise UserAlreadyInactive()
 
+        # ── Last-admin protection ────────────────────────────────────
+        if user.role is not None and user.role.name in ("ADMIN", "CHIEF_DOCTOR"):
+            if count_admin_users(db) <= 1:
+                logger.warning(
+                    "Blocked deactivation: would remove last admin (user_id=%s)",
+                    user_id,
+                )
+                raise LastAdminCannotBeModified()
+
         user.status = USER_STATUS_INACTIVE
         user.is_active = False
+
+        if deactivated_by is not None:
+            user.updated_by = deactivated_by
 
         db.commit()
         db.refresh(user)
 
         logger.info(
-            "User deactivated: id=%s",
+            "User deactivated: id=%s, deactivated_by=%s",
             user.id,
+            deactivated_by,
         )
 
         return user
 
-    except (UserNotFound, UserAlreadyInactive):
+    except (UserNotFound, UserAlreadyInactive, LastAdminCannotBeModified):
         raise
 
     except Exception:

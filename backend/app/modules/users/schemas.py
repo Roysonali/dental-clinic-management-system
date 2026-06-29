@@ -40,6 +40,7 @@ class UserDetailResponse(BaseModel):
     role_id: int | None = None
     role_name: str | None = None
     last_login_at: datetime | None = None
+    created_by: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     updated_by: int | None = None
