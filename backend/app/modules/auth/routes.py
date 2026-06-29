@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
-from app.modules.auth.dependencies import require_admin
+from app.modules.rbac.permissions import require_admin
+
+from app.modules.users.exceptions import SelfDeactivationNotAllowed
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     CurrentUserResponse,
@@ -131,7 +133,12 @@ def approve_user_route(
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
 ) -> UserApprovalResponse:
-    approve_user(db, user_id, approval_data.role_id)
+    approve_user(
+        db,
+        user_id,
+        approval_data.role_id,
+        approved_by=current_admin.id,
+    )
 
     return {
         "message": "User approved successfully.",
@@ -173,7 +180,14 @@ def deactivate_user_route(
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
 ) -> UserApprovalResponse:
-    deactivate_user(db, user_id)
+    if current_admin.id == user_id:
+        raise SelfDeactivationNotAllowed()
+
+    deactivate_user(
+        db,
+        user_id,
+        deactivated_by=current_admin.id,
+    )
 
     return {
         "message": "User deactivated successfully.",

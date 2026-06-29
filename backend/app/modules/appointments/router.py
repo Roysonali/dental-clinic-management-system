@@ -32,8 +32,14 @@ from app.modules.appointments.service import (
     AppointmentService,
 )
 
-from app.modules.auth.dependencies import (
-    get_current_user,
+from app.core.constants import (
+    DOCTOR_ROLES,
+    ROLE_ADMIN,
+    ROLE_RECEPTIONIST,
+)
+
+from app.modules.rbac.permissions import (
+    require_roles,
 )
 
 from app.modules.auth.models import (
@@ -114,7 +120,13 @@ def create_appointment(
         get_service,
     ),
     current_user: User = Depends(
-        get_current_user,
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        ),
     ),
 ):
 
@@ -148,6 +160,15 @@ def list_appointments(
     service: AppointmentService = Depends(
         get_service,
     ),
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        ),
+    ),
 ):
 
     rows, total = (
@@ -173,6 +194,15 @@ def get_today_appointments(
     service: AppointmentService = Depends(
         get_service,
     ),
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        ),
+    ),
 ):
 
     return service.today()
@@ -186,6 +216,15 @@ def get_appointment(
     appointment_id: UUID,
     service: AppointmentService = Depends(
         get_service,
+    ),
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        ),
     ),
 ):
 
@@ -212,7 +251,13 @@ def update_appointment(
         get_service,
     ),
     current_user: User = Depends(
-        get_current_user,
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        ),
     ),
 ):
 
@@ -244,7 +289,13 @@ def cancel_appointment(
         get_service,
     ),
     current_user: User = Depends(
-        get_current_user,
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        ),
     ),
 ):
 

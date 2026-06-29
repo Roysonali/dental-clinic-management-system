@@ -12,7 +12,109 @@ from pydantic import (
 from app.core.constants import GenderEnum
 
 
-class PatientBase(BaseModel):
+class PatientValidators:
+    """
+    Shared Pydantic field validators for patient schemas.
+
+    Both :class:`PatientBase` and :class:`PatientUpdate` inherit from this
+    mixin to avoid duplicating normalization and validation logic.
+    """
+
+    @field_validator(
+        "first_name",
+        "middle_name",
+        "last_name",
+        mode="before",
+    )
+    @classmethod
+    def normalize_names(cls, value: str | None) -> str | None:
+        """Strip whitespace and validate that names contain only allowed characters."""
+        if value is None:
+            return value
+
+        value = value.strip()
+        # Allow alphabetic characters, spaces, hyphens, and apostrophes
+        allowed = {" ", "-", "'"}
+        if value and not all(
+            c.isalpha() or c in allowed
+            for c in value
+        ):
+            raise ValueError(
+                "Name should contain only alphabetic characters, spaces, hyphens, and apostrophes."
+            )
+
+        return value
+
+    @field_validator(
+        "date_of_birth"
+    )
+    @classmethod
+    def validate_dob(cls, value: date | None) -> date | None:
+        """Ensure date of birth is not in the future and is a reasonable past date."""
+        if value is None:
+            return value
+
+        today = date.today()
+
+        if value > today:
+            raise ValueError(
+                "Date of birth cannot be in the future."
+            )
+        if value.year < 1900:
+            raise ValueError(
+                "Invalid date of birth."
+            )
+
+        return value
+
+    @field_validator(
+        "address",
+        "remarks",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        """Strip leading/trailing whitespace from optional text fields."""
+        if value is None:
+            return value
+
+        return value.strip()
+
+    @field_validator(
+        "email",
+        mode="before",
+    )
+    @classmethod
+    def normalize_email(cls, value: str | None) -> str | None:
+        """Normalize email to lowercase with trimmed whitespace."""
+        if value is None:
+            return value
+
+        return value.strip().lower()
+
+    @field_validator(
+        "primary_contact_number",
+        "emergency_contact_number",
+        mode="before",
+    )
+    @classmethod
+    def normalize_phone(cls, value: str | None) -> str | None:
+        """Strip spaces and hyphens from phone numbers for consistent storage."""
+        if value is None:
+            return value
+
+        return (
+            str(value)
+            .replace(" ", "")
+            .replace("-", "")
+            .strip()
+        )
+
+
+class PatientBase(
+    PatientValidators,
+    BaseModel
+):
     """Base schema with shared fields and normalization logic for patient operations."""
 
     model_config = ConfigDict(
@@ -97,93 +199,6 @@ class PatientBase(BaseModel):
         examples=["Allergic to penicillin."],
     )
 
-    @field_validator(
-        "first_name",
-        "middle_name",
-        "last_name",
-        mode="before",
-    )
-    @classmethod
-    def normalize_names(cls, value: str | None) -> str | None:
-        """Strip whitespace and validate that names contain only allowed characters."""
-        if value is None:
-            return value
-
-        value = value.strip()
-        # Allow alphabetic characters, spaces, hyphens, and apostrophes
-        allowed = {" ", "-", "'"}
-        if value and not all(
-            c.isalpha() or c in allowed
-            for c in value
-        ):
-            raise ValueError(
-                "Name should contain only alphabetic characters, spaces, hyphens, and apostrophes."
-            )
-
-        return value
-
-    @field_validator(
-        "date_of_birth"
-    )
-    @classmethod
-    def validate_dob(cls, value: date) -> date:
-        """Ensure date of birth is not in the future and is a reasonable past date."""
-        today = date.today()
-
-        if value > today:
-            raise ValueError(
-                "date_of_birth cannot be in future"
-            )
-        if value.year < 1900:
-            raise ValueError(
-                "Invalid date of birth."
-            )
-
-        return value
-
-    @field_validator(
-        "address",
-        "remarks",
-        mode="before",
-    )
-    @classmethod
-    def normalize_optional_text(cls, value: str | None) -> str | None:
-        """Strip leading/trailing whitespace from optional text fields."""
-        if value is None:
-            return value
-
-        return value.strip()
-
-    @field_validator(
-        "email",
-        mode="before",
-    )
-    @classmethod
-    def normalize_email(cls, value: str | None) -> str | None:
-        """Normalize email to lowercase with trimmed whitespace."""
-        if value is None:
-            return value
-
-        return value.strip().lower()
-
-    @field_validator(
-        "primary_contact_number",
-        "emergency_contact_number",
-        mode="before",
-    )
-    @classmethod
-    def normalize_phone(cls, value: str | None) -> str | None:
-        """Strip spaces and hyphens from phone numbers for consistent storage."""
-        if value is None:
-            return value
-
-        return (
-            str(value)
-            .replace(" ", "")
-            .replace("-", "")
-            .strip()
-        )
-
 
 class PatientCreate(
     PatientBase
@@ -193,6 +208,7 @@ class PatientCreate(
 
 
 class PatientUpdate(
+    PatientValidators,
     BaseModel
 ):
     """Schema for updating an existing patient. All fields are optional for partial updates."""
@@ -284,95 +300,6 @@ class PatientUpdate(
         examples=["Allergic to penicillin."],
     )
 
-    @field_validator(
-        "date_of_birth"
-    )
-    @classmethod
-    def validate_dob(cls, value: date | None) -> date | None:
-        """Ensure date of birth is not in the future and is a reasonable past date."""
-        today = date.today()
-
-        if value:
-
-            if value > today:
-                raise ValueError(
-                    "Date of birth cannot be in future."
-                )
-
-            if value.year < 1900:
-                raise ValueError(
-                    "Invalid date of birth."
-                )
-
-        return value
-
-    @field_validator(
-        "first_name",
-        "middle_name",
-        "last_name",
-        mode="before",
-    )
-    @classmethod
-    def normalize_names(cls, value: str | None) -> str | None:
-        """Strip whitespace and validate that names contain only allowed characters."""
-        if value is None:
-            return value
-
-        value = value.strip()
-        allowed = {" ", "-", "'"}
-        if value and not all(
-            c.isalpha() or c in allowed
-            for c in value
-        ):
-            raise ValueError(
-                "Name should contain only alphabetic characters, spaces, hyphens, and apostrophes."
-            )
-
-        return value
-
-    @field_validator(
-        "address",
-        "remarks",
-        mode="before",
-    )
-    @classmethod
-    def normalize_optional_text(cls, value: str | None) -> str | None:
-        """Strip leading/trailing whitespace from optional text fields."""
-        if value is None:
-            return value
-
-        return value.strip()
-
-    @field_validator(
-        "email",
-        mode="before",
-    )
-    @classmethod
-    def normalize_email(cls, value: str | None) -> str | None:
-        """Normalize email to lowercase with trimmed whitespace."""
-        if value is None:
-            return value
-
-        return value.strip().lower()
-
-    @field_validator(
-        "primary_contact_number",
-        "emergency_contact_number",
-        mode="before",
-    )
-    @classmethod
-    def normalize_phone(cls, value: str | None) -> str | None:
-        """Strip spaces and hyphens from phone numbers for consistent storage."""
-        if value is None:
-            return value
-
-        return (
-            str(value)
-            .replace(" ", "")
-            .replace("-", "")
-            .strip()
-        )
-
 
 class PatientResponse(
     BaseModel
@@ -459,6 +386,20 @@ class PatientResponse(
         title="Is Active",
         description="Whether the patient record is currently active.",
         examples=[True],
+    )
+
+    created_by: Optional[int] = Field(
+        default=None,
+        title="Created By",
+        description="User ID who created the patient record.",
+        examples=[1],
+    )
+
+    updated_by: Optional[int] = Field(
+        default=None,
+        title="Updated By",
+        description="User ID who last updated the patient record.",
+        examples=[1],
     )
 
     created_at: datetime = Field(

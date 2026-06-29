@@ -112,6 +112,10 @@ class PatientMapper:
 
             is_active=patient.is_active,
 
+            created_by=patient.created_by,
+
+            updated_by=patient.updated_by,
+
             created_at=patient.created_at,
 
             updated_at=patient.updated_at,

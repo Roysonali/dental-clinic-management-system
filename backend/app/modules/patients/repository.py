@@ -259,6 +259,7 @@ class PatientRepository:
         self,
         patient: Patient,
         updates: dict,
+        updated_by: int | None = None,
     ) -> Patient:
         """Apply field-level updates to a patient record and return the refreshed instance."""
 
@@ -272,6 +273,9 @@ class PatientRepository:
                 field,
                 value,
             )
+
+        if updated_by is not None:
+            patient.updated_by = updated_by
 
         self.db.flush()
 
@@ -287,12 +291,16 @@ class PatientRepository:
         self,
         patient: Patient,
         status: bool,
+        updated_by: int | None = None,
     ) -> Patient:
         """Toggle a patient's is_active flag and return the refreshed instance."""
 
         patient.is_active = (
             status
         )
+
+        if updated_by is not None:
+            patient.updated_by = updated_by
 
         self.db.flush()
 

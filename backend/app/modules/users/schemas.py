@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -10,7 +12,10 @@ class UserListItem(BaseModel):
     email: str
     status: str
     is_active: bool
+    role_id: int | None = None
     role_name: str | None = None
+    last_login_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class UserListResponse(BaseModel):
@@ -24,6 +29,9 @@ class UserListResponse(BaseModel):
 
 
 class UserDetailResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True
+    )
     id: int
     full_name: str
     email: str
@@ -31,6 +39,11 @@ class UserDetailResponse(BaseModel):
     is_active: bool
     role_id: int | None = None
     role_name: str | None = None
+    last_login_at: datetime | None = None
+    created_by: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    updated_by: int | None = None
 
 
 class ChangeRoleRequest(BaseModel):
@@ -38,6 +51,7 @@ class ChangeRoleRequest(BaseModel):
 
 
 class UserActionResponse(BaseModel):
+    user_id: int
     message: str
 
 class UserListQueryParams(BaseModel):

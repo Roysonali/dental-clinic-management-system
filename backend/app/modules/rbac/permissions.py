@@ -9,39 +9,27 @@ from fastapi import status
 from app.dependencies.auth import get_current_user
 from app.modules.auth.models import User
 from app.core.constants import ROLE_ADMIN
+from app.core.constants import ROLE_CHIEF_DOCTOR
 
 
 logger = logging.getLogger(__name__)
+
+_ADMIN_ROLES: frozenset[str] = frozenset({ROLE_ADMIN, ROLE_CHIEF_DOCTOR})
 
 
 def require_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """Require the current user to have the ``ROLE_ADMIN`` role."""
+    """Require the current user to have an admin-level role.
 
-    if not current_user.role:
-        logger.warning(
-            "Forbidden access: user_id=%s has no role assigned",
-            current_user.id,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Role not assigned",
-        )
+    Admin roles are :data:`~app.core.constants.ROLE_ADMIN` and
+    :data:`~app.core.constants.ROLE_CHIEF_DOCTOR`.
 
-    if current_user.role.name != ROLE_ADMIN:
-        logger.warning(
-            "Forbidden access: user_id=%s, role=%s, required=%s",
-            current_user.id,
-            current_user.role.name,
-            ROLE_ADMIN,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
-
-    return current_user
+    Delegates to :func:`require_roles` to avoid duplicating
+    authorization logic.
+    """
+    role_checker = require_roles(list(_ADMIN_ROLES))
+    return role_checker(current_user=current_user)
 
 
 def require_roles(

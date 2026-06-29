@@ -9,6 +9,7 @@ from fastapi import status
 from fastapi.security import OAuth2PasswordBearer
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import selectinload
 
 from app.core.security import decode_access_token
 from app.database.session import get_db
@@ -75,12 +76,24 @@ def get_current_user(
         )
         raise credentials_exception
 
-    user = get_user_by_email(db, email)
+    user = get_user_by_email(
+        db,
+        email,
+        load_options=[selectinload(User.role)],
+    )
 
     if not user:
         logger.warning(
             "Authenticated user not found in DB: email=%s",
             email,
+        )
+        raise credentials_exception
+
+    if not user.is_active:
+        logger.warning(
+            "Inactive user attempted API access: email=%s, status=%s",
+            email,
+            user.status,
         )
         raise credentials_exception
 

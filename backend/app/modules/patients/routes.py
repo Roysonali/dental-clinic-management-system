@@ -24,6 +24,12 @@ from app.modules.patients.service import (
     PatientService,
 )
 
+from app.core.constants import (
+    DOCTOR_ROLES,
+    ROLE_ADMIN,
+    ROLE_RECEPTIONIST,
+)
+
 from app.modules.rbac.permissions import (
     require_roles,
 )
@@ -65,8 +71,8 @@ def create_patient(
     current_user: User = Depends(
         require_roles(
             [
-                "ADMIN",
-                "RECEPTIONIST",
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
             ]
         )
     ),
@@ -127,9 +133,9 @@ def list_patients(
     current_user: User = Depends(
         require_roles(
             [
-                "ADMIN",
-                "RECEPTIONIST",
-                "DOCTOR",
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
             ]
         )
     ),
@@ -169,9 +175,9 @@ def get_patient(
     current_user: User = Depends(
         require_roles(
             [
-                "ADMIN",
-                "RECEPTIONIST",
-                "DOCTOR",
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
             ]
         )
     ),
@@ -212,8 +218,8 @@ def update_patient(
     current_user: User = Depends(
         require_roles(
             [
-                "ADMIN",
-                "RECEPTIONIST",
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
             ]
         )
     ),
@@ -226,6 +232,7 @@ def update_patient(
     return service.update_patient(
         patient_id,
         payload,
+        updated_by=current_user.id,
     )
 
 
@@ -240,7 +247,7 @@ def update_patient(
     summary="Activate Patient",
     description=(
         "Activate a previously deactivated patient. "
-        "Returns a 409 error if the patient is already active. "
+        "Returns a 400 error if the patient is already active. "
         "Requires ADMIN role."
     ),
     response_description="The patient record with updated active status.",
@@ -252,7 +259,7 @@ def activate_patient(
     current_user: User = Depends(
         require_roles(
             [
-                "ADMIN",
+                ROLE_ADMIN,
             ]
         )
     ),
@@ -265,6 +272,7 @@ def activate_patient(
     return service.change_patient_status(
         patient_id,
         True,
+        updated_by=current_user.id,
     )
 
 
@@ -280,7 +288,7 @@ def activate_patient(
     description=(
         "Deactivate a patient record. "
         "Deactivated patients are excluded from most searches by default. "
-        "Returns a 409 error if the patient is already inactive. "
+        "Returns a 400 error if the patient is already inactive. "
         "Requires ADMIN role."
     ),
     response_description="The patient record with updated active status.",
@@ -292,7 +300,7 @@ def deactivate_patient(
     current_user: User = Depends(
         require_roles(
             [
-                "ADMIN",
+                ROLE_ADMIN,
             ]
         )
     ),
@@ -305,6 +313,7 @@ def deactivate_patient(
     return service.change_patient_status(
         patient_id,
         False,
+        updated_by=current_user.id,
     )
 
 
@@ -332,9 +341,9 @@ def patient_profile(
     current_user: User = Depends(
         require_roles(
             [
-                "ADMIN",
-                "RECEPTIONIST",
-                "DOCTOR",
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
             ]
         )
     ),

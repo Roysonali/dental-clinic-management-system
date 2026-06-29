@@ -12,6 +12,12 @@ from app.modules.rbac.permissions import (
     require_admin
 )
 
+from app.modules.users.exceptions import (
+    SelfActivationNotAllowed,
+    SelfDeactivationNotAllowed,
+    SelfRoleChangeNotAllowed,
+)
+
 from app.modules.users.schemas import (
     UserListResponse,
     UserDetailResponse,
@@ -94,14 +100,12 @@ def change_user_role(
     current_admin: User = Depends(require_admin)
 ):
     if current_admin.id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You cannot change your own role"
-        )
+        raise SelfRoleChangeNotAllowed()
     return change_user_role_service(
         db=db,
         user_id=user_id,
-        role_id=role_data.role_id
+        role_id=role_data.role_id,
+        updated_by=current_admin.id,
     )
 
 @router.patch(
@@ -113,9 +117,12 @@ def activate_user(
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin)
 ):
+    if current_admin.id == user_id:
+        raise SelfActivationNotAllowed()
     return activate_user_service(
         db=db,
-        user_id=user_id
+        user_id=user_id,
+        updated_by=current_admin.id,
     )
 
 @router.patch(
@@ -128,11 +135,9 @@ def deactivate_user(
     current_admin: User = Depends(require_admin)
 ):
     if current_admin.id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You cannot deactivate your own account"
-        )
+        raise SelfDeactivationNotAllowed()
     return deactivate_user_service(
         db=db,
-        user_id=user_id
+        user_id=user_id,
+        updated_by=current_admin.id,
     )

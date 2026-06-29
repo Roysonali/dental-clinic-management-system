@@ -114,6 +114,46 @@ class User(Base):
         passive_deletes=True,
     )
 
+    last_login_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="Timestamp (UTC) of the most recent successful login. Null until first login.",
+    )
+
+    created_by = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        doc="Foreign key to the user who created/approved this record (null for self-registered users).",
+    )
+
+    updated_by = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        doc="Foreign key to the user who last modified this record (null until first modification).",
+    )
+
+    creator = relationship(
+        "User",
+        foreign_keys=[created_by],
+        remote_side=[id],
+        passive_deletes=True,
+    )
+
+    updater = relationship(
+        "User",
+        foreign_keys=[updated_by],
+        remote_side=[id],
+        passive_deletes=True,
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
