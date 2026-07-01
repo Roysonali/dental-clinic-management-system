@@ -118,6 +118,7 @@ class Patient(Base):
             ondelete="SET NULL",
         ),
         nullable=True,
+        comment="Foreign key to the user who last modified this record",
     )
 
     created_at = Column(

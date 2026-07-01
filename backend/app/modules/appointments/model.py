@@ -1,5 +1,3 @@
-# app/modules/appointments/model.py
-
 import uuid
 
 from sqlalchemy import (

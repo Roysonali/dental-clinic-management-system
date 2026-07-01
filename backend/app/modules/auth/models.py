@@ -117,6 +117,7 @@ class User(Base):
     last_login_at = Column(
         DateTime(timezone=True),
         nullable=True,
+        comment="Timestamp (UTC) of the most recent successful login",
         doc="Timestamp (UTC) of the most recent successful login. Null until first login.",
     )
 
@@ -127,6 +128,7 @@ class User(Base):
             ondelete="SET NULL",
         ),
         nullable=True,
+        comment="Foreign key to the user who created/approved this record",
         doc="Foreign key to the user who created/approved this record (null for self-registered users).",
     )
 
@@ -137,6 +139,7 @@ class User(Base):
             ondelete="SET NULL",
         ),
         nullable=True,
+        comment="Foreign key to the user who last modified this record",
         doc="Foreign key to the user who last modified this record (null until first modification).",
     )
 
