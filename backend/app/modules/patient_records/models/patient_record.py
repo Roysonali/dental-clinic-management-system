@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import ForeignKey, Text, Enum
+from sqlalchemy import DateTime, ForeignKey, Index, Text, Enum, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import (
     Mapped,
@@ -81,6 +82,19 @@ class PatientRecord(Base):
         nullable=False,
     )
 
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
     diagnoses: Mapped[list["PatientRecordDiagnosis"]] = relationship(
         back_populates="patient_record",
         cascade="all, delete-orphan",
@@ -88,6 +102,7 @@ class PatientRecord(Base):
     )
 
     prescriptions: Mapped[list["PatientRecordPrescription"]] = relationship(
+        "PatientRecordPrescription",
         back_populates="patient_record",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -109,4 +124,9 @@ class PatientRecord(Base):
         back_populates="patient_record",
         cascade="all, delete-orphan",
         lazy="selectin",
+    )
+
+    __table_args__ = (
+        Index("ix_patient_records_status", "status"),
+        Index("ix_patient_records_is_deleted", "is_deleted"),
     )

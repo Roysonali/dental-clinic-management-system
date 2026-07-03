@@ -1,10 +1,18 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import Date, Text, ForeignKey
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import (
     Mapped,
@@ -41,6 +49,29 @@ class PatientRecordFollowup(Base):
 
     notes: Mapped[str | None] = mapped_column(Text)
 
+    is_deleted: Mapped[bool] = mapped_column(
+        default=False,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
     patient_record: Mapped["PatientRecord"] = relationship(
         back_populates="followups",
+    )
+
+    __table_args__ = (
+        Index("ix_patient_record_followups_is_deleted", "is_deleted"),
+        Index("ix_patient_record_followups_followup_date", "followup_date"),
     )

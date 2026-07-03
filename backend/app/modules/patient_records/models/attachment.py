@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import String, Enum, ForeignKey
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    String,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import (
     Mapped,
@@ -49,6 +59,39 @@ class PatientRecordAttachment(Base):
         nullable=False,
     )
 
+    mime_type: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    file_size: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+    )
+
+    is_deleted: Mapped[bool] = mapped_column(
+        default=False,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
     patient_record: Mapped["PatientRecord"] = relationship(
         back_populates="attachments",
+    )
+
+    __table_args__ = (
+        Index("ix_patient_record_attachments_is_deleted", "is_deleted"),
+        Index("ix_patient_record_attachments_type", "attachment_type"),
     )

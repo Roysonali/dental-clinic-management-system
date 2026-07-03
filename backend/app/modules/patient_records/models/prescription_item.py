@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    String,
     Text,
     func,
 )
@@ -22,20 +23,16 @@ from sqlalchemy.orm import (
 from app.database.base import Base
 
 if TYPE_CHECKING:
-    from .patient_record import PatientRecord
-    from .prescription_item import PatientRecordPrescriptionItem
-    from app.modules.auth.models import User
+    from .prescription import PatientRecordPrescription
 
 
-class PatientRecordPrescription(Base):
+class PatientRecordPrescriptionItem(Base):
     """
-    Represents a prescription document issued
-    during a patient visit.
-
-    One prescription can contain multiple medicines.
+    Represents a single medicine
+    within a prescription.
     """
 
-    __tablename__ = "patient_record_prescriptions"
+    __tablename__ = "patient_record_prescription_items"
 
     id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -43,32 +40,37 @@ class PatientRecordPrescription(Base):
         default=uuid4,
     )
 
-    patient_record_id: Mapped[UUID] = mapped_column(
+    prescription_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey(
-            "patient_records.id",
+            "patient_record_prescriptions.id",
             ondelete="CASCADE",
         ),
         nullable=False,
         index=True,
     )
 
-    prescribed_by: Mapped[int] = mapped_column(
-        ForeignKey(
-            "users.id",
-            ondelete="RESTRICT",
-        ),
+    medicine_name: Mapped[str] = mapped_column(
+        String(255),
         nullable=False,
-        index=True,
     )
 
-    prescribed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+    dosage: Mapped[str] = mapped_column(
+        String(100),
         nullable=False,
-        server_default=func.now(),
     )
 
-    notes: Mapped[str | None] = mapped_column(
+    frequency: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    duration: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    instructions: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -95,23 +97,11 @@ class PatientRecordPrescription(Base):
     # Relationships
     # ======================
 
-    patient_record: Mapped["PatientRecord"] = relationship(
-        "PatientRecord",
-        back_populates="prescriptions",
-    )
-
-    prescriber: Mapped["User"] = relationship(
-        "User",
-        foreign_keys=[prescribed_by],
-    )
-
-    items: Mapped[list["PatientRecordPrescriptionItem"]] = relationship(
-        "PatientRecordPrescriptionItem",
-        back_populates="prescription",
-        cascade="all, delete-orphan",
-        lazy="selectin",
+    prescription: Mapped["PatientRecordPrescription"] = relationship(
+        "PatientRecordPrescription",
+        back_populates="items",
     )
 
     __table_args__ = (
-        Index("ix_patient_record_prescriptions_is_deleted", "is_deleted"),
+        Index("ix_patient_record_prescription_items_is_deleted", "is_deleted"),
     )
