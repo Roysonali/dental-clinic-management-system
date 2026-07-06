@@ -42,6 +42,10 @@ class PatientRecordAuditLog(Base):
         index=True,
     )
 
+    # The index is declared via index=True above.
+    # The explicit Index() in __table_args__ for performed_by and action
+    # covers additional query patterns.
+
     action: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
@@ -55,7 +59,6 @@ class PatientRecordAuditLog(Base):
         Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
-        index=True,
     )
 
     performed_at: Mapped[datetime] = mapped_column(

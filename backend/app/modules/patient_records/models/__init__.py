@@ -1,3 +1,8 @@
+# Import User first so SQLAlchemy can resolve the ``prescriber`` relationship
+# on ``PatientRecordPrescription``.  Without this, the mapper builder raises
+# ``InvalidRequestError`` when it encounters the string reference ``"User"``.
+from app.modules.auth.models import User
+
 from .patient_record import PatientRecord
 from .diagnosis import PatientRecordDiagnosis
 from .prescription import PatientRecordPrescription
@@ -14,4 +19,5 @@ __all__ = [
     "PatientRecordFollowup",
     "PatientRecordAuditLog",
     "PatientRecordPrescriptionItem",
+    "User",
 ]

@@ -112,6 +112,10 @@ class PatientRecordPrescription(Base):
         lazy="selectin",
     )
 
+    @property
+    def medicine_count(self) -> int:
+        return len(self.items) if self.items else 0
+    
     __table_args__ = (
         Index("ix_patient_record_prescriptions_is_deleted", "is_deleted"),
     )
