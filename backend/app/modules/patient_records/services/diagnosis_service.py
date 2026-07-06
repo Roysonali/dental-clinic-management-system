@@ -158,7 +158,7 @@ class DiagnosisService:
                 PatientRecordDiagnosis(
                     patient_record_id=patient_record_id,
                     diagnosis_type=p.diagnosis_type,
-                    diagnosis=p.diagnosis_name,
+                    diagnosis_name=p.diagnosis_name,
                     notes=p.notes,
                 )
                 for p in payloads

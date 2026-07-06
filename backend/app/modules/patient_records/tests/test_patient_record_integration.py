@@ -114,7 +114,7 @@ class TestPatientRecordLifecycle:
 
         finalized = svc.record_repo.finalize_record(svc.record_repo.get_by_id_or_raise(record_id))
         assert finalized.is_finalized is True
-        assert finalized.status == RecordStatus.COMPLETED
+        assert finalized.status == RecordStatus.FINALIZED
 
         with pytest.raises(PatientRecordBusinessRule, match="finalized"):
             PatientRecordValidator.assert_not_finalized(finalized)
@@ -135,7 +135,7 @@ class TestDiagnosisWorkflow:
 
         result = svc.create_diagnosis(record.id, DiagnosisCreate(diagnosis_name="Gingivitis", diagnosis_type=DiagnosisType.CONFIRMED), actor_id=1)
         assert result.id is not None
-        assert result.diagnosis == "Gingivitis"
+        assert result.diagnosis_name == "Gingivitis"
 
         updated = svc.update_diagnosis(result.id, DiagnosisUpdate(notes="Mild case"), actor_id=1)
         assert updated.notes == "Mild case"

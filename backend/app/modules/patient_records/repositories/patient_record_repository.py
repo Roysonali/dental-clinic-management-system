@@ -42,7 +42,6 @@ _ALLOWED_UPDATE_FIELDS: frozenset[str] = frozenset({
     "medical_alerts",
     "allergies",
     "dental_history",
-    "status",
 })
 
 
@@ -490,7 +489,7 @@ class PatientRecordRepository:
 
         Once finalised, the record is considered immutable for clinical
         purposes.  The ``is_finalized`` boolean is set to ``True``, and
-        the ``status`` is advanced to ``COMPLETED``.
+        the ``status`` is advanced to ``FINALIZED``.
 
         The record is refreshed after flush so that the caller receives
         a fully synchronised object with the latest ``updated_at`` and
@@ -503,7 +502,7 @@ class PatientRecordRepository:
             The refreshed patient record.
         """
         record.is_finalized = True
-        record.status = RecordStatus.COMPLETED
+        record.status = RecordStatus.FINALIZED
 
         self.db.flush()
         self.db.refresh(record)

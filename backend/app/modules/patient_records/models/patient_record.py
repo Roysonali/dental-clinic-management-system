@@ -126,6 +126,22 @@ class PatientRecord(Base):
         lazy="selectin",
     )
 
+    @property
+    def diagnosis_count(self) -> int:
+        return len(self.diagnoses) if self.diagnoses else 0
+
+    @property
+    def prescription_count(self) -> int:
+        return len(self.prescriptions) if self.prescriptions else 0
+
+    @property
+    def attachment_count(self) -> int:
+        return len(self.attachments) if self.attachments else 0
+
+    @property
+    def followup_count(self) -> int:
+        return len(self.followups) if self.followups else 0
+
     __table_args__ = (
         Index("ix_patient_records_status", "status"),
         Index("ix_patient_records_is_deleted", "is_deleted"),

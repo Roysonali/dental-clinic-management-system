@@ -268,11 +268,6 @@ class PatientRecordUpdate(
         description="Previous dental history",
     )
 
-    status: Optional[RecordStatus] = Field(
-        default=None,
-        title="Record Status",
-        description="Current record status",
-    )
 
 # ==========================================================
 # FINALIZE REQUEST
