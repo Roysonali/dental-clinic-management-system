@@ -249,11 +249,9 @@ sequenceDiagram
     participant Repository
     participant DB
 
-    Client->>Router: POST /doctors {user_id, specialization_ids, ...}
+    Client->>Router: POST /doctors {user_id, ...}
     Router->>Service: create_doctor(payload, current_user)
     Service->>Validator: validate_user_has_doctor_role(user_id)
-    Validator-->>Service: valid
-    Service->>Validator: validate_specializations(specialization_ids)
     Validator-->>Service: valid
     Service->>Repository: check_duplicate_doctor_code()
     Repository-->>Service: no duplicate
@@ -261,12 +259,10 @@ sequenceDiagram
     Service->>Repository: create(doctor)
     Repository->>DB: INSERT doctors
     DB-->>Repository: doctor row
-    Service->>Repository: add_specializations(doctor_id, ids, primary)
-    Repository->>DB: INSERT doctor_specializations
-    DB-->>Repository: specialization rows
     Service->>Service: set created_by, created_at
     Service-->>Router: DoctorResponse
     Router-->>Client: 201 Created
+    Note over Client,Router: Specialization assignment handled separately\nPOST /doctors/{id}/specializations
 ```
 
 ### 5.2 Search Doctors

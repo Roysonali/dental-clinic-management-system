@@ -109,9 +109,9 @@ The primary table for doctor profiles. A 1:1 extension of the `users` table. Ide
 | address | TEXT | NULLABLE | |
 | qualification | VARCHAR(500) | NULLABLE | Free-text qualifications |
 | registration_number | VARCHAR(100) | NULLABLE, UNIQUE | License/registration ID. Healthcare compliance — should be unique per doctor. |
-| years_of_experience | INTEGER | NULLABLE, CHECK >= 0 | |
-| consultation_fee | DECIMAL(10,2) | NULLABLE, CHECK >= 0 | |
-| consultation_duration | INTEGER | NULLABLE, CHECK > 0 | Minutes per appointment slot |
+| years_of_experience | INTEGER | NULLABLE, CHECK >= 0 | Upper bound of 50 enforced by application layer |
+| consultation_fee | DECIMAL(10,2) | NULLABLE, CHECK > 0 | Must be strictly positive (Phase 2 INV-7, Phase 5 BR-005) |
+| consultation_duration | INTEGER | NULLABLE, CHECK > 0 | Minutes per appointment slot. Application layer enforces 15–240 min range (Phase 10 §2.1). DB enforces > 0 as the minimum integrity constraint. |
 | languages_known | JSONB | NULLABLE, DEFAULT '[]' | Array of language strings |
 | profile_photo_url | VARCHAR(500) | NULLABLE | |
 | biography | TEXT | NULLABLE | |

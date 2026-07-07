@@ -32,7 +32,7 @@ class DoctorRepository:
 | Method | Signature | Description |
 |---|---|---|
 | `create` | `(doctor: Doctor) -> Doctor` | Persist new doctor, refresh, return |
-| `get_by_id` | `(doctor_id: UUID) -> Optional[Doctor]` | Single doctor by ID with relationships |
+| `get_by_id` | `(doctor_id: UUID) -> Optional[Doctor]` | Single doctor by ID with eager-loaded relationships (specializations, schedules) via `selectinload()` using `.options(selectinload(Doctor.specializations), selectinload(Doctor.schedules))` |
 | `get_by_user_id` | `(user_id: int) -> Optional[Doctor]` | Find doctor by linked user |
 | `get_by_doctor_code` | `(code: str) -> Optional[Doctor]` | Find by unique doctor code |
 | `update` | `(doctor: Doctor, updates: dict, updated_by: int) -> Doctor` | Apply field-level updates |
