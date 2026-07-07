@@ -19,6 +19,17 @@ from app.modules.auth.exceptions import (
     UserAlreadyInactive,
     UserNotFound,
 )
+from app.modules.patient_records.exceptions import (
+    AttachmentNotFound as PatientRecordAttachmentNotFound,
+    DiagnosisNotFound as PatientRecordDiagnosisNotFound,
+    FollowupNotFound as PatientRecordFollowupNotFound,
+    PatientRecordBusinessRule,
+    PatientRecordConflict,
+    PatientRecordException,
+    PatientRecordNotFound,
+    PrescriptionItemNotFound,
+    PrescriptionNotFound as PatientRecordPrescriptionNotFound,
+)
 from app.modules.patients.exceptions import (
     DuplicatePatientDetected,
     InvalidPatientOperation,
@@ -100,6 +111,17 @@ _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {
     PatientUpdateFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
+_PATIENT_RECORD_EXCEPTION_MAP: dict[type[PatientRecordException], int] = {
+    PatientRecordNotFound: status.HTTP_404_NOT_FOUND,
+    PatientRecordConflict: status.HTTP_409_CONFLICT,
+    PatientRecordBusinessRule: status.HTTP_400_BAD_REQUEST,
+    PatientRecordDiagnosisNotFound: status.HTTP_404_NOT_FOUND,
+    PatientRecordPrescriptionNotFound: status.HTTP_404_NOT_FOUND,
+    PrescriptionItemNotFound: status.HTTP_404_NOT_FOUND,
+    PatientRecordAttachmentNotFound: status.HTTP_404_NOT_FOUND,
+    PatientRecordFollowupNotFound: status.HTTP_404_NOT_FOUND,
+}
+
 
 async def auth_exception_handler(
     request: Request,
@@ -156,6 +178,39 @@ async def patient_exception_handler(
     )
     logger.warning(
         "Patient exception handled: code=%s, status=%d, path=%s",
+        exc.code,
+        http_status,
+        request.url.path,
+    )
+    return _error_response(
+        message=exc.message,
+        details=exc.details,
+        status_code=http_status,
+    )
+
+
+async def patient_record_exception_handler(
+    request: Request,
+    exc: PatientRecordException,
+) -> JSONResponse:
+    """Handle any PatientRecordException subclass and map it to the correct HTTP status.
+
+    Covers:
+    * PatientRecordNotFound → 404
+    * PatientRecordConflict → 409
+    * PatientRecordBusinessRule → 400
+    * DiagnosisNotFound → 404
+    * PrescriptionNotFound → 404
+    * PrescriptionItemNotFound → 404
+    * AttachmentNotFound → 404
+    * FollowupNotFound → 404
+    """
+    http_status = _PATIENT_RECORD_EXCEPTION_MAP.get(
+        type(exc),
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    logger.warning(
+        "PatientRecord exception handled: code=%s, status=%d, path=%s",
         exc.code,
         http_status,
         request.url.path,
@@ -233,6 +288,10 @@ def register_exception_handlers(app) -> None:
     app.add_exception_handler(
         PatientException,
         patient_exception_handler,
+    )
+    app.add_exception_handler(
+        PatientRecordException,
+        patient_record_exception_handler,
     )
     app.add_exception_handler(
         HTTPException,
