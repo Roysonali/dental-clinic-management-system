@@ -342,12 +342,6 @@ class DoctorSpecialization(Base):
         primary_key=True,
     )
 
-    is_primary = Column(
-        Boolean,
-        nullable=False,
-        default=False,
-    )
-
     certification_date = Column(
         Date,
         nullable=True,
@@ -390,7 +384,6 @@ class DoctorSpecialization(Base):
             f"spec_id={self.specialization_id}, "
             f"primary={self.is_primary})>"
         )
-
 
 class DoctorSchedule(Base):
     """
