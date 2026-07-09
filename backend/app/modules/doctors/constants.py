@@ -49,3 +49,15 @@ ALLOWED_SORT_FIELDS = {"full_name", "years_of_experience"}
 MIN_YEARS_EXPERIENCE = 0
 MAX_YEARS_EXPERIENCE = 50
 MIN_CONSULTATION_FEE = 0.01
+
+# ==========================================================
+# Consultation Duration (minutes)
+# ==========================================================
+
+# Business rule from Phase 10 §2.1 / INV-7:
+# Consultation duration must be between 15 minutes (minimum
+# meaningful slot) and 240 minutes (4-hour max session).
+# The database CheckConstraint enforces this range at the
+# schema level as defense-in-depth.
+MIN_CONSULTATION_DURATION = 15
+MAX_CONSULTATION_DURATION = 240
