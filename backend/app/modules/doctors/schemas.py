@@ -534,6 +534,41 @@ class SpecializationCreate(BaseModel):
     )
 
 
+class SpecializationUpdate(BaseModel):
+    """Request body for PATCH /specializations/{id}.
+
+    All fields optional for PATCH semantics. Only provided fields are updated.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+        title="Name",
+        description="Display name of the specialization.",
+        examples=["Orthodontics"],
+    )
+
+    code: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=20,
+        title="Code",
+        description="Short code for programmatic reference.",
+        examples=["ORTHO"],
+    )
+
+    description: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        title="Description",
+        description="Optional description of the specialization.",
+        examples=["Diagnosis, prevention, and correction of malpositioned teeth."],
+    )
+
+
 class DoctorSpecializationAssign(BaseModel):
     """Request body for POST /doctors/{id}/specializations.
 

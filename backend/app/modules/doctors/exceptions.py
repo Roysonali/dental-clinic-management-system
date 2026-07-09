@@ -116,6 +116,38 @@ class DoctorUserNotFound(DoctorException):
         )
 
 
+class ScheduleNotFound(DoctorException):
+    """Raised when a schedule ID is not found."""
+
+    def __init__(self):
+        super().__init__(
+            code="SCHEDULE_NOT_FOUND",
+            message="Schedule does not exist",
+        )
+
+
+class ScheduleCreationFailed(DoctorException):
+    """Raised when schedule creation fails unexpectedly."""
+
+    def __init__(self, details: Any = None):
+        super().__init__(
+            code="SCHEDULE_CREATION_FAILED",
+            message="Schedule creation failed",
+            details=details,
+        )
+
+
+class ScheduleUpdateFailed(DoctorException):
+    """Raised when schedule update fails unexpectedly."""
+
+    def __init__(self, details: Any = None):
+        super().__init__(
+            code="SCHEDULE_UPDATE_FAILED",
+            message="Schedule update failed",
+            details=details,
+        )
+
+
 class ScheduleOverlap(DoctorException):
     """Raised when a schedule slot overlaps with an existing slot."""
 
@@ -134,6 +166,39 @@ class SpecializationNotFound(DoctorException):
         super().__init__(
             code="SPECIALIZATION_NOT_FOUND",
             message="Specialization does not exist",
+        )
+
+
+class SpecializationCreationFailed(DoctorException):
+    """Raised when specialization creation fails unexpectedly."""
+
+    def __init__(self, details: Any = None):
+        super().__init__(
+            code="SPECIALIZATION_CREATION_FAILED",
+            message="Specialization creation failed",
+            details=details,
+        )
+
+
+class SpecializationUpdateFailed(DoctorException):
+    """Raised when specialization update fails unexpectedly."""
+
+    def __init__(self, details: Any = None):
+        super().__init__(
+            code="SPECIALIZATION_UPDATE_FAILED",
+            message="Specialization update failed",
+            details=details,
+        )
+
+
+class SpecializationValidationFailed(DoctorException):
+    """Raised when specialization business validation fails."""
+
+    def __init__(self, details: Any = None):
+        super().__init__(
+            code="SPECIALIZATION_VALIDATION_FAILED",
+            message="Specialization validation failed",
+            details=details,
         )
 
 
