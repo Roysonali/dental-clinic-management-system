@@ -19,33 +19,20 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.constants import DOCTOR_ROLES, USER_STATUS_ACTIVE
 from app.modules.auth.models import User
 from app.modules.doctors.constants import (
     DOCTOR_CODE_PREFIX,
     DOCTOR_CODE_SEQUENCE_WIDTH,
-    ERR_ALREADY_ACTIVE,
-    ERR_ALREADY_HAS_PROFILE,
-    ERR_ALREADY_INACTIVE,
-    ERR_CANNOT_MARK_INACTIVE_AVAILABLE,
     ERR_DOCTOR_NOT_FOUND,
-    ERR_NOT_A_DOCTOR_USER,
     ERR_PRIMARY_SPEC_NOT_IN_LIST,
-    ERR_REG_NUMBER_TAKEN,
-    ERR_SPEC_NOT_ASSIGNED,
     ERR_SPEC_NOT_FOUND,
-    ERR_USER_MUST_BE_ACTIVE,
-    ERR_USER_NOT_FOUND,
 )
 from app.modules.doctors.exceptions import (
     DoctorCreationFailed,
     DoctorNotFound,
     DoctorUpdateFailed,
-    DoctorUserNotFound,
     DoctorValidationFailed,
-    DuplicateDoctorDetected,
     InvalidDoctorOperation,
-    NotADoctorUser,
     SpecializationNotFound,
 )
 from app.modules.doctors.models import Doctor, DoctorSpecialization
@@ -56,6 +43,7 @@ from app.modules.doctors.repositories import (
     SpecializationRepository,
 )
 from app.modules.doctors.schemas import DoctorCreate, DoctorUpdate
+from app.modules.doctors.validators import DoctorValidator
 from app.modules.users.repository import get_user_by_id
 
 
@@ -349,7 +337,10 @@ class DoctorService:
                 return doctor
             registration_number = filtered.get("registration_number")
             if registration_number is not None:
-                self._assert_registration_number_unique(registration_number, exclude_doctor_id=doctor_id)
+                DoctorValidator.assert_registration_number_unique(
+                    self.doctor_repo, registration_number,
+                    exclude_doctor_id=doctor_id,
+                )
             for field, value in filtered.items():
                 setattr(doctor, field, value)
             doctor.updated_by = actor_id
@@ -380,8 +371,7 @@ class DoctorService:
         """
         def _activate() -> Doctor:
             doctor = self._get_doctor_or_raise(doctor_id)
-            if doctor.is_active:
-                raise InvalidDoctorOperation(ERR_ALREADY_ACTIVE)
+            DoctorValidator.assert_doctor_can_activate(doctor)
             doctor.is_active = True
             doctor.updated_by = actor_id
             self.doctor_repo.flush()
@@ -410,8 +400,7 @@ class DoctorService:
         """
         def _deactivate() -> Doctor:
             doctor = self._get_doctor_or_raise(doctor_id)
-            if not doctor.is_active:
-                raise InvalidDoctorOperation(ERR_ALREADY_INACTIVE)
+            DoctorValidator.assert_doctor_can_deactivate(doctor)
             doctor.is_active = False
             doctor.updated_by = actor_id
             self.doctor_repo.flush()
@@ -468,8 +457,7 @@ class DoctorService:
         """
         def _toggle() -> Doctor:
             doctor = self._get_doctor_or_raise(doctor_id)
-            if not doctor.is_active and not doctor.available_for_appointment:
-                raise InvalidDoctorOperation(ERR_CANNOT_MARK_INACTIVE_AVAILABLE)
+            DoctorValidator.assert_doctor_can_toggle_availability(doctor)
             doctor.available_for_appointment = not doctor.available_for_appointment
             doctor.updated_by = actor_id
             self.doctor_repo.flush()
@@ -545,8 +533,9 @@ class DoctorService:
         """
         def _remove() -> None:
             self._get_doctor_or_raise(doctor_id)
-            if not self.doctor_spec_repo.exists(doctor_id, specialization_id):
-                raise DoctorValidationFailed(ERR_SPEC_NOT_ASSIGNED)
+            DoctorValidator.assert_specialization_assigned(
+                self.doctor_spec_repo, doctor_id, specialization_id,
+            )
             self.doctor_spec_repo.delete(doctor_id, specialization_id)
 
         return self._run_in_transaction(
@@ -634,8 +623,8 @@ class DoctorService:
     def _validate_create_payload(self, payload: DoctorCreate) -> None:
         """Validate all business rules for doctor creation.
 
-        Loads the User once and reuses it across all assertion
-        helpers to avoid redundant database lookups.
+        Delegates to ``DoctorValidator`` for all validation logic.
+        The service retains orchestration responsibility.
 
         Args:
             payload: The validated create schema.
@@ -645,12 +634,14 @@ class DoctorService:
             DoctorValidationFailed: If the user is inactive or not a doctor.
             DuplicateDoctorDetected: If the user already has a profile.
         """
-        user = self._assert_user_exists(payload.user_id)
-        self._assert_user_active(user)
-        self._assert_user_has_doctor_role(user)
-        self._assert_no_existing_profile(payload.user_id)
+        user = DoctorValidator.assert_user_exists(self.user_repo, payload.user_id)
+        DoctorValidator.assert_user_active(user)
+        DoctorValidator.assert_user_has_doctor_role(user)
+        DoctorValidator.assert_no_existing_profile(self.doctor_repo, payload.user_id)
         if payload.registration_number:
-            self._assert_registration_number_unique(payload.registration_number)
+            DoctorValidator.assert_registration_number_unique(
+                self.doctor_repo, payload.registration_number,
+            )
 
     def _assign_specializations_to_doctor(
         self,
@@ -678,84 +669,6 @@ class DoctorService:
             )
             self.doctor_spec_repo.add(entry)
         self.doctor_spec_repo.flush()
-
-    # ------------------------------------------------------------------
-    # Assertion Helpers
-    # ------------------------------------------------------------------
-
-    def _assert_user_exists(self, user_id: int) -> User:
-        """Verify that a user exists.
-
-        Args:
-            user_id: Numeric ID of the user to check.
-
-        Returns:
-            The User entity for further checks.
-
-        Raises:
-            DoctorUserNotFound: If the user does not exist.
-        """
-        user = self.user_repo.get_by_id(user_id)
-        if user is None:
-            raise DoctorUserNotFound(ERR_USER_NOT_FOUND)
-        return user
-
-    def _assert_user_active(self, user: User) -> None:
-        """Verify that a user is active.
-
-        Checks both the is_active flag and the user status field.
-
-        Args:
-            user: The pre-loaded User entity.
-
-        Raises:
-            DoctorValidationFailed: If the user is not active.
-        """
-        if not user.is_active or user.status != USER_STATUS_ACTIVE:
-            raise DoctorValidationFailed(ERR_USER_MUST_BE_ACTIVE)
-
-    def _assert_user_has_doctor_role(self, user: User) -> None:
-        """Verify that a user has a role eligible to be a doctor.
-
-        Args:
-            user: The pre-loaded User entity.
-
-        Raises:
-            NotADoctorUser: If the user lacks a doctor role.
-        """
-        if not user.role or user.role.name not in DOCTOR_ROLES:
-            raise NotADoctorUser(ERR_NOT_A_DOCTOR_USER)
-
-    def _assert_no_existing_profile(self, user_id: int) -> None:
-        """Verify that a user does not already have a doctor profile.
-
-        Args:
-            user_id: Numeric ID of the user to check.
-
-        Raises:
-            DuplicateDoctorDetected: If the user already has a profile.
-        """
-        if self.doctor_repo.exists_by_user_id(user_id):
-            raise DuplicateDoctorDetected(ERR_ALREADY_HAS_PROFILE)
-
-    def _assert_registration_number_unique(
-        self,
-        registration_number: str,
-        exclude_doctor_id: Optional[UUID] = None,
-    ) -> None:
-        """Verify that a registration number is not already taken.
-
-        Args:
-            registration_number: The registration number to check.
-            exclude_doctor_id: Optional doctor ID to exclude (for updates).
-
-        Raises:
-            DoctorValidationFailed: If the registration number is taken.
-        """
-        if self.doctor_repo.registration_number_exists(
-            registration_number, exclude_doctor_id=exclude_doctor_id
-        ):
-            raise DoctorValidationFailed(ERR_REG_NUMBER_TAKEN)
 
     # ------------------------------------------------------------------
     # Specialisation Resolution

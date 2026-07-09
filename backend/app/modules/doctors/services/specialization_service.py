@@ -20,11 +20,6 @@ from sqlalchemy.orm import Session
 
 from app.modules.doctors.constants import (
     DEFAULT_PAGE_SIZE,
-    ERR_SPEC_ALREADY_ACTIVE,
-    ERR_SPEC_ALREADY_INACTIVE,
-    ERR_SPEC_ASSIGNED_TO_DOCTORS,
-    ERR_SPEC_CODE_TAKEN,
-    ERR_SPEC_NAME_TAKEN,
     ERR_SPEC_NOT_FOUND,
 )
 from app.modules.doctors.exceptions import (
@@ -39,6 +34,7 @@ from app.modules.doctors.repositories import (
     SpecializationRepository,
 )
 from app.modules.doctors.schemas import SpecializationCreate, SpecializationUpdate
+from app.modules.doctors.validators import SpecializationValidator
 
 
 logger = logging.getLogger(__name__)
@@ -180,8 +176,8 @@ class SpecializationService:
             SpecializationCreationFailed: If persistence fails.
         """
         def _create() -> Specialization:
-            self._assert_name_unique(payload.name)
-            self._assert_code_unique(payload.code)
+            SpecializationValidator.assert_name_unique(self.specialization_repo, payload.name)
+            SpecializationValidator.assert_code_unique(self.specialization_repo, payload.code)
             specialization = Specialization(
                 name=payload.name,
                 code=payload.code,
@@ -231,10 +227,14 @@ class SpecializationService:
                 return spec
             name = filtered.get("name")
             if name is not None:
-                self._assert_name_unique(name, exclude_id=specialization_id)
+                SpecializationValidator.assert_name_unique(
+                    self.specialization_repo, name, exclude_id=specialization_id,
+                )
             code = filtered.get("code")
             if code is not None:
-                self._assert_code_unique(code, exclude_id=specialization_id)
+                SpecializationValidator.assert_code_unique(
+                    self.specialization_repo, code, exclude_id=specialization_id,
+                )
             return self.specialization_repo.update(spec, filtered)
 
         return self._run_in_transaction(
@@ -260,9 +260,7 @@ class SpecializationService:
         """
         def _activate() -> Specialization:
             spec = self._get_specialization_for_update_or_raise(specialization_id)
-            if spec.is_active:
-                logger.warning("Specialization already active", extra={"specialization_id": specialization_id, "actor_id": actor_id})
-                raise SpecializationValidationFailed(ERR_SPEC_ALREADY_ACTIVE)
+            SpecializationValidator.assert_specialization_can_activate(spec)
             return self.specialization_repo.update(spec, {"is_active": True})
 
         return self._run_in_transaction(
@@ -287,9 +285,7 @@ class SpecializationService:
         """
         def _deactivate() -> Specialization:
             spec = self._get_specialization_for_update_or_raise(specialization_id)
-            if not spec.is_active:
-                logger.warning("Specialization already inactive", extra={"specialization_id": specialization_id, "actor_id": actor_id})
-                raise SpecializationValidationFailed(ERR_SPEC_ALREADY_INACTIVE)
+            SpecializationValidator.assert_specialization_can_deactivate(spec)
             return self.specialization_repo.update(spec, {"is_active": False})
 
         return self._run_in_transaction(
@@ -311,12 +307,9 @@ class SpecializationService:
         """
         def _delete() -> None:
             spec = self._get_specialization_for_update_or_raise(specialization_id)
-            if self.doctor_spec_repo.is_specialization_assigned(specialization_id):
-                logger.warning(
-                    "Cannot delete specialization assigned to doctors",
-                    extra={"specialization_id": specialization_id, "actor_id": actor_id},
-                )
-                raise SpecializationValidationFailed(ERR_SPEC_ASSIGNED_TO_DOCTORS)
+            SpecializationValidator.assert_not_assigned_to_doctors(
+                self.doctor_spec_repo, specialization_id,
+            )
             self.specialization_repo.delete(spec)
 
         return self._run_in_transaction(
@@ -367,33 +360,3 @@ class SpecializationService:
         return spec
 
 
-    def _assert_name_unique(self, name: str, exclude_id: Optional[int] = None) -> None:
-        """Verify a specialization name is not already taken (case-insensitive).
-
-        Args:
-            name: The name to check.
-            exclude_id: Optional ID to exclude from the check (for updates).
-
-        Raises:
-            SpecializationValidationFailed: If the name is already taken.
-        """
-        existing = self.specialization_repo.get_by_name(name)
-        if existing is not None and existing.id != exclude_id:
-            logger.warning("Duplicate specialization name", extra={"name": name, "existing_id": existing.id})
-            raise SpecializationValidationFailed(ERR_SPEC_NAME_TAKEN)
-
-
-    def _assert_code_unique(self, code: str, exclude_id: Optional[int] = None) -> None:
-        """Verify a specialization code is not already taken (case-insensitive).
-
-        Args:
-            code: The code to check.
-            exclude_id: Optional ID to exclude from the check (for updates).
-
-        Raises:
-            SpecializationValidationFailed: If the code is already taken.
-        """
-        existing = self.specialization_repo.get_by_code(code)
-        if existing is not None and existing.id != exclude_id:
-            logger.warning("Duplicate specialization code", extra={"code": code, "existing_id": existing.id})
-            raise SpecializationValidationFailed(ERR_SPEC_CODE_TAKEN)

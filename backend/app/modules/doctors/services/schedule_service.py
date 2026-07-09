@@ -15,7 +15,6 @@ Transaction Rules
 from __future__ import annotations
 
 import logging
-from datetime import time
 from typing import Any, Optional
 from uuid import UUID
 
@@ -25,12 +24,7 @@ from sqlalchemy.orm import Session
 from app.modules.doctors.constants import (
     ERR_DOCTOR_MUST_BE_ACTIVE,
     ERR_DOCTOR_NOT_FOUND,
-    ERR_SCHEDULE_CROSS_DOCTOR,
-    ERR_SCHEDULE_DUPLICATE_DAY,
-    ERR_SCHEDULE_END_BEFORE_START,
-    ERR_SCHEDULE_MAX_EXCEEDED,
     ERR_SCHEDULE_NOT_FOUND,
-    MAX_SCHEDULE_ENTRIES_PER_DOCTOR,
 )
 from app.modules.doctors.exceptions import (
     DoctorNotFound,
@@ -45,6 +39,7 @@ from app.modules.doctors.repositories import (
     DoctorScheduleRepository,
 )
 from app.modules.doctors.schemas import ScheduleCreate, ScheduleUpdate
+from app.modules.doctors.validators import ScheduleValidator
 
 
 logger = logging.getLogger(__name__)
@@ -162,37 +157,7 @@ class ScheduleService:
         return self.schedule_repo.get_doctor_schedule(doctor_id)
 
 
-    def _validate_schedule_constraints(
-        self,
-        doctor_id: UUID,
-        day_of_week: int,
-        start_time: time,
-        end_time: time,
-        exclude_schedule_id: Optional[UUID] = None,
-    ) -> None:
-        """Validate schedule time ordering and weekday uniqueness.
 
-        Ensures end time is after start time and that only one
-        schedule entry exists per weekday. An optional
-        ``exclude_schedule_id`` skips the entry being updated.
-
-        Args:
-            doctor_id: UUID of the doctor.
-            day_of_week: Target day (0=Monday through 5=Saturday).
-            start_time: Proposed start time.
-            end_time: Proposed end time.
-            exclude_schedule_id: Optional schedule ID to exclude from check.
-
-        Raises:
-            InvalidDoctorOperation: If end_time <= start_time.
-            InvalidDoctorOperation: If the day already has a schedule entry.
-        """
-        if end_time <= start_time:
-            raise InvalidDoctorOperation(ERR_SCHEDULE_END_BEFORE_START)
-        existing = self.schedule_repo.get_schedule_for_day(doctor_id, day_of_week)
-        if existing is not None:
-            if exclude_schedule_id is None or existing.id != exclude_schedule_id:
-                raise InvalidDoctorOperation(ERR_SCHEDULE_DUPLICATE_DAY)
 
     # ------------------------------------------------------------------
     # Write Methods
@@ -225,9 +190,9 @@ class ScheduleService:
         """
         def _create() -> DoctorSchedule:
             self._get_doctor_and_assert_active(doctor_id)
-            self._validate_schedule_constraints(
-                doctor_id, payload.day_of_week,
-                payload.start_time, payload.end_time,
+            ScheduleValidator.assert_time_ordering(payload.start_time, payload.end_time)
+            ScheduleValidator.assert_weekday_unique(
+                self.schedule_repo, doctor_id, payload.day_of_week,
             )
             schedule = DoctorSchedule(
                 doctor_id=doctor_id,
@@ -276,8 +241,7 @@ class ScheduleService:
             schedule = self.schedule_repo.get_schedule_by_id_for_update(schedule_id)
             if schedule is None:
                 raise ScheduleNotFound()
-            if schedule.doctor_id != doctor_id:
-                raise InvalidDoctorOperation(ERR_SCHEDULE_CROSS_DOCTOR)
+            ScheduleValidator.assert_schedule_belongs_to_doctor(schedule, doctor_id)
             update_data = payload.model_dump(exclude_unset=True)
             filtered = {
                 k: v for k, v in update_data.items()
@@ -288,8 +252,9 @@ class ScheduleService:
             day = filtered.get("day_of_week", schedule.day_of_week)
             start = filtered.get("start_time", schedule.start_time)
             end = filtered.get("end_time", schedule.end_time)
-            self._validate_schedule_constraints(
-                doctor_id, day, start, end,
+            ScheduleValidator.assert_time_ordering(start, end)
+            ScheduleValidator.assert_weekday_unique(
+                self.schedule_repo, doctor_id, day,
                 exclude_schedule_id=schedule_id,
             )
             return self.schedule_repo.update(schedule, filtered)
@@ -319,8 +284,7 @@ class ScheduleService:
             schedule = self.schedule_repo.get_schedule_by_id_for_update(schedule_id)
             if schedule is None:
                 raise ScheduleNotFound()
-            if schedule.doctor_id != doctor_id:
-                raise InvalidDoctorOperation(ERR_SCHEDULE_CROSS_DOCTOR)
+            ScheduleValidator.assert_schedule_belongs_to_doctor(schedule, doctor_id)
             self.schedule_repo.delete(schedule)
 
         return self._run_in_transaction(
@@ -357,15 +321,8 @@ class ScheduleService:
         """
         def _replace() -> list[DoctorSchedule]:
             self._get_doctor_and_assert_active(doctor_id)
-            if len(schedules) > MAX_SCHEDULE_ENTRIES_PER_DOCTOR:
-                raise InvalidDoctorOperation(ERR_SCHEDULE_MAX_EXCEEDED)
-            seen_days: set[int] = set()
-            for entry in schedules:
-                if entry.end_time <= entry.start_time:
-                    raise InvalidDoctorOperation(ERR_SCHEDULE_END_BEFORE_START)
-                if entry.day_of_week in seen_days:
-                    raise InvalidDoctorOperation(ERR_SCHEDULE_DUPLICATE_DAY)
-                seen_days.add(entry.day_of_week)
+            ScheduleValidator.assert_entry_count_not_exceeded(len(schedules))
+            ScheduleValidator.validate_replace_list(schedules)
             # Lock existing rows then atomically replace all entries
             self.schedule_repo.get_schedules_for_update(doctor_id)
             self.schedule_repo.delete_all_for_doctor(doctor_id)
