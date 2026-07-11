@@ -24,7 +24,6 @@ from app.modules.doctors.constants import (
     DOCTOR_CODE_PREFIX,
     DOCTOR_CODE_SEQUENCE_WIDTH,
     ERR_DOCTOR_NOT_FOUND,
-    ERR_PRIMARY_SPEC_NOT_IN_LIST,
     ERR_SPEC_NOT_FOUND,
 )
 from app.modules.doctors.exceptions import (
@@ -32,7 +31,10 @@ from app.modules.doctors.exceptions import (
     DoctorNotFound,
     DoctorUpdateFailed,
     DoctorValidationFailed,
+    DuplicateDoctorDetected,
     InvalidDoctorOperation,
+    NotADoctorUser,
+    DoctorUserNotFound,
     SpecializationNotFound,
 )
 from app.modules.doctors.models import Doctor, DoctorSpecialization
@@ -150,7 +152,11 @@ class DoctorService:
             self.db.commit()
             logger.info("Doctor operation succeeded", extra=ctx)
             return result
-        except (DoctorCreationFailed, DoctorUpdateFailed, InvalidDoctorOperation):
+        except (
+            DoctorCreationFailed, DoctorUpdateFailed, InvalidDoctorOperation,
+            DoctorNotFound, DoctorValidationFailed, DuplicateDoctorDetected,
+            NotADoctorUser, DoctorUserNotFound, SpecializationNotFound,
+        ):
             self.db.rollback()
             raise
         except IntegrityError as exc:
@@ -245,8 +251,8 @@ class DoctorService:
             A tuple of (list of Doctor entities, total count).
         """
         skip = (page - 1) * page_size
-        return self.doctor_repo.list_all(
-            skip=skip, limit=page_size, search=search,
+        return self.doctor_repo.list(
+            page=page, page_size=page_size, search=search,
             specialization_id=specialization_id, is_active=is_active,
             is_available=is_available, sort_by=sort_by, sort_order=sort_order,
         )
@@ -286,20 +292,21 @@ class DoctorService:
                 consultation_fee=payload.consultation_fee,
                 consultation_duration=payload.consultation_duration,
                 languages_known=payload.languages_known,
-                profile_photo_url=payload.profile_photo_url,
+                # Convert Pydantic HttpUrl → str for psycopg2 compatibility.
+                # HttpUrl is not a str subclass, so passing the object directly
+                # causes a "can't adapt type 'HttpUrl'" ProgrammingError from
+                # PostgreSQL during Session.flush(). The service layer owns this
+                # boundary between application domain types and persistence types.
+                profile_photo_url=str(payload.profile_photo_url)
+                    if payload.profile_photo_url is not None else None,
                 biography=payload.biography,
                 emergency_contact_name=payload.emergency_contact_name,
                 emergency_contact_phone=payload.emergency_contact_phone,
                 created_by=actor_id,
             )
             self.doctor_repo.add(doctor)
-            self.doctor_repo.flush()
-            self.doctor_repo.refresh(doctor)
-            if payload.specialization_ids:
-                self._assign_specializations_to_doctor(
-                    doctor.id, payload.specialization_ids,
-                    primary_id=payload.primary_specialization_id,
-                )
+            self.db.flush()
+            self.db.refresh(doctor)
             return doctor
 
         return self._run_in_transaction(
@@ -341,11 +348,17 @@ class DoctorService:
                     self.doctor_repo, registration_number,
                     exclude_doctor_id=doctor_id,
                 )
+            # Convert Pydantic HttpUrl → str for psycopg2 compatibility.
+            # The filter dict values come from model_dump(), which preserves
+            # Pydantic wrapper objects like HttpUrl. PostgreSQL cannot adapt
+            # these, so we eagerly convert them here at the service boundary.
+            if "profile_photo_url" in filtered and filtered["profile_photo_url"] is not None:
+                filtered["profile_photo_url"] = str(filtered["profile_photo_url"])
             for field, value in filtered.items():
                 setattr(doctor, field, value)
             doctor.updated_by = actor_id
-            self.doctor_repo.flush()
-            self.doctor_repo.refresh(doctor)
+            self.db.flush()
+            self.db.refresh(doctor)
             return doctor
 
         return self._run_in_transaction(
@@ -374,8 +387,8 @@ class DoctorService:
             DoctorValidator.assert_doctor_can_activate(doctor)
             doctor.is_active = True
             doctor.updated_by = actor_id
-            self.doctor_repo.flush()
-            self.doctor_repo.refresh(doctor)
+            self.db.flush()
+            self.db.refresh(doctor)
             return doctor
 
         return self._run_in_transaction(
@@ -403,8 +416,8 @@ class DoctorService:
             DoctorValidator.assert_doctor_can_deactivate(doctor)
             doctor.is_active = False
             doctor.updated_by = actor_id
-            self.doctor_repo.flush()
-            self.doctor_repo.refresh(doctor)
+            self.db.flush()
+            self.db.refresh(doctor)
             return doctor
 
         return self._run_in_transaction(
@@ -429,8 +442,8 @@ class DoctorService:
             doctor = self._get_doctor_or_raise(doctor_id)
             doctor.on_leave = not doctor.on_leave
             doctor.updated_by = actor_id
-            self.doctor_repo.flush()
-            self.doctor_repo.refresh(doctor)
+            self.db.flush()
+            self.db.refresh(doctor)
             return doctor
 
         return self._run_in_transaction(
@@ -460,8 +473,8 @@ class DoctorService:
             DoctorValidator.assert_doctor_can_toggle_availability(doctor)
             doctor.available_for_appointment = not doctor.available_for_appointment
             doctor.updated_by = actor_id
-            self.doctor_repo.flush()
-            self.doctor_repo.refresh(doctor)
+            self.db.flush()
+            self.db.refresh(doctor)
             return doctor
 
         return self._run_in_transaction(
@@ -510,7 +523,7 @@ class DoctorService:
                 )
                 self.doctor_spec_repo.add(entry)
                 new_entries.append(entry)
-            self.doctor_spec_repo.flush()
+            self.db.flush()
             return new_entries
 
         return self._run_in_transaction(
@@ -668,7 +681,7 @@ class DoctorService:
                 is_primary=is_primary,
             )
             self.doctor_spec_repo.add(entry)
-        self.doctor_spec_repo.flush()
+        self.db.flush()
 
     # ------------------------------------------------------------------
     # Specialisation Resolution
@@ -694,11 +707,10 @@ class DoctorService:
 
         Raises:
             SpecializationNotFound: If any ID is invalid.
-            DoctorValidationFailed: If primary is not in the list.
         """
-        if primary_specialization_id is not None:
-            if primary_specialization_id not in specialization_ids:
-                raise DoctorValidationFailed(ERR_PRIMARY_SPEC_NOT_IN_LIST)
+        DoctorValidator.assert_primary_specialization_valid(
+            primary_specialization_id, specialization_ids,
+        )
 
         existing = self.specialization_repo.get_by_ids(specialization_ids)
         existing_ids = {s.id for s in existing}

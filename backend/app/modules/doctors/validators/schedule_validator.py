@@ -29,6 +29,7 @@ from app.modules.doctors.constants import (
 from app.modules.doctors.exceptions import InvalidDoctorOperation
 from app.modules.doctors.models import DoctorSchedule
 from app.modules.doctors.schemas import ScheduleCreate
+from ._protocols import ScheduleRepositoryProtocol
 
 
 class ScheduleValidator:
@@ -69,7 +70,7 @@ class ScheduleValidator:
 
     @staticmethod
     def assert_weekday_unique(
-        schedule_repo,
+        schedule_repo: ScheduleRepositoryProtocol,
         doctor_id: UUID,
         day_of_week: int,
         exclude_schedule_id: Optional[UUID] = None,
@@ -158,8 +159,7 @@ class ScheduleValidator:
         """
         seen_days: set[int] = set()
         for entry in schedules:
-            if entry.end_time <= entry.start_time:
-                raise InvalidDoctorOperation(ERR_SCHEDULE_END_BEFORE_START)
+            ScheduleValidator.assert_time_ordering(entry.start_time, entry.end_time)
             if entry.day_of_week in seen_days:
                 raise InvalidDoctorOperation(ERR_SCHEDULE_DUPLICATE_DAY)
             seen_days.add(entry.day_of_week)

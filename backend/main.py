@@ -32,6 +32,11 @@ from app.modules.patient_records.routers.audit_router import (
     router as audit_router,
     item_router as audit_item_router,
 )
+from app.modules.doctors.routes import (
+    router as doctor_router,
+    specialization_router,
+    schedule_router,
+)
 from app.core.exception_handlers import (register_exception_handlers)
 
 app = FastAPI(
@@ -56,6 +61,9 @@ app.include_router(followup_router)
 app.include_router(followup_item_router)
 app.include_router(audit_router)
 app.include_router(audit_item_router)
+app.include_router(doctor_router)
+app.include_router(specialization_router)
+app.include_router(schedule_router)
 
 # Register global exception handlers
 register_exception_handlers(app)

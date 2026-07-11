@@ -71,10 +71,17 @@ class DoctorValidators:
 
     @field_validator("date_of_birth", mode="before")
     @classmethod
-    def validate_date_of_birth(cls, value: date | None) -> date | None:
+    def validate_date_of_birth(cls, value: date | str | None) -> date | None:
         """Reject future dates and implausibly old dates."""
         if value is None:
             return None
+        if isinstance(value, str):
+            try:
+                value = date.fromisoformat(value)
+            except (ValueError, TypeError):
+                raise ValueError(
+                    "Date of birth must be a valid ISO date string (YYYY-MM-DD)"
+                )
         today = date.today()
         if value > today:
             raise ValueError("Date of birth cannot be in the future")
@@ -1049,6 +1056,36 @@ class SpecializationResponse(BaseModel):
         title="Is Active",
         description="Whether this specialization is active.",
         examples=[True],
+    )
+
+
+class SpecializationListResponse(BaseModel):
+    """Paginated list of specialization records."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    items: list[SpecializationResponse] = Field(
+        default_factory=list,
+        title="Items",
+        description="Specialization records on this page.",
+    )
+
+    total: int = Field(
+        ge=0,
+        title="Total",
+        description="Total number of specializations matching the query.",
+    )
+
+    page: int = Field(
+        ge=1,
+        title="Page",
+        description="Current page number (1-based).",
+    )
+
+    page_size: int = Field(
+        ge=1,
+        title="Page Size",
+        description="Number of items per page.",
     )
 
 

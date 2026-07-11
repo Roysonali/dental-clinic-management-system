@@ -15,6 +15,14 @@ class DoctorSpecializationRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def add(self, entry: DoctorSpecialization) -> None:
+        """Add a new specialization assignment to the session without committing.
+
+        Used by the service layer which manages its own transaction
+        boundary and calls ``flush()`` / ``refresh()`` separately.
+        """
+        self.db.add(entry)
+
     def assign_specialization(
         self,
         doctor_specialization: DoctorSpecialization,
@@ -125,6 +133,13 @@ class DoctorSpecializationRepository:
             .limit(1)
         )
         return self.db.execute(stmt).first() is not None
+
+    def delete(self, doctor_id: UUID, specialization_id: int) -> None:
+        """Alias for :meth:`remove_specialization`.
+
+        Called by the service layer as ``self.doctor_spec_repo.delete()``.
+        """
+        return self.remove_specialization(doctor_id, specialization_id)
 
     def is_specialization_assigned(self, specialization_id: int) -> bool:
         """Check whether any doctor has this specialization assigned.

@@ -342,6 +342,12 @@ class DoctorSpecialization(Base):
         primary_key=True,
     )
 
+    is_primary = Column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+
     certification_date = Column(
         Date,
         nullable=True,

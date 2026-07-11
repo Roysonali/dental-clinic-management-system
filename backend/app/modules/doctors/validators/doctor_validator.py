@@ -25,6 +25,7 @@ from app.modules.doctors.constants import (
     ERR_ALREADY_HAS_PROFILE,
     ERR_ALREADY_INACTIVE,
     ERR_CANNOT_MARK_INACTIVE_AVAILABLE,
+    ERR_DOCTOR_MUST_BE_ACTIVE,
     ERR_NOT_A_DOCTOR_USER,
     ERR_PRIMARY_SPEC_NOT_IN_LIST,
     ERR_REG_NUMBER_TAKEN,
@@ -42,6 +43,11 @@ from app.modules.doctors.exceptions import (
     SpecializationNotFound,
 )
 from app.modules.doctors.models import Doctor
+from ._protocols import (
+    DoctorRepositoryProtocol,
+    DoctorSpecializationRepositoryProtocol,
+    UserRepositoryProtocol,
+)
 
 
 class DoctorValidator:
@@ -65,7 +71,7 @@ class DoctorValidator:
 
     @staticmethod
     def assert_user_exists(
-        user_repo,
+        user_repo: UserRepositoryProtocol,
         user_id: int,
     ) -> User:
         """Verify that a user exists and return it for further checks.
@@ -119,7 +125,7 @@ class DoctorValidator:
 
     @staticmethod
     def assert_no_existing_profile(
-        doctor_repo,
+        doctor_repo: DoctorRepositoryProtocol,
         user_id: int,
     ) -> None:
         """Verify that a user does not already have a doctor profile.
@@ -137,7 +143,7 @@ class DoctorValidator:
 
     @staticmethod
     def assert_registration_number_unique(
-        doctor_repo,
+        doctor_repo: DoctorRepositoryProtocol,
         registration_number: str,
         exclude_doctor_id: Optional[UUID] = None,
     ) -> None:
@@ -206,13 +212,46 @@ class DoctorValidator:
         if not doctor.is_active and not doctor.available_for_appointment:
             raise InvalidDoctorOperation(ERR_CANNOT_MARK_INACTIVE_AVAILABLE)
 
+    @staticmethod
+    def assert_doctor_active(doctor: Doctor) -> None:
+        """Verify that a doctor is active.
+
+        Reusable business rule for dependent operations (e.g. managing
+        a doctor's schedule) that require an active doctor.
+
+        Args:
+            doctor: The ``Doctor`` entity to check.
+
+        Raises:
+            InvalidDoctorOperation: If the doctor is inactive.
+        """
+        if not doctor.is_active:
+            raise InvalidDoctorOperation(ERR_DOCTOR_MUST_BE_ACTIVE)
+
     # ==================================================================
     # Specialization Validation
     # ==================================================================
 
     @staticmethod
+    def assert_primary_specialization_valid(
+        primary_specialization_id: Optional[int],
+        specialization_ids: list[int],
+    ) -> None:
+        """Verify that the chosen primary specialization is in the assigned list.
+
+        Raises:
+            DoctorValidationFailed: If a primary specialization is specified
+                but is not present in ``specialization_ids``.
+        """
+        if (
+            primary_specialization_id is not None
+            and primary_specialization_id not in specialization_ids
+        ):
+            raise DoctorValidationFailed(ERR_PRIMARY_SPEC_NOT_IN_LIST)
+
+    @staticmethod
     def assert_specialization_assigned(
-        doctor_spec_repo,
+        doctor_spec_repo: DoctorSpecializationRepositoryProtocol,
         doctor_id: UUID,
         specialization_id: int,
     ) -> None:

@@ -99,7 +99,7 @@ class SpecializationService:
             self.db.commit()
             logger.info("Specialization operation succeeded", extra=ctx)
             return result
-        except (SpecializationCreationFailed, SpecializationUpdateFailed, SpecializationValidationFailed):
+        except (SpecializationCreationFailed, SpecializationUpdateFailed, SpecializationValidationFailed, SpecializationNotFound):
             self.db.rollback()
             raise
         except IntegrityError as exc:

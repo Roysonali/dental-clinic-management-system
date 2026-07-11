@@ -22,7 +22,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.doctors.constants import (
-    ERR_DOCTOR_MUST_BE_ACTIVE,
     ERR_DOCTOR_NOT_FOUND,
     ERR_SCHEDULE_NOT_FOUND,
 )
@@ -39,7 +38,7 @@ from app.modules.doctors.repositories import (
     DoctorScheduleRepository,
 )
 from app.modules.doctors.schemas import ScheduleCreate, ScheduleUpdate
-from app.modules.doctors.validators import ScheduleValidator
+from app.modules.doctors.validators import DoctorValidator, ScheduleValidator
 
 
 logger = logging.getLogger(__name__)
@@ -104,7 +103,7 @@ class ScheduleService:
             self.db.commit()
             logger.info("Schedule operation succeeded", extra=ctx)
             return result
-        except (ScheduleCreationFailed, ScheduleUpdateFailed, InvalidDoctorOperation):
+        except (ScheduleCreationFailed, ScheduleUpdateFailed, InvalidDoctorOperation, DoctorNotFound, ScheduleNotFound):
             self.db.rollback()
             raise
         except IntegrityError as exc:
@@ -133,8 +132,7 @@ class ScheduleService:
         doctor = self.doctor_repo.get_by_id(doctor_id)
         if doctor is None:
             raise DoctorNotFound(ERR_DOCTOR_NOT_FOUND)
-        if not doctor.is_active:
-            raise InvalidDoctorOperation(ERR_DOCTOR_MUST_BE_ACTIVE)
+        DoctorValidator.assert_doctor_active(doctor)
 
     # ------------------------------------------------------------------
     # Query Methods

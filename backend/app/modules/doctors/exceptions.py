@@ -34,20 +34,21 @@ class DoctorException(Exception):
 class DoctorNotFound(DoctorException):
     """Raised when a doctor ID is not found in the database."""
 
-    def __init__(self):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="DOCTOR_NOT_FOUND",
-            message="Doctor does not exist",
+            message=message or "Doctor does not exist",
+            details=details,
         )
 
 
 class DuplicateDoctorDetected(DoctorException):
     """Raised when a duplicate doctor_code or user_id is detected."""
 
-    def __init__(self, details: Any = None):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="DUPLICATE_DOCTOR",
-            message="Possible duplicate doctor detected",
+            message=message or "Possible duplicate doctor detected",
             details=details,
         )
 
@@ -77,10 +78,10 @@ class DoctorUpdateFailed(DoctorException):
 class DoctorValidationFailed(DoctorException):
     """Raised when schema or business validation fails."""
 
-    def __init__(self, details: Any = None):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="DOCTOR_VALIDATION_FAILED",
-            message="Doctor validation failed",
+            message=message or "Doctor validation failed",
             details=details,
         )
 
@@ -88,10 +89,10 @@ class DoctorValidationFailed(DoctorException):
 class InvalidDoctorOperation(DoctorException):
     """Raised for invalid state transitions (e.g. deactivate already inactive)."""
 
-    def __init__(self, details: Any = None):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="INVALID_DOCTOR_OPERATION",
-            message="Invalid doctor operation",
+            message=message or "Invalid doctor operation",
             details=details,
         )
 
@@ -99,30 +100,33 @@ class InvalidDoctorOperation(DoctorException):
 class NotADoctorUser(DoctorException):
     """Raised when the linked User does not have a DOCTOR-family role."""
 
-    def __init__(self):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="NOT_A_DOCTOR_USER",
-            message="User does not have a doctor role",
+            message=message or "User does not have a doctor role",
+            details=details,
         )
 
 
 class DoctorUserNotFound(DoctorException):
     """Raised when a referenced User ID does not exist in the system."""
 
-    def __init__(self):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="USER_NOT_FOUND",
-            message="Referenced user does not exist",
+            message=message or "Referenced user does not exist",
+            details=details,
         )
 
 
 class ScheduleNotFound(DoctorException):
     """Raised when a schedule ID is not found."""
 
-    def __init__(self):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="SCHEDULE_NOT_FOUND",
-            message="Schedule does not exist",
+            message=message or "Schedule does not exist",
+            details=details,
         )
 
 
@@ -162,10 +166,11 @@ class ScheduleOverlap(DoctorException):
 class SpecializationNotFound(DoctorException):
     """Raised when a specialization ID is not found."""
 
-    def __init__(self):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="SPECIALIZATION_NOT_FOUND",
-            message="Specialization does not exist",
+            message=message or "Specialization does not exist",
+            details=details,
         )
 
 
@@ -194,10 +199,10 @@ class SpecializationUpdateFailed(DoctorException):
 class SpecializationValidationFailed(DoctorException):
     """Raised when specialization business validation fails."""
 
-    def __init__(self, details: Any = None):
+    def __init__(self, message=None, details=None):
         super().__init__(
             code="SPECIALIZATION_VALIDATION_FAILED",
-            message="Specialization validation failed",
+            message=message or "Specialization validation failed",
             details=details,
         )
 

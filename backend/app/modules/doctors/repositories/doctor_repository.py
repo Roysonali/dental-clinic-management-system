@@ -46,6 +46,14 @@ class DoctorRepository:
             Doctor.registration_number.ilike(pattern),
         )
 
+    def add(self, doctor: Doctor) -> None:
+        """Add a new doctor to the session without committing.
+
+        Used by the service layer which manages its own transaction
+        boundary and calls ``flush()`` / ``refresh()`` separately.
+        """
+        self.db.add(doctor)
+
     def create(self, doctor: Doctor) -> Doctor:
         self.db.add(doctor)
         self.db.flush()
@@ -128,11 +136,19 @@ class DoctorRepository:
             )
         if is_active is not None:
             filters.append(Doctor.is_active == is_active)
-        if is_available is not None:
-            filters.append(
+        if is_available is True:
+            filters.extend([
                 Doctor.is_active.is_(True),
                 Doctor.available_for_appointment.is_(True),
                 Doctor.on_leave.is_(False),
+            ])
+        elif is_available is False:
+            filters.append(
+                or_(
+                    Doctor.is_active.is_(False),
+                    Doctor.available_for_appointment.is_(False),
+                    Doctor.on_leave.is_(True),
+                )
             )
 
         count_stmt = select(func.count()).select_from(Doctor)
@@ -150,6 +166,8 @@ class DoctorRepository:
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
+        if sort_field == "full_name":
+            stmt = stmt.join(Doctor.user, isouter=True)
         if filters:
             stmt = stmt.where(*filters)
         items = list(self.db.execute(stmt).scalars().all())
@@ -210,9 +228,35 @@ class DoctorRepository:
         stmt = select(Doctor.id).where(Doctor.doctor_code == doctor_code).limit(1)
         return self.db.execute(stmt).first() is not None
 
+    def registration_number_exists(
+        self,
+        registration_number: str,
+        exclude_doctor_id: UUID | None = None,
+    ) -> bool:
+        """Return True if a *different* doctor already owns the registration number.
+
+        The doctor identified by ``exclude_doctor_id`` is excluded so the
+        same doctor can retain (or re-submit) its own number during an
+        update without triggering a false duplicate. Used by both doctor
+        creation (``exclude_doctor_id=None``) and updates.
+
+        Args:
+            registration_number: The (normalized, uppercase) number to check.
+            exclude_doctor_id: Optional doctor UUID to ignore in the check.
+
+        Returns:
+            True if another doctor owns the number, else False.
+        """
+        stmt = select(Doctor.id).where(
+            Doctor.registration_number == registration_number
+        )
+        if exclude_doctor_id is not None:
+            stmt = stmt.where(Doctor.id != exclude_doctor_id)
+        return self.db.execute(stmt.limit(1)).first() is not None
+
     def exists_by_registration_number(self, registration_number: str) -> bool:
-        stmt = select(Doctor.id).where(Doctor.registration_number == registration_number).limit(1)
-        return self.db.execute(stmt).first() is not None
+        """Backward-compatible alias for :meth:`registration_number_exists`."""
+        return self.registration_number_exists(registration_number)
 
     def get_latest_doctor_code(self) -> Optional[str]:
         stmt = (
