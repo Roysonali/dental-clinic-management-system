@@ -1,24 +1,3 @@
-# Authentication
-from app.modules.auth.models import User, Role
+from app.modules.auth.models import Role
+from app.modules.auth.models import User
 
-# Patients
-from app.modules.patients.models import Patient
-
-# Appointments
-from app.modules.appointments.model import Appointment
-
-# Patient Records
-from app.modules.patient_records.models import (
-    PatientRecord,
-    PatientRecordDiagnosis,
-    PatientRecordAttachment,
-    PatientRecordAuditLog,
-)
-
-# Doctors
-from app.modules.doctors.models import (
-    Doctor,
-    DoctorSchedule,
-    DoctorSpecialization,
-    Specialization,
-)
