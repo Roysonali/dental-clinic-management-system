@@ -4,7 +4,7 @@
 > **MVP Scope:** This document reflects only the Doctor Management MVP. Future features are documented in Phase 18.
 
 | Field | Value |
-|---|---|
+|-------|-------|
 | Document | Business Requirements Document |
 | Module | Doctor Management |
 | Version | 1.0 |
@@ -43,9 +43,9 @@ DensCare is a dental clinic management platform with the following completed mod
 
 Doctors (dentists) are currently represented indirectly as User records with a DOCTOR-family role. This causes several operational problems:
 
-| # | Problem | Business Impact |
-|---|---|---|
-| P1 | No structured specialization data | Reception staff cannot route patients to the correct specialist. Manual lookups waste 5–10 minutes per patient. |
+| # |       Problem                        | Business Impact               |
+|---|--------------------------------------|------------------------------|
+| P1 | No structured specialization data | Reception staff cannot route        patients to the correct specialist. Manual lookups waste 5–10 minutes per patient. |
 | P2 | No schedule templates | Each appointment requires manual time-slot verification. Schedule conflicts go undetected until patient arrival. |
 | P3 | No consultation fee configuration | Fee negotiation happens verbally. Billing has no reference rate for doctor-specific procedures. |
 | P4 | No doctor search by attributes | Front desk cannot answer "available general dentists today." Patients wait while staff manually check. |
@@ -145,8 +145,8 @@ The following are explicitly out of scope for the MVP and are documented in Phas
 
 ## 6. Stakeholders
 
-| Stakeholder | Role | Interest |
-|---|---|---|
+| Stakeholder          | Role         | Interest |
+|----------------------|--------------|-------------------------|
 | Clinic Administrator | System owner | Complete doctor data visibility, audit compliance |
 | Chief Doctor | Clinical lead | Specialization routing, schedule management |
 | General Dentist | End user | Own profile management, schedule visibility |

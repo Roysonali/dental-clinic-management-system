@@ -1,6 +1,6 @@
 # Phase 14: Router Layer — Doctor Management Module
 
-> **Status:** IN REVIEW | **Target Quality Score:** 9.8/10
+> **Status:** PASS | **Target Quality Score:** 9.8/10
 > **MVP Scope:** Only router endpoints for Doctor Profile, Specialization, and Schedule management.
 
 ---
@@ -28,6 +28,7 @@ from app.modules.rbac.permissions import require_roles
 from app.modules.auth.models import User
 
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
+specializations_router = APIRouter(prefix="/specializations", tags=["Specializations"])
 ```
 
 ---
@@ -73,13 +74,41 @@ from app.core.constants import (
     ROLE_SPECIALIST_DOCTOR, ROLE_CONSULTING_DOCTOR, ROLE_RECEPTIONIST,
     DOCTOR_ROLES,
 )
-
 require_admin_or_chief = require_roles([ROLE_ADMIN, ROLE_CHIEF_DOCTOR])
 require_clinical_role = require_roles([
     ROLE_ADMIN, ROLE_CHIEF_DOCTOR, ROLE_GENERAL_DOCTOR,
     ROLE_SPECIALIST_DOCTOR, ROLE_CONSULTING_DOCTOR, ROLE_RECEPTIONIST
 ])
 require_doctor_role = require_roles(list(DOCTOR_ROLES))
+
+
+def doctor_owner_or_admin(
+    doctor_id: UUID,
+    current_user: User = Depends(require_roles(
+        [ROLE_ADMIN, ROLE_CHIEF_DOCTOR, *DOCTOR_ROLES],
+    )),
+    service: DoctorService = Depends(get_doctor_service),
+) -> User:
+    """Return current_user if admin/chief or the profile owner.
+    
+    Two-step auth:
+    1. require_roles() checks role membership (Admin, Chief Doctor, or any Doctor role)
+    2. Owner check: Admin and Chief Doctor bypass; other doctors must own the profile
+    
+    The role list includes ROLE_ADMIN and ROLE_CHIEF_DOCTOR because require_roles()
+    runs BEFORE the owner-check body. Without them, Admin users would be rejected
+    at the role check stage and never reach the admin-bypass logic.
+    """
+    if current_user.role.name in {ROLE_ADMIN, ROLE_CHIEF_DOCTOR}:
+        return current_user
+    # Check if the doctor profile's user_id matches current user
+    doctor = service.get_doctor(doctor_id)
+    if doctor.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SELF_SERVICE_NOT_ALLOWED",
+        )
+    return current_user
 ```
 
 ---
@@ -144,6 +173,23 @@ def get_doctor(
         handle_exception(exc)
 
 
+@router.get("/{doctor_id}/profile", response_model=DoctorProfileResponse)
+def get_doctor_profile(
+    doctor_id: UUID,
+    service: DoctorService = Depends(get_doctor_service),
+    current_user: User = Depends(doctor_owner_or_admin),
+):
+    """
+    Get own detailed profile including schedules.
+    Returns DoctorResponse fields plus schedules array.
+    Auth: Admin/Chief Doctor (any profile), Doctor (own profile only).
+    """
+    try:
+        return service.get_doctor_profile(doctor_id)
+    except Exception as exc:
+        handle_exception(exc)
+
+
 @router.patch("/{doctor_id}", response_model=DoctorResponse)
 def update_doctor(
     doctor_id: UUID,
@@ -189,7 +235,7 @@ def toggle_availability(
     doctor_id: UUID,
     payload: DoctorAvailabilityUpdate,
     service: DoctorService = Depends(get_doctor_service),
-    _: User = Depends(require_doctor_role),
+    current_user: User = Depends(doctor_owner_or_admin),
 ):
     try:
         service.toggle_availability(doctor_id, payload.available)
@@ -203,7 +249,7 @@ def toggle_leave(
     doctor_id: UUID,
     payload: DoctorLeaveToggle,
     service: DoctorService = Depends(get_doctor_service),
-    _: User = Depends(require_doctor_role),
+    current_user: User = Depends(doctor_owner_or_admin),
 ):
     try:
         service.toggle_leave(doctor_id, payload.on_leave)
@@ -226,8 +272,14 @@ def check_availability(
 
 ### 5.3 Specialization Endpoints
 
+Specialization management endpoints are defined on a separate router (`specializations_router`) with prefix `/specializations`, distinct from the doctor profile router. Doctor-specific specialization assignment endpoints remain on the `doctors_router`.
+
 ```python
-@router.get("/specializations", response_model=list[SpecializationResponse])
+# ---- Specializations Router (prefix=/specializations) ----
+specializations_router = APIRouter(prefix="/specializations", tags=["Specializations"])
+
+
+@specializations_router.get("", response_model=list[SpecializationResponse])
 def list_specializations(
     service: DoctorService = Depends(get_doctor_service),
     _: User = Depends(require_clinical_role),
@@ -235,7 +287,7 @@ def list_specializations(
     return service.list_active_specializations()
 
 
-@router.post("/specializations", response_model=SpecializationResponse, status_code=201)
+@specializations_router.post("", response_model=SpecializationResponse, status_code=201)
 def create_specialization(
     payload: SpecializationCreate,
     service: DoctorService = Depends(get_doctor_service),
@@ -246,7 +298,11 @@ def create_specialization(
         return specialization
     except Exception as exc:
         handle_exception(exc)
+```
 
+```python
+# ---- Doctor-specific specialization endpoints (on doctors router) ----
+# These remain on the doctors router because they operate within the DoctorProfile aggregate
 
 @router.get("/{doctor_id}/specializations", response_model=list[DoctorSpecializationResponse])
 def get_doctor_specializations(
@@ -306,7 +362,7 @@ def set_primary_specialization(
 def get_schedules(
     doctor_id: UUID,
     service: DoctorService = Depends(get_doctor_service),
-    current_user: User = Depends(require_doctor_role),
+    current_user: User = Depends(doctor_owner_or_admin),
 ):
     try:
         return service.get_doctor_schedules(doctor_id)
@@ -319,7 +375,7 @@ def create_schedule(
     doctor_id: UUID,
     payload: ScheduleCreate,
     service: DoctorService = Depends(get_doctor_service),
-    current_user: User = Depends(require_doctor_role),
+    current_user: User = Depends(doctor_owner_or_admin),
 ):
     try:
         return service.create_schedule(doctor_id, payload)
@@ -332,7 +388,7 @@ def delete_schedule(
     doctor_id: UUID,
     schedule_id: UUID,
     service: DoctorService = Depends(get_doctor_service),
-    _: User = Depends(require_doctor_role),
+    current_user: User = Depends(doctor_owner_or_admin),
 ):
     try:
         service.delete_schedule(schedule_id)
@@ -346,7 +402,7 @@ def update_schedule(
     schedule_id: UUID,
     payload: ScheduleUpdate,
     service: DoctorService = Depends(get_doctor_service),
-    _: User = Depends(require_doctor_role),
+    current_user: User = Depends(doctor_owner_or_admin),
 ):
     try:
         return service.update_schedule(schedule_id, payload, doctor_id)
@@ -361,10 +417,11 @@ def update_schedule(
 In `backend/app/main.py`:
 
 ```python
-from app.modules.doctors.router import router as doctors_router
+from app.modules.doctors.router import router as doctors_router, specializations_router
 
 # Register Doctor Management routes (prefix from router definition)
 app.include_router(doctors_router)
+app.include_router(specializations_router)
 ```
 
 ---

@@ -1,19 +1,20 @@
 # Phase 6: API Design — Doctor Management Module
 
-> **Status:** IN REVIEW | **Target Quality Score:** 9.8/10
+> **Status:** PASS | **Target Quality Score:** 9.8/10
 > **MVP Scope:** Only endpoints required for Doctor Profile, Specializations, and Schedule management.
 
 ---
 
 ## 1. Base Path & Versioning
 
-All endpoints are prefixed with `/doctors`:
+Doctor profile and schedule endpoints are prefixed with `/doctors`. Specialization management endpoints are prefixed with `/specializations` (separate resource, separate router):
 
 ```
-http://localhost:8000/api/doctors
+http://localhost:8000/api/doctors    # Doctor profiles and schedules
+http://localhost:8000/api/specializations  # Specialization management
 ```
 
-The FastAPI router prefix is `/doctors` with tag `["Doctors"]`.
+The FastAPI router prefix is `/doctors` with tag `["Doctors"]` for profile/schedule endpoints, and `/specializations` with tag `["Specializations"]` for specialization management.
 
 **API Versioning:** DensCare follows implicit versioning — no version prefix in the URL (current version = v1). Breaking changes introduce a path prefix (`/api/v2`) per the existing project convention. This module introduces no breaking changes to existing API contracts.
 
@@ -70,6 +71,8 @@ Each endpoint follows the existing DensCare FastAPI decorator pattern with `summ
 | GET | `/doctors/{id}/availability` | All clinical roles | Check doctor availability |
 | GET | `/specializations` | All authenticated | List specializations |
 | POST | `/specializations` | Admin, Chief Doctor | Create specialization |
+
+> **Note:** The `/specializations` endpoints are on a separate router (prefix `/specializations`), while doctor-specific specialization assignment endpoints (`/doctors/{id}/specializations`) remain on the doctors router.
 | GET | `/doctors/{id}/specializations` | All authenticated | Get doctor specializations |
 | POST | `/doctors/{id}/specializations` | Admin, Chief Doctor | Assign specialization |
 | DELETE | `/doctors/{id}/specializations/{sid}` | Admin, Chief Doctor | Remove specialization |
@@ -310,6 +313,8 @@ Check whether the doctor is currently accepting appointments. Returns computed a
 | PUT | `/doctors/{id}/specializations/primary/{sid}` | Set as primary (idempotent — re-setting succeeds) | — | 404 (doctor/specialization not found) |
 
 ### 4.12 Schedule Endpoints
+
+> **Overlap validation behavior on updates:** When updating an existing schedule entry (`PATCH /doctors/{id}/schedules/{sid}`), the overlap check excludes the entry being updated. This ensures a doctor can modify the time range of a schedule entry without triggering a false overlap with the entry's own original time range. The `has_overlap()` repository method accepts an optional `exclude_id` parameter for this purpose.
 
 | Method | Path | Description | Request Body | Error Responses |
 |---|---|---|---|---|

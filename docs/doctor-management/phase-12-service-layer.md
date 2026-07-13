@@ -1,6 +1,6 @@
 # Phase 12: Service Layer — Doctor Management Module
 
-> **Status:** IN REVIEW | **Target Quality Score:** 9.8/10
+> **Status:** PASS | **Target Quality Score:** 9.8/10
 > **MVP Scope:** Only service methods for Doctor Profile, Specialization, and Schedule management.
 
 ---
@@ -34,7 +34,9 @@ class DoctorService:
 
 ```python
 def create_doctor(self, payload: DoctorCreate, created_by: int) -> Doctor:
-    """Create a new doctor profile with validation and specialization assignment."""
+    """Create a new doctor profile with validation.
+    Specialization assignment is handled separately via POST /doctors/{id}/specializations.
+    """
     try:
         # 1. Validate user exists and has DOCTOR role
         user = self.db.query(User).filter(User.id == payload.user_id).first()
@@ -47,19 +49,11 @@ def create_doctor(self, payload: DoctorCreate, created_by: int) -> Doctor:
         if self.doctor_repo.get_by_user_id(payload.user_id):
             raise DuplicateDoctorDetected(f"User {payload.user_id} already has a profile")
 
-        # 3. Validate specializations exist
-        specialization_ids = payload.specialization_ids
-        if payload.primary_specialization_id not in specialization_ids:
-            raise DoctorValidationFailed("Primary specialization must be in specialization list")
-        for sid in specialization_ids:
-            if not self.specialization_repo.get_by_id(sid):
-                raise SpecializationNotFound(sid)
-
-        # 4. Generate doctor code
+        # 3. Generate doctor code
         next_seq = self.doctor_repo.get_next_doctor_code_sequence()
         doctor_code = f"DOC-{next_seq:06d}"
 
-        # 5. Create doctor (identity data resolved through User FK — not duplicated here)
+        # 4. Create doctor (identity data resolved through User FK — not duplicated here)
         doctor = Doctor(
             doctor_code=doctor_code,
             user_id=payload.user_id,
@@ -252,7 +246,21 @@ def set_primary_specialization(self, doctor_id: UUID, specialization_id: int) ->
     self.ds_repo.set_primary(doctor_id, specialization_id)
 ```
 
-### 2.7 Schedule Management
+### 2.7 Profile Extended View
+
+```python
+def get_doctor_profile(self, doctor_id: UUID) -> Doctor:
+    """
+    Get doctor by ID with ALL relationships loaded (specializations + schedules).
+    Used by GET /doctors/{id}/profile for the extended self-view.
+    """
+    doctor = self.get_doctor(doctor_id)
+    # Schedules are eagerly loaded via selectinload in get_by_id
+    # Ensure both specializations and schedules are populated
+    return doctor
+```
+
+### 2.8 Schedule Management
 
 ```python
 def create_schedule(self, doctor_id: UUID, payload: ScheduleCreate) -> DoctorSchedule:

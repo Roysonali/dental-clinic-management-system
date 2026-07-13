@@ -1,6 +1,6 @@
 # Phase 9: SQLAlchemy Models — Doctor Management Module
 
-> **Status:** IN REVIEW | **Target Quality Score:** 9.8/10
+> **Status:** PASS | **Target Quality Score:** 9.8/10
 > **MVP Scope:** Four models only: Doctor, Specialization, DoctorSpecialization, DoctorSchedule.
 
 ---
@@ -84,6 +84,7 @@ class Doctor(Base):
         CheckConstraint("consultation_duration > 0", name="ck_doctors_duration_positive"),
         Index("ix_doctors_active_available", "is_active", "available_for_appointment"),
         Index("ix_doctors_created_by", "created_by"),
+        Index("ix_doctors_updated_by", "updated_by"),
     )
 ```
 

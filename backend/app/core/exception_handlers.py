@@ -30,6 +30,18 @@ from app.modules.patient_records.exceptions import (
     PrescriptionItemNotFound,
     PrescriptionNotFound as PatientRecordPrescriptionNotFound,
 )
+from app.modules.doctors.exceptions import (
+    DoctorException,
+    DoctorNotFound as DoctorNotFoundEx,
+    DuplicateDoctorDetected as DuplicateDoctorDetectedEx,
+    DoctorValidationFailed as DoctorValidationFailedEx,
+    InvalidDoctorOperation as InvalidDoctorOperationEx,
+    NotADoctorUser as NotADoctorUserEx,
+    DoctorUserNotFound as DoctorUserNotFoundEx,
+    ScheduleNotFound as ScheduleNotFoundEx,
+    SpecializationNotFound as SpecializationNotFoundEx,
+    SpecializationValidationFailed as SpecializationValidationFailedEx,
+)
 from app.modules.patients.exceptions import (
     DuplicatePatientDetected,
     InvalidPatientOperation,
@@ -102,6 +114,18 @@ _USER_EXCEPTION_MAP: dict[type[UserException], int] = {
     DeactivationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
+_DOCTOR_EXCEPTION_MAP: dict[type[DoctorException], int] = {
+    DoctorNotFoundEx: status.HTTP_404_NOT_FOUND,
+    DoctorUserNotFoundEx: status.HTTP_404_NOT_FOUND,
+    ScheduleNotFoundEx: status.HTTP_404_NOT_FOUND,
+    SpecializationNotFoundEx: status.HTTP_404_NOT_FOUND,
+    DuplicateDoctorDetectedEx: status.HTTP_409_CONFLICT,
+    DoctorValidationFailedEx: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    SpecializationValidationFailedEx: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    InvalidDoctorOperationEx: status.HTTP_400_BAD_REQUEST,
+    NotADoctorUserEx: status.HTTP_400_BAD_REQUEST,
+}
+
 _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {
     PatientNotFound: status.HTTP_404_NOT_FOUND,
     DuplicatePatientDetected: status.HTTP_409_CONFLICT,
@@ -156,6 +180,36 @@ async def user_exception_handler(
     )
     logger.warning(
         "User exception handled: code=%s, status=%d, path=%s",
+        exc.code,
+        http_status,
+        request.url.path,
+    )
+    return _error_response(
+        message=exc.message,
+        details=exc.details,
+        status_code=http_status,
+    )
+
+
+async def doctor_exception_handler(
+    request: Request,
+    exc: DoctorException,
+) -> JSONResponse:
+    """Handle any DoctorException subclass and map it to the correct HTTP status.
+
+    Mapping:
+    * NotFound exceptions → 404
+    * Duplicate/Conflict → 409
+    * Validation failures → 422
+    * Invalid operations → 400
+    * Everything else → 500
+    """
+    http_status = _DOCTOR_EXCEPTION_MAP.get(
+        type(exc),
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    logger.warning(
+        "Doctor exception handled: code=%s, status=%d, path=%s",
         exc.code,
         http_status,
         request.url.path,
@@ -244,16 +298,32 @@ async def validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
-    """Handle Pydantic validation errors with a clean, structured response."""
+    """Handle Pydantic validation errors with a clean, structured response.
+
+    Sanitises Pydantic v2 error details to remove non-serialisable objects
+    (e.g. ``ValueError`` instances in ``ctx``) that would cause a
+    ``TypeError`` when ``JSONResponse`` serialises the response.
+    """
     errors = exc.errors()
+    # Sanitise: convert any non-serialisable objects in ctx to strings
+    clean_errors: list[dict] = []
+    for err in errors:
+        clean = dict(err)
+        ctx = clean.get("ctx")
+        if isinstance(ctx, dict):
+            clean["ctx"] = {
+                k: str(v) if not isinstance(v, (str, int, float, bool, list, dict, type(None))) else v
+                for k, v in ctx.items()
+            }
+        clean_errors.append(clean)
     logger.warning(
         "Validation error: path=%s, errors=%s",
         request.url.path,
-        errors,
+        clean_errors,
     )
     return _error_response(
         message="Request validation failed",
-        details=errors,
+        details=clean_errors,
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     )
 
@@ -284,6 +354,10 @@ def register_exception_handlers(app) -> None:
     app.add_exception_handler(
         UserException,
         user_exception_handler,
+    )
+    app.add_exception_handler(
+        DoctorException,
+        doctor_exception_handler,
     )
     app.add_exception_handler(
         PatientException,

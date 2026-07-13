@@ -1,6 +1,6 @@
 # Phase 10: Pydantic Schemas — Doctor Management Module
 
-> **Status:** IN REVIEW | **Target Quality Score:** 9.8/10
+> **Status:** PASS | **Target Quality Score:** 9.8/10
 > **MVP Scope:** Only schemas for Doctor Profile, Specialization, and Schedule management.
 
 ---
@@ -266,7 +266,47 @@ class ScheduleResponse(BaseModel):
     is_active: bool
 ```
 
+### 3.6 DoctorProfileResponse
 
+Extended profile for self-view (returned by `GET /doctors/{id}/profile`). Includes all `DoctorResponse` fields plus the `schedules` array.
+
+```python
+class DoctorProfileResponse(DoctorResponse):
+    """DoctorResponse plus schedules array for self-view."""
+    schedules: list[ScheduleResponse] = []
+```
+
+> **Computed field strategy for `user_full_name` and `user_email`:**
+>
+> These fields are NOT columns on the `doctors` table — they belong to the `User` entity (accessed via `doctor.user.full_name` and `doctor.user.email`). Because `DoctorResponse` uses `from_attributes=True`, direct ORM-to-schema validation (`DoctorResponse.model_validate(doctor)`) cannot populate these fields automatically since they are not direct column attributes.
+>
+> Two approaches are available:
+>
+> **Approach A — Mapper function (recommended for MVP, matches existing DensCare pattern):**
+> The mapper layer (Phase 3 §2.6) is responsible for constructing `DoctorResponse` objects from ORM models. After calling `model_validate(doctor)`, the mapper explicitly sets:
+> ```python
+> response.user_full_name = doctor.user.full_name
+> response.user_email = doctor.user.email
+> ```
+> This is the same approach used by the existing Patient and Appointment modules for computed fields.
+>
+> **Approach B — `@computed_field` decorator:**
+> Pydantic v2's `@computed_field` (PEP 593) can derive these values automatically:
+> ```python
+> from pydantic import computed_field
+>
+> class DoctorResponse(BaseModel):
+>     model_config = ConfigDict(from_attributes=True)
+>     ...
+>
+>     @computed_field
+>     @property
+>     def user_full_name(self) -> str | None:
+>         return self.user.full_name if self.user else None
+> ```
+> This approach is cleaner but introduces coupling between the response schema and ORM relationship traversal. It also requires the ORM instance to be available after validation, which is not supported when using `from_attributes=True` — the validated object is a Pydantic model, not an ORM instance.
+>
+> **Decision:** **Approach A (Mapper)** is recommended for the MVP to maintain consistency with the existing DensCare module pattern. The mapper layer remains the single point of responsibility for resolving User-derived fields.
 
 ---
 
@@ -282,6 +322,7 @@ class ScheduleResponse(BaseModel):
 | PATCH .../activate | — | DoctorResponse |
 | PATCH .../availability | DoctorAvailabilityUpdate | DoctorResponse |
 | PATCH .../leave-toggle | DoctorLeaveToggle | DoctorResponse |
+| GET /doctors/{id}/profile | — | DoctorProfileResponse |
 | GET .../availability | — | DoctorAvailabilityResponse |
 | GET /specializations | — | list[SpecializationResponse] |
 | POST /specializations | SpecializationCreate | SpecializationResponse |
