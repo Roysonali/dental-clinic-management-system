@@ -22,3 +22,12 @@ from app.modules.doctors.models import (
     DoctorSpecialization,
     Specialization,
 )
+
+# Treatment Plan
+from app.modules.treatment.models import (
+    TreatmentPlan,
+    TreatmentPlanItem,
+    TreatmentPlanVersion,
+    TreatmentPlanApproval,
+    Procedure,
+)

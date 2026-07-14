@@ -52,6 +52,31 @@ from app.modules.patients.exceptions import (
     PatientValidationFailed,
 )
 
+from app.modules.treatment.exceptions import (
+    ApprovalNotFound as TreatmentPlanApprovalNotFound,
+    DuplicateItemSequence as TreatmentPlanDuplicateItemSequence,
+    DuplicatePlanDetected as TreatmentPlanDuplicatePlanDetected,
+    DuplicateProcedureDetected as TreatmentPlanDuplicateProcedureDetected,
+    EmptyPlanTransition as TreatmentPlanEmptyPlanTransition,
+    InvalidDateRange as TreatmentPlanInvalidDateRange,
+    InvalidItemStatusTransition as TreatmentPlanInvalidItemStatusTransition,
+    InvalidPlanOperation as TreatmentPlanInvalidPlanOperation,
+    InvalidToothNumber as TreatmentPlanInvalidToothNumber,
+    ItemNotFound as TreatmentPlanItemNotFound,
+    PatientAcknowledgmentExists as TreatmentPlanPatientAcknowledgmentExists,
+    PlanAlreadyApproved as TreatmentPlanAlreadyApproved,
+    PlanCreationFailed as TreatmentPlanCreationFailed,
+    PlanNotDeletable as TreatmentPlanNotDeletable,
+    PlanNotFound as TreatmentPlanNotFound,
+    PlanNotEditable as TreatmentPlanNotEditable,
+    PlanUpdateFailed as TreatmentPlanUpdateFailed,
+    PlanValidationFailed as TreatmentPlanValidationFailed,
+    ProcedureNotFound as TreatmentPlanProcedureNotFound,
+    TreatmentPlanException,
+    VersionImmutable as TreatmentPlanVersionImmutable,
+    VersionNotFound as TreatmentPlanVersionNotFound,
+)
+
 from app.modules.users.exceptions import (
     ActivationFailed,
     DeactivationFailed,
@@ -133,6 +158,30 @@ _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {
     PatientValidationFailed: status.HTTP_422_UNPROCESSABLE_CONTENT,
     PatientCreationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
     PatientUpdateFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+}
+
+_TREATMENT_PLAN_EXCEPTION_MAP: dict[type[TreatmentPlanException], int] = {
+    TreatmentPlanNotFound: status.HTTP_404_NOT_FOUND,
+    TreatmentPlanDuplicatePlanDetected: status.HTTP_409_CONFLICT,
+    TreatmentPlanCreationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    TreatmentPlanUpdateFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    TreatmentPlanValidationFailed: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    TreatmentPlanInvalidPlanOperation: status.HTTP_409_CONFLICT,
+    TreatmentPlanNotEditable: status.HTTP_409_CONFLICT,
+    TreatmentPlanEmptyPlanTransition: status.HTTP_409_CONFLICT,
+    TreatmentPlanNotDeletable: status.HTTP_409_CONFLICT,
+    TreatmentPlanItemNotFound: status.HTTP_404_NOT_FOUND,
+    TreatmentPlanDuplicateItemSequence: status.HTTP_409_CONFLICT,
+    TreatmentPlanInvalidItemStatusTransition: status.HTTP_409_CONFLICT,
+    TreatmentPlanProcedureNotFound: status.HTTP_404_NOT_FOUND,
+    TreatmentPlanDuplicateProcedureDetected: status.HTTP_409_CONFLICT,
+    TreatmentPlanInvalidToothNumber: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    TreatmentPlanInvalidDateRange: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    TreatmentPlanVersionNotFound: status.HTTP_404_NOT_FOUND,
+    TreatmentPlanVersionImmutable: status.HTTP_409_CONFLICT,
+    TreatmentPlanApprovalNotFound: status.HTTP_404_NOT_FOUND,
+    TreatmentPlanAlreadyApproved: status.HTTP_409_CONFLICT,
+    TreatmentPlanPatientAcknowledgmentExists: status.HTTP_409_CONFLICT,
 }
 
 _PATIENT_RECORD_EXCEPTION_MAP: dict[type[PatientRecordException], int] = {
@@ -232,6 +281,28 @@ async def patient_exception_handler(
     )
     logger.warning(
         "Patient exception handled: code=%s, status=%d, path=%s",
+        exc.code,
+        http_status,
+        request.url.path,
+    )
+    return _error_response(
+        message=exc.message,
+        details=exc.details,
+        status_code=http_status,
+    )
+
+
+async def treatment_plan_exception_handler(
+    request: Request,
+    exc: TreatmentPlanException,
+) -> JSONResponse:
+    """Handle any TreatmentPlanException subclass and map it to the correct HTTP status."""
+    http_status = _TREATMENT_PLAN_EXCEPTION_MAP.get(
+        type(exc),
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    logger.warning(
+        "TreatmentPlan exception handled: code=%s, status=%d, path=%s",
         exc.code,
         http_status,
         request.url.path,
@@ -362,6 +433,10 @@ def register_exception_handlers(app) -> None:
     app.add_exception_handler(
         PatientException,
         patient_exception_handler,
+    )
+    app.add_exception_handler(
+        TreatmentPlanException,
+        treatment_plan_exception_handler,
     )
     app.add_exception_handler(
         PatientRecordException,

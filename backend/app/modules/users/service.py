@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
 
 from sqlalchemy.orm import Session
 
+from app.modules.auth.models import User
 from app.modules.auth.repository import get_role_by_id
 
 from app.modules.users.repository import (
