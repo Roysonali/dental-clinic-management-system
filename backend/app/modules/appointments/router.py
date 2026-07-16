@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import List
+
 from uuid import UUID
 
 from fastapi import (
@@ -186,7 +190,7 @@ def list_appointments(
 
 @router.get(
     "/today",
-    response_model=list[
+    response_model=List[
         AppointmentResponse
     ],
 )

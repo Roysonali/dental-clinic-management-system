@@ -5,6 +5,8 @@ Contains schemas for patient
 record follow-up management.
 """
 
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID

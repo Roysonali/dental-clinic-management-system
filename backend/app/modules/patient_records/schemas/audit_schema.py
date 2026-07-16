@@ -5,6 +5,8 @@ Contains schemas for patient
 record audit history.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
