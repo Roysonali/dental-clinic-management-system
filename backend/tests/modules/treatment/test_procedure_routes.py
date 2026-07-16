@@ -13,6 +13,7 @@ Tests verify:
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -21,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exception_handlers import register_exception_handlers
 from app.database.session import get_db
+from app.dependencies.auth import get_current_user
 from app.modules.treatment.constants import DEFAULT_PAGE_SIZE
 from app.modules.treatment.dependencies import get_procedure_service
 from app.modules.treatment.enums import ProcedureCategory
@@ -50,8 +52,16 @@ def _build_client(db: Session) -> TestClient:
         validator = ProcedureValidator(repo)
         return ProcedureService(repo=repo, validator=validator, db=db)
 
+    def override_get_current_user():
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.role = MagicMock()
+        mock_user.role.name = "ADMIN"
+        return mock_user
+
     application.dependency_overrides[get_db] = override_get_db
     application.dependency_overrides[get_procedure_service] = override_get_procedure_service
+    application.dependency_overrides[get_current_user] = override_get_current_user
     client = TestClient(application)
     return client
 

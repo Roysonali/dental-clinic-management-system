@@ -61,7 +61,7 @@ def get_procedure_service(
     Returns:
         A fully-wired ``ProcedureService`` ready for request handling.
     """
-    repo = ProcedureRepository()
+    repo = ProcedureRepository(db)
     validator = ProcedureValidator(repo)
     return ProcedureService(repo=repo, validator=validator, db=db)
 
@@ -87,8 +87,8 @@ def get_treatment_plan_service(
     Returns:
         A fully-wired ``TreatmentPlanService`` ready for request handling.
     """
-    plan_repo = TreatmentPlanRepository()
-    procedure_repo = ProcedureRepository()
+    plan_repo = TreatmentPlanRepository(db)
+    procedure_repo = ProcedureRepository(db)
     procedure_validator = ProcedureValidator(procedure_repo)
     plan_validator = TreatmentPlanValidator(
         plan_repo=plan_repo,

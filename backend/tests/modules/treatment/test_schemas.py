@@ -290,37 +290,36 @@ class TestItemUpdateRequest:
 
 class TestTransitionPlanRequest:
     def test_valid(self):
-        dto = TransitionPlanRequest(updated_by=1)
-        assert dto.updated_by == 1
+        dto = TransitionPlanRequest()
+        assert dto.model_dump() == {}
 
-    def test_zero_updated_by_raises(self):
+    def test_extra_fields_forbidden(self):
         with pytest.raises(ValidationError):
-            TransitionPlanRequest(updated_by=0)
+            TransitionPlanRequest(updated_by=1)
 
 
 class TestCancelPlanRequest:
     def test_valid(self):
-        dto = CancelPlanRequest(updated_by=1)
-        assert dto.updated_by == 1
+        dto = CancelPlanRequest()
+        assert dto.model_dump() == {}
 
 
 class TestVersionRequest:
     def test_valid(self):
         dto = VersionRequest(
             change_reason="Cost adjustment",
-            changed_by=1,
         )
         assert dto.change_reason == "Cost adjustment"
 
     def test_empty_reason_raises(self):
         with pytest.raises(ValidationError):
-            VersionRequest(change_reason="", changed_by=1)
+            VersionRequest(change_reason="")
 
 
 class TestRestoreVersionRequest:
     def test_valid(self):
-        dto = RestoreVersionRequest(changed_by=1)
-        assert dto.changed_by == 1
+        dto = RestoreVersionRequest()
+        assert dto.model_dump() == {}
 
 
 class TestReorderItemsRequest:

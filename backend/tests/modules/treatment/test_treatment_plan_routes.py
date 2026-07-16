@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.exception_handlers import register_exception_handlers
+from app.dependencies.auth import get_current_user
 from app.database.session import get_db
 from app.modules.treatment.dependencies import get_treatment_plan_service
 from app.modules.treatment.repositories import (
@@ -88,8 +90,16 @@ def _build_client(db: Session) -> TestClient:
             db=db,
         )
 
+    def override_get_current_user():
+        mock_user = MagicMock()
+        mock_user.id = _STUB_USER_ID
+        mock_user.role = MagicMock()
+        mock_user.role.name = "GENERAL_DOCTOR"
+        return mock_user
+
     application.dependency_overrides[get_db] = override_get_db
     application.dependency_overrides[get_treatment_plan_service] = override_get_treatment_plan_service
+    application.dependency_overrides[get_current_user] = override_get_current_user
     return TestClient(application)
 
 
@@ -510,7 +520,6 @@ class TestWorkflowTransitions:
         client, plan_id = self._plan_with_item(db)
         resp = client.post(
             f"/treatment-plans/{plan_id}/submit-for-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "under_review"
@@ -520,12 +529,10 @@ class TestWorkflowTransitions:
         # First submit
         client.post(
             f"/treatment-plans/{plan_id}/submit-for-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         # Then approve review
         resp = client.post(
             f"/treatment-plans/{plan_id}/approve-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "proposed"
@@ -534,11 +541,9 @@ class TestWorkflowTransitions:
         client, plan_id = self._plan_with_item(db)
         client.post(
             f"/treatment-plans/{plan_id}/submit-for-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         resp = client.post(
             f"/treatment-plans/{plan_id}/reject-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "draft"
@@ -548,20 +553,16 @@ class TestWorkflowTransitions:
         # Submit → approve review → doctor approve → patient acknowledge → accept
         client.post(
             f"/treatment-plans/{plan_id}/submit-for-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         client.post(
             f"/treatment-plans/{plan_id}/approve-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         client.post(
             f"/treatment-plans/{plan_id}/doctor-approve",
-            json={"updated_by": _STUB_USER_ID},
         )
         client.post(f"/treatment-plans/{plan_id}/patient-acknowledge")
         resp = client.post(
             f"/treatment-plans/{plan_id}/accept",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "accepted"
@@ -570,15 +571,12 @@ class TestWorkflowTransitions:
         client, plan_id = self._plan_with_item(db)
         client.post(
             f"/treatment-plans/{plan_id}/submit-for-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         client.post(
             f"/treatment-plans/{plan_id}/approve-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         resp = client.post(
             f"/treatment-plans/{plan_id}/decline",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "rejected"
@@ -587,7 +585,6 @@ class TestWorkflowTransitions:
         client, plan_id = self._plan_with_item(db)
         resp = client.post(
             f"/treatment-plans/{plan_id}/cancel",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "cancelled"
@@ -598,29 +595,24 @@ class TestWorkflowTransitions:
         # Submit for review
         client.post(
             f"/treatment-plans/{plan_id}/submit-for-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         # Approve review → PROPOSED
         client.post(
             f"/treatment-plans/{plan_id}/approve-review",
-            json={"updated_by": _STUB_USER_ID},
         )
         # Doctor approve
         client.post(
             f"/treatment-plans/{plan_id}/doctor-approve",
-            json={"updated_by": _STUB_USER_ID},
         )
         # Patient acknowledge
         client.post(f"/treatment-plans/{plan_id}/patient-acknowledge")
         # Accept
         client.post(
             f"/treatment-plans/{plan_id}/accept",
-            json={"updated_by": _STUB_USER_ID},
         )
         # Start treatment
         resp = client.post(
             f"/treatment-plans/{plan_id}/start-treatment",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "in_progress"
@@ -628,7 +620,6 @@ class TestWorkflowTransitions:
         # Put on hold
         resp = client.post(
             f"/treatment-plans/{plan_id}/hold",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "on_hold"
@@ -636,7 +627,6 @@ class TestWorkflowTransitions:
         # Resume
         resp = client.post(
             f"/treatment-plans/{plan_id}/resume",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "in_progress"
@@ -644,7 +634,6 @@ class TestWorkflowTransitions:
         # Complete
         resp = client.post(
             f"/treatment-plans/{plan_id}/complete",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "completed"
@@ -679,7 +668,6 @@ class TestApprovalEndpoints:
 
         resp = client.post(
             f"/treatment-plans/{plan.id}/doctor-approve",
-            json={"updated_by": _STUB_USER_ID},
         )
         assert resp.status_code == 200
         assert resp.json()["approval"] is not None
@@ -768,7 +756,6 @@ class TestVersionEndpoints:
         plan = TreatmentPlanFactory.create(db)  # current_version=1
         payload = {
             "change_reason": "Cost revision",
-            "changed_by": _STUB_USER_ID,
         }
         resp = client.post(
             f"/treatment-plans/{plan.id}/versions", json=payload,

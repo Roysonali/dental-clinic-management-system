@@ -1560,6 +1560,7 @@ class TreatmentPlanService:
     def doctor_revoke(
         self,
         plan_id: UUID,
+        actor_id: int,
     ) -> TreatmentPlan:
         """Revoke a doctor's approval from a plan.
 
@@ -1568,10 +1569,12 @@ class TreatmentPlanService:
         2. Validate the plan is in ``PROPOSED`` status and the doctor
            has previously approved (``validate_doctor_approved``).
         3. Clear ``approved_by`` and ``approved_at`` on the approval record.
-        4. Commit the transaction.
+        4. Set ``updated_by`` to the actor.
+        5. Commit the transaction.
 
         Args:
             plan_id: UUID of the target plan.
+            actor_id: User ID of the authenticated actor performing the revoke.
 
         Returns:
             The updated ``TreatmentPlan`` with the doctor's signature cleared.
@@ -1595,6 +1598,7 @@ class TreatmentPlanService:
             # ── 3. Clear doctor signature ─────────────────────────
             plan.approval.approved_by = None
             plan.approval.approved_at = None
+            plan.updated_by = actor_id
 
             self._commit()
 
@@ -1625,6 +1629,7 @@ class TreatmentPlanService:
     def patient_acknowledge(
         self,
         plan_id: UUID,
+        actor_id: int,
     ) -> TreatmentPlan:
         """Record patient acknowledgment (acceptance) of a proposed plan.
 
@@ -1635,7 +1640,8 @@ class TreatmentPlanService:
            not already acknowledged).
         3. Set ``patient_status`` to ``ACCEPTED`` and
            ``patient_acknowledged_at`` to now.
-        4. Commit the transaction.
+        4. Set ``updated_by`` to the actor.
+        5. Commit the transaction.
 
         This does **not** change the plan's status — the status transition
         to ``ACCEPTED`` is a separate step (``accept_plan``).
@@ -1669,6 +1675,7 @@ class TreatmentPlanService:
             plan.approval.patient_acknowledged_at = (
                 datetime.now(timezone.utc)
             )
+            plan.updated_by = actor_id
 
             self._commit()
 
@@ -1700,6 +1707,7 @@ class TreatmentPlanService:
     def patient_decline(
         self,
         plan_id: UUID,
+        actor_id: int,
     ) -> TreatmentPlan:
         """Record patient declining a proposed plan.
 
@@ -1709,7 +1717,8 @@ class TreatmentPlanService:
            approved, and the patient has not already taken action.
         3. Set ``patient_status`` to ``REJECTED`` and
            ``patient_acknowledged_at`` to now.
-        4. Commit the transaction.
+        4. Set ``updated_by`` to the actor.
+        5. Commit the transaction.
 
         This does **not** change the plan's status — the status transition
         to ``REJECTED`` is a separate step (``decline_plan``).
@@ -1747,6 +1756,7 @@ class TreatmentPlanService:
             plan.approval.patient_acknowledged_at = (
                 datetime.now(timezone.utc)
             )
+            plan.updated_by = actor_id
 
             self._commit()
 

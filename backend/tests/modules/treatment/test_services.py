@@ -656,31 +656,31 @@ class TestTreatmentPlanServiceApproval:
     def test_doctor_revoke(self, db, treatment_plan_service):
         plan = self._make_proposed_plan(db, treatment_plan_service)
         treatment_plan_service.doctor_approve(plan.id, approved_by=1)
-        result = treatment_plan_service.doctor_revoke(plan.id)
+        result = treatment_plan_service.doctor_revoke(plan.id, actor_id=1)
         assert result.approval.approved_by is None
         assert result.approval.approved_at is None
 
     def test_doctor_revoke_not_approved_raises(self, db, treatment_plan_service):
         plan = self._make_proposed_plan(db, treatment_plan_service)
         with pytest.raises(InvalidPlanOperation):
-            treatment_plan_service.doctor_revoke(plan.id)
+            treatment_plan_service.doctor_revoke(plan.id, actor_id=1)
 
     def test_patient_acknowledge(self, db, treatment_plan_service):
         plan = self._make_proposed_plan(db, treatment_plan_service)
         treatment_plan_service.doctor_approve(plan.id, approved_by=1)
-        result = treatment_plan_service.patient_acknowledge(plan.id)
+        result = treatment_plan_service.patient_acknowledge(plan.id, actor_id=1)
         assert result.approval.patient_status == PatientAcknowledgmentStatus.ACCEPTED
         assert result.approval.patient_acknowledged_at is not None
 
     def test_patient_acknowledge_without_doctor_approval_raises(self, db, treatment_plan_service):
         plan = self._make_proposed_plan(db, treatment_plan_service)
         with pytest.raises(InvalidPlanOperation):
-            treatment_plan_service.patient_acknowledge(plan.id)
+            treatment_plan_service.patient_acknowledge(plan.id, actor_id=1)
 
     def test_patient_decline(self, db, treatment_plan_service):
         plan = self._make_proposed_plan(db, treatment_plan_service)
         treatment_plan_service.doctor_approve(plan.id, approved_by=1)
-        result = treatment_plan_service.patient_decline(plan.id)
+        result = treatment_plan_service.patient_decline(plan.id, actor_id=1)
         assert result.approval.patient_status == PatientAcknowledgmentStatus.REJECTED
         assert result.approval.patient_acknowledged_at is not None
 

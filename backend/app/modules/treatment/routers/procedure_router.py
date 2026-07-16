@@ -8,6 +8,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.core.constants import (
+    DOCTOR_ROLES,
+    ROLE_ADMIN,
+    ROLE_RECEPTIONIST,
+)
+from app.modules.auth.models import User
+from app.modules.rbac.permissions import require_admin, require_roles
 from app.modules.treatment.constants import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -50,6 +57,7 @@ router = APIRouter(
 def create_procedure(
     payload: ProcedureCreate,
     service: ProcedureService = Depends(get_procedure_service),
+    _: User = Depends(require_admin),
 ) -> ProcedureResponse:
     """Create a procedure and return its full representation."""
     procedure = service.create_procedure(
@@ -97,6 +105,9 @@ def list_procedures(
     sort_order: str = Query(
         default="asc", pattern="^(asc|desc)$", description="Sort direction."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> PaginatedResponse[ProcedureResponse]:
     """List procedures with pagination and optional filters."""
@@ -132,6 +143,9 @@ def search_procedures(
         default=PROCEDURE_SEARCH_DEFAULT_LIMIT, ge=1, le=50,
         description="Max results (max 50)."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> list[ProcedureResponse]:
     """Search procedures by code or name fragment."""
@@ -155,6 +169,9 @@ def search_procedures(
     response_description="List of active procedures.",
 )
 def list_active_procedures(
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> list[ProcedureResponse]:
     """Return all active procedures for dropdown use."""
@@ -178,6 +195,9 @@ def count_procedures(
     is_active: bool | None = Query(
         default=None, description="Filter by active state."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> dict[str, int]:
     """Return the procedure count."""
@@ -199,6 +219,9 @@ def count_procedures(
 )
 def get_procedure(
     procedure_id: int,
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> ProcedureResponse:
     """Get a procedure by its integer ID."""
@@ -223,6 +246,9 @@ def get_procedure(
 )
 def get_procedure_by_code(
     code: str,
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> ProcedureResponse:
     """Get a procedure by its business code."""
@@ -249,6 +275,7 @@ def get_procedure_by_code(
 def update_procedure(
     procedure_id: int,
     payload: ProcedureUpdate,
+    _: User = Depends(require_admin),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> ProcedureResponse:
     """Update a procedure's mutable fields."""
@@ -271,6 +298,7 @@ def update_procedure(
 )
 def activate_procedure(
     procedure_id: int,
+    _: User = Depends(require_admin),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> ProcedureResponse:
     """Activate a procedure."""
@@ -292,6 +320,7 @@ def activate_procedure(
 )
 def deactivate_procedure(
     procedure_id: int,
+    _: User = Depends(require_admin),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> ProcedureResponse:
     """Deactivate a procedure."""
@@ -317,6 +346,7 @@ def deactivate_procedure(
 )
 def delete_procedure(
     procedure_id: int,
+    _: User = Depends(require_admin),
     service: ProcedureService = Depends(get_procedure_service),
 ) -> None:
     """Delete a procedure (must be inactive)."""

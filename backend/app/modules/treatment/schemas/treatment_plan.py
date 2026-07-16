@@ -263,25 +263,11 @@ class TransitionPlanRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    updated_by: int = Field(
-        ...,
-        gt=0,
-        title="Updated By",
-        description="User ID of the actor performing the transition.",
-    )
-
 
 class CancelPlanRequest(BaseModel):
     """Request body for ``POST /treatment-plans/{id}/cancel``."""
 
     model_config = ConfigDict(extra="forbid")
-
-    updated_by: int = Field(
-        ...,
-        gt=0,
-        title="Updated By",
-        description="User ID of the actor cancelling the plan.",
-    )
 
 
 class VersionRequest(BaseModel):
@@ -300,25 +286,12 @@ class VersionRequest(BaseModel):
         description="Human-readable reason for creating this version.",
         examples=["Cost adjustment after patient consultation"],
     )
-    changed_by: int = Field(
-        ...,
-        gt=0,
-        title="Changed By",
-        description="User ID of the person creating the version.",
-    )
 
 
 class RestoreVersionRequest(BaseModel):
     """Request body for ``POST /treatment-plans/{id}/versions/{version_id}/restore``."""
 
     model_config = ConfigDict(extra="forbid")
-
-    changed_by: int = Field(
-        ...,
-        gt=0,
-        title="Changed By",
-        description="User ID of the person performing the restore.",
-    )
 
 
 # ======================================================================

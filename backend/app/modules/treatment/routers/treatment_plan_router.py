@@ -11,6 +11,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.core.constants import (
+    DOCTOR_ROLES,
+    ROLE_ADMIN,
+    ROLE_RECEPTIONIST,
+)
+from app.modules.auth.models import User
+from app.modules.rbac.permissions import require_roles
 from app.modules.treatment.constants import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -64,12 +71,15 @@ router = APIRouter(
 def create_treatment_plan(
     payload: CreatePlanRequest,
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
 ) -> TreatmentPlanResponse:
     """Create a new treatment plan."""
     plan = service.create_plan(
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
-        created_by=0,  # TODO: replace with current_user.id from auth
+        created_by=current_user.id,
         clinical_notes=payload.clinical_notes,
         observations=payload.observations,
         dentist_recommendations=payload.dentist_recommendations,
@@ -130,6 +140,9 @@ def list_treatment_plans(
     sort_order: str = Query(
         default="desc", pattern="^(asc|desc)$", description="Sort direction."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> PaginatedResponse[TreatmentPlanListItem]:
     """List treatment plans with pagination and optional filters."""
@@ -177,6 +190,9 @@ def search_treatment_plans(
         default=TREATMENT_PLAN_SEARCH_DEFAULT_LIMIT, ge=1, le=50,
         description="Max results (max 50)."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> list[TreatmentPlanListItem]:
     """Search plans by code fragment."""
@@ -201,6 +217,9 @@ def list_pending_review(
     page_size: int = Query(
         default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE,
         description=f"Items per page (max {MAX_PAGE_SIZE})."
+    ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
     ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> PaginatedResponse[TreatmentPlanListItem]:
@@ -227,6 +246,9 @@ def list_pending_approval(
         default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE,
         description=f"Items per page (max {MAX_PAGE_SIZE})."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> PaginatedResponse[TreatmentPlanListItem]:
     """List plans awaiting doctor approval."""
@@ -251,6 +273,9 @@ def list_pending_approval(
     response_description="Dashboard statistics.",
 )
 def dashboard_summary(
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> DashboardSummaryResponse:
     """Return dashboard statistics."""
@@ -291,6 +316,9 @@ def list_plans_by_patient(
     sort_order: str = Query(
         default="desc", pattern="^(asc|desc)$", description="Sort direction."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> PaginatedResponse[TreatmentPlanListItem]:
     """List plans for a specific patient."""
@@ -330,6 +358,9 @@ def list_plans_by_doctor(
     sort_order: str = Query(
         default="desc", pattern="^(asc|desc)$", description="Sort direction."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> PaginatedResponse[TreatmentPlanListItem]:
     """List plans for a specific doctor."""
@@ -356,6 +387,9 @@ def list_plans_by_doctor(
     response_description="{\"draft\": 12, \"proposed\": 5, ...}",
 )
 def count_by_status(
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> dict[str, int]:
     """Return plan counts grouped by status."""
@@ -380,6 +414,9 @@ def count_by_status(
 def count_by_doctor(
     doctor_id: UUID | None = Query(
         default=None, description="Optional doctor UUID filter."
+    ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
     ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> dict[str, int] | int:
@@ -406,6 +443,9 @@ def count_by_patient(
     patient_id: UUID | None = Query(
         default=None, description="Optional patient UUID filter."
     ),
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> dict[str, int] | int:
     """Return plan counts by patient."""
@@ -430,6 +470,9 @@ def count_by_patient(
 )
 def get_treatment_plan(
     plan_id: UUID,
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Get a single treatment plan by UUID."""
@@ -453,6 +496,9 @@ def get_treatment_plan(
 def add_item(
     plan_id: UUID,
     payload: AddItemRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Add a procedure item to a plan."""
@@ -491,6 +537,9 @@ def update_item(
     plan_id: UUID,
     item_id: UUID,
     payload: ItemUpdateRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Update an item's mutable fields."""
@@ -525,6 +574,9 @@ def update_item(
 def remove_item(
     plan_id: UUID,
     item_id: UUID,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Remove an item from a plan."""
@@ -550,6 +602,9 @@ def remove_item(
 def reorder_items(
     plan_id: UUID,
     payload: ReorderItemsRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Reorder items in a plan."""
@@ -571,12 +626,14 @@ def reorder_items(
 )
 def submit_for_review(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Submit plan for clinical review."""
     plan = service.submit_for_review(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -590,12 +647,14 @@ def submit_for_review(
 )
 def approve_review(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Approve plan review."""
     plan = service.approve_review(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -609,12 +668,14 @@ def approve_review(
 )
 def reject_review(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Reject plan review, returning to draft."""
     plan = service.reject_review(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -628,12 +689,14 @@ def reject_review(
 )
 def accept_plan(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Accept a proposed plan."""
     plan = service.accept_plan(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -647,12 +710,14 @@ def accept_plan(
 )
 def decline_plan(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Decline a proposed plan."""
     plan = service.decline_plan(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -666,12 +731,14 @@ def decline_plan(
 )
 def cancel_plan(
     plan_id: UUID,
-    payload: CancelPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Cancel a plan."""
     plan = service.cancel_plan(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -685,12 +752,14 @@ def cancel_plan(
 )
 def start_treatment(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Start treatment on an accepted plan."""
     plan = service.start_treatment(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -704,12 +773,14 @@ def start_treatment(
 )
 def put_on_hold(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Put treatment on hold."""
     plan = service.put_on_hold(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -723,12 +794,14 @@ def put_on_hold(
 )
 def resume_treatment(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Resume treatment from hold."""
     plan = service.resume_treatment(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -742,12 +815,14 @@ def resume_treatment(
 )
 def complete_treatment(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Complete treatment."""
     plan = service.complete_treatment(
-        plan_id=plan_id, updated_by=payload.updated_by
+        plan_id=plan_id, updated_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -766,12 +841,14 @@ def complete_treatment(
 )
 def doctor_approve(
     plan_id: UUID,
-    payload: TransitionPlanRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Record doctor approval on a plan."""
     plan = service.doctor_approve(
-        plan_id=plan_id, approved_by=payload.updated_by
+        plan_id=plan_id, approved_by=current_user.id
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -785,10 +862,15 @@ def doctor_approve(
 )
 def doctor_revoke(
     plan_id: UUID,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Revoke doctor approval."""
-    plan = service.doctor_revoke(plan_id=plan_id)
+    plan = service.doctor_revoke(
+        plan_id=plan_id, actor_id=current_user.id
+    )
     return TreatmentPlanMapper.to_response(plan)
 
 
@@ -801,10 +883,15 @@ def doctor_revoke(
 )
 def patient_acknowledge(
     plan_id: UUID,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Record patient acknowledgment of a plan."""
-    plan = service.patient_acknowledge(plan_id=plan_id)
+    plan = service.patient_acknowledge(
+        plan_id=plan_id, actor_id=current_user.id
+    )
     return TreatmentPlanMapper.to_response(plan)
 
 
@@ -817,10 +904,15 @@ def patient_acknowledge(
 )
 def patient_decline(
     plan_id: UUID,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Record patient declining a plan."""
-    plan = service.patient_decline(plan_id=plan_id)
+    plan = service.patient_decline(
+        plan_id=plan_id, actor_id=current_user.id
+    )
     return TreatmentPlanMapper.to_response(plan)
 
 
@@ -844,13 +936,16 @@ def patient_decline(
 def create_version(
     plan_id: UUID,
     payload: VersionRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Create a version snapshot."""
     plan = service.create_version(
         plan_id=plan_id,
         change_reason=payload.change_reason,
-        changed_by=payload.changed_by,
+        changed_by=current_user.id,
     )
     return TreatmentPlanMapper.to_response(plan)
 
@@ -864,6 +959,9 @@ def create_version(
 )
 def list_versions(
     plan_id: UUID,
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> VersionListResponse:
     """List version snapshots for a plan."""
@@ -884,6 +982,9 @@ def list_versions(
 def get_version(
     plan_id: UUID,
     version_id: UUID,
+    _: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> VersionDetailResponse:
     """Get a specific version snapshot."""
@@ -906,12 +1007,15 @@ def restore_version(
     plan_id: UUID,
     version_id: UUID,
     payload: RestoreVersionRequest,
+    current_user: User = Depends(
+        require_roles([ROLE_ADMIN, ROLE_RECEPTIONIST, *DOCTOR_ROLES])
+    ),
     service: TreatmentPlanService = Depends(get_treatment_plan_service),
 ) -> TreatmentPlanResponse:
     """Restore a plan from an earlier version."""
     plan = service.restore_version(
         plan_id=plan_id,
         version_id=version_id,
-        changed_by=payload.changed_by,
+        changed_by=current_user.id,
     )
     return TreatmentPlanMapper.to_response(plan)
