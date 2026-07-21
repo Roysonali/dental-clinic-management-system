@@ -34,6 +34,7 @@ from sqlalchemy.orm import (
 )
 
 from app.database.base import Base
+from app.modules.billing.constants import RECEIPT_NUMBER_MAX_LENGTH
 from app.modules.billing.enums import ReceiptStatus
 from app.modules.billing.mixins.financial import money_column
 
@@ -104,7 +105,7 @@ class Receipt(Base):
     )
 
     receipt_number: Mapped[str] = mapped_column(
-        String(30),
+        String(RECEIPT_NUMBER_MAX_LENGTH),
         nullable=False,
         unique=True,
         comment="Sequential display number (ADR-003).",

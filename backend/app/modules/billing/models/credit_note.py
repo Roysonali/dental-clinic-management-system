@@ -34,6 +34,7 @@ from sqlalchemy.orm import (
 
 from app.database.base import Base
 from app.modules.billing.constants import (
+    CREDIT_NOTE_NUMBER_MAX_LENGTH,
     CREDIT_NOTE_REASON_MAX_LENGTH,
     INITIAL_INVOICE_VERSION_NUMBER,
 )
@@ -77,7 +78,7 @@ class CreditNote(Base, VersioningMixin):
     )
 
     credit_note_number: Mapped[str] = mapped_column(
-        String(30),
+        String(CREDIT_NOTE_NUMBER_MAX_LENGTH),
         nullable=False,
         unique=True,
         comment="Sequential display number (ADR-003).",

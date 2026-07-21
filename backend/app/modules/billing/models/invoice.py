@@ -339,6 +339,7 @@ class Invoice(Base, VersioningMixin):
         Index("ix_invoices_appointment", "appointment_id"),
         Index("ix_invoices_doctor", "doctor_id"),
         Index("ix_invoices_status", "status"),
+        Index("ix_invoices_patient_status", "patient_id", "status"),
         Index("ix_invoices_currency", "currency_code"),
         Index("ix_invoices_invoice_date", "invoice_date"),
         Index("ix_invoices_due_date", "due_date"),

@@ -38,6 +38,7 @@ from app.database.base import Base
 from app.modules.billing.constants import (
     INITIAL_INVOICE_VERSION_NUMBER,
     PAYMENT_NOTES_MAX_LENGTH,
+    PAYMENT_NUMBER_MAX_LENGTH,
     TRANSACTION_REFERENCE_MAX_LENGTH,
 )
 from app.modules.billing.enums import PaymentMethod, PaymentStatus
@@ -75,7 +76,7 @@ class Payment(Base, VersioningMixin):
     )
 
     payment_number: Mapped[str] = mapped_column(
-        String(30),
+        String(PAYMENT_NUMBER_MAX_LENGTH),
         nullable=False,
         unique=True,
         comment="Sequential display number (ADR-003).",
@@ -230,6 +231,7 @@ class Payment(Base, VersioningMixin):
         Index("ix_payments_number", "payment_number"),
         Index("ix_payments_created_at", "created_at"),
         Index("ix_payments_method_status", "payment_method", "status"),
+        Index("ix_payments_patient_status", "patient_id", "status"),
     )
 
     def __repr__(self) -> str:

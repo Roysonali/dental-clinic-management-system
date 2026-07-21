@@ -31,6 +31,10 @@ from sqlalchemy.orm import (
 )
 
 from app.database.base import Base
+from app.modules.billing.constants import (
+    SEQUENCE_CONSUMPTION_STATUS_MAX_LENGTH,
+    SEQUENCE_DOCUMENT_TYPE_MAX_LENGTH,
+)
 from app.modules.billing.mixins.audit import AuditMixin
 
 if TYPE_CHECKING:
@@ -54,7 +58,7 @@ class SequenceConsumptionLog(Base):
     )
 
     document_type: Mapped[str] = mapped_column(
-        String(20),
+        String(SEQUENCE_DOCUMENT_TYPE_MAX_LENGTH),
         ForeignKey("document_sequences.document_type", ondelete="CASCADE"),
         nullable=False,
         comment="Which sequence was consumed.",
@@ -87,7 +91,7 @@ class SequenceConsumptionLog(Base):
     )
 
     status: Mapped[str] = mapped_column(
-        String(20),
+        String(SEQUENCE_CONSUMPTION_STATUS_MAX_LENGTH),
         nullable=False,
         default="completed",
         comment="'completed', 'failed', or 'rolled_back'.",
@@ -138,7 +142,7 @@ class DocumentSequence(Base):
     __tablename__ = "document_sequences"
 
     document_type: Mapped[str] = mapped_column(
-        String(20),
+        String(SEQUENCE_DOCUMENT_TYPE_MAX_LENGTH),
         primary_key=True,
         comment="Document type key (e.g. 'invoice', 'receipt', 'credit_note').",
     )
@@ -173,6 +177,7 @@ class DocumentSequence(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
         comment="Last increment timestamp.",
     )
