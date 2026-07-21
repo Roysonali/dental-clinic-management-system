@@ -31,3 +31,19 @@ from app.modules.treatment.models import (
     TreatmentPlanApproval,
     Procedure,
 )
+
+# Billing
+from app.modules.billing.models import (
+    Invoice,
+    InvoiceItem,
+    InvoiceStatusHistory,
+    Payment,
+    PaymentAllocation,
+    Receipt,
+    ReceiptInvoice,
+    CreditNote,
+    PatientCredit,
+    DocumentSequence,
+    SequenceConsumptionLog,
+    BillingAuditLog,
+)

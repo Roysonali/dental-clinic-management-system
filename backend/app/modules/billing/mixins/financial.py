@@ -35,52 +35,47 @@ from app.modules.billing.constants import (
 )
 
 
-def money_column(nullable: bool = False, **kwargs):
-    """Construct a ``NUMERIC(12,2)`` column for monetary amounts.
+def money_column(**kwargs):
+    """Construct a ``NUMERIC(12,2)`` type for monetary amounts.
+
+    Returns the SQLAlchemy ``Numeric`` type instance configured with the
+    module's precision and scale. ``nullable`` and ``default`` are passed
+    through to :func:`~sqlalchemy.orm.mapped_column` by the caller.
 
     Args:
-        nullable: Whether the column allows ``NULL``.
-        **kwargs: Extra SQLAlchemy column keyword arguments.
+        **kwargs: Forwarded to :class:`~sqlalchemy.Numeric` (rarely needed).
 
     Returns:
-        A configured :class:`~sqlalchemy.Numeric` column.
+        A configured :class:`~sqlalchemy.Numeric` type instance.
     """
     return Numeric(
         precision=MONEY_TOTAL_DIGITS,
         scale=MONEY_DECIMAL_PLACES,
-        nullable=nullable,
         **kwargs,
     )
 
 
-def tax_rate_column(nullable: bool = False, **kwargs):
-    """Construct a ``NUMERIC(5,3)`` column for tax rates."""
+def tax_rate_column(**kwargs):
+    """Construct a ``NUMERIC(5,3)`` type for tax rates."""
     return Numeric(
         precision=TAX_RATE_TOTAL_DIGITS,
         scale=TAX_RATE_DECIMAL_PLACES,
-        nullable=nullable,
         **kwargs,
     )
 
 
-def discount_rate_column(nullable: bool = False, **kwargs):
-    """Construct a ``NUMERIC(5,2)`` column for discount rates."""
+def discount_rate_column(**kwargs):
+    """Construct a ``NUMERIC(5,2)`` type for discount rates."""
     return Numeric(
         precision=DISCOUNT_RATE_TOTAL_DIGITS,
         scale=DISCOUNT_RATE_DECIMAL_PLACES,
-        nullable=nullable,
         **kwargs,
     )
 
 
-def currency_column(nullable: bool = False, **kwargs):
-    """Construct an ISO 4217 ``VARCHAR(3)`` currency column.
-
-    Defaults to :data:`DEFAULT_CURRENCY` when not nullable.
-    """
-    column_kwargs: dict = {"length": CURRENCY_CODE_LENGTH, "nullable": nullable}
-    if not nullable:
-        column_kwargs["default"] = DEFAULT_CURRENCY.value
+def currency_column(**kwargs):
+    """Construct an ISO 4217 ``VARCHAR(3)`` type for currency codes."""
+    column_kwargs: dict = {"length": CURRENCY_CODE_LENGTH}
     column_kwargs.update(kwargs)
     return String(**column_kwargs)
 
