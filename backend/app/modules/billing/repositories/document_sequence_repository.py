@@ -29,6 +29,8 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.modules.billing.constants import MAX_SEQUENCE_NUMBER
+from app.modules.billing.exceptions import BillingValidationError
 from app.modules.billing.models import (
     DocumentSequence,
     SequenceConsumptionLog,
@@ -95,12 +97,11 @@ class DocumentSequenceRepository:
 
     # -------------------------------------------------------------- mutation
     def increment(self, document_type: str) -> Optional[DocumentSequence]:
-        """Increment the sequence value for a document type.
+        """Atomically acquire a row lock, validate overflow, and increment.
 
-        This is a persistence primitive — it updates ``current_value`` and
-        flushes. The caller is responsible for ensuring the sequence exists
-        and for any business validation (e.g. not exceeding
-        ``MAX_SEQUENCE_NUMBER``).
+        This method acquires a pessimistic row lock via ``get_for_update()``
+        and enforces the ``MAX_SEQUENCE_NUMBER`` invariant under that lock.
+        The caller is responsible for ensuring the sequence exists.
 
         Args:
             document_type: The document type key to increment.
@@ -108,10 +109,24 @@ class DocumentSequenceRepository:
         Returns:
             The updated DocumentSequence, or None if the sequence does not
             exist.
+
+        Raises:
+            BillingValidationError: If ``current_value + 1`` would exceed
+                ``MAX_SEQUENCE_NUMBER``.
         """
         sequence = self.get_for_update(document_type)
         if sequence is None:
             return None
+        if sequence.current_value >= MAX_SEQUENCE_NUMBER:
+            raise BillingValidationError(
+                f"Document sequence has reached maximum value "
+                f"{MAX_SEQUENCE_NUMBER}. Current value: "
+                f"{sequence.current_value}.",
+                details={
+                    "current_value": sequence.current_value,
+                    "max_sequence_number": MAX_SEQUENCE_NUMBER,
+                },
+            )
         sequence.current_value += 1
         self.db.flush()
         return sequence

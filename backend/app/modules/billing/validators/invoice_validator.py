@@ -173,11 +173,23 @@ class InvoiceValidator:
                 else str(invoice.status),
             )
 
-    def validate_cancellable(self, invoice: Invoice) -> None:
+    def validate_cancellable(
+        self,
+        invoice: Invoice,
+        *,
+        cancellation_reason: str | None = None,
+    ) -> None:
         """Validate that an invoice can be cancelled from its current status.
 
         Cancellation is allowed from any non-terminal status. Terminal
         statuses (CANCELLED, VOID) have no outgoing transitions.
+
+        Args:
+            invoice: The invoice to validate.
+            cancellation_reason: Optional explicit cancellation reason to
+                validate in lieu of ``invoice.cancellation_reason``. Provided
+                by the service layer before the reason is persisted so that
+                validation can occur before mutation.
 
         Raises:
             InvalidInvoiceStatusTransition: If the invoice is already in a
@@ -199,7 +211,12 @@ class InvoiceValidator:
                 },
             )
 
-        if not invoice.cancellation_reason or not str(invoice.cancellation_reason).strip():
+        reason = (
+            cancellation_reason
+            if cancellation_reason is not None
+            else invoice.cancellation_reason
+        )
+        if not reason or not str(reason).strip():
             raise InvoiceValidationFailed(
                 "cancellation_reason is required when cancelling an invoice",
                 details={"invoice_id": str(invoice.id)},

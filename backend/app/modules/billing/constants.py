@@ -24,9 +24,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.modules.billing.enums import (
+    CreditNoteStatus,
     CurrencyCode,
     DocumentType,
     InvoiceStatus,
+    PaymentStatus,
+    ReceiptStatus,
 )
 
 # ==========================================================
@@ -189,6 +192,56 @@ VALID_INVOICE_TRANSITIONS: dict[str, frozenset[str]] = {
     for source, targets in INVOICE_TRANSITIONS.items()
 }
 
+PAYMENT_TRANSITIONS: dict[PaymentStatus, frozenset[PaymentStatus]] = {
+    PaymentStatus.PENDING: frozenset(
+        {
+            PaymentStatus.COMPLETED,
+            PaymentStatus.FAILED,
+        }
+    ),
+    PaymentStatus.COMPLETED: frozenset(
+        {
+            PaymentStatus.REFUNDED,
+            PaymentStatus.REVERSED,
+        }
+    ),
+    PaymentStatus.FAILED: frozenset(
+        {
+            PaymentStatus.PENDING,
+        }
+    ),
+    PaymentStatus.REFUNDED: frozenset(),  # Terminal
+    PaymentStatus.REVERSED: frozenset(),  # Terminal
+}
+
+RECEIPT_TRANSITIONS: dict[ReceiptStatus, frozenset[ReceiptStatus]] = {
+    ReceiptStatus.GENERATED: frozenset(
+        {
+            ReceiptStatus.CANCELLED,
+        }
+    ),
+    ReceiptStatus.CANCELLED: frozenset(),  # Terminal
+}
+
+CREDIT_NOTE_TRANSITIONS: dict[CreditNoteStatus, frozenset[CreditNoteStatus]] = {
+    CreditNoteStatus.DRAFT: frozenset(
+        {
+            CreditNoteStatus.ISSUED,
+            CreditNoteStatus.VOID,
+        }
+    ),
+    CreditNoteStatus.ISSUED: frozenset(
+        {
+            CreditNoteStatus.APPLIED,
+            CreditNoteStatus.VOID,
+            CreditNoteStatus.EXPIRED,
+        }
+    ),
+    CreditNoteStatus.APPLIED: frozenset(),  # Terminal
+    CreditNoteStatus.VOID: frozenset(),  # Terminal
+    CreditNoteStatus.EXPIRED: frozenset(),  # Terminal
+}
+
 
 def is_valid_currency(code: str) -> bool:
     """Return ``True`` if ``code`` is a supported ISO 4217 currency code.
@@ -254,5 +307,8 @@ __all__ = [
     "MAX_SEQUENCE_NUMBER",
     "INVOICE_TRANSITIONS",
     "VALID_INVOICE_TRANSITIONS",
+    "PAYMENT_TRANSITIONS",
+    "RECEIPT_TRANSITIONS",
+    "CREDIT_NOTE_TRANSITIONS",
     "is_valid_currency",
 ]

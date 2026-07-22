@@ -91,6 +91,28 @@ class PaymentStatus(str, Enum):
     REVERSED = "reversed"
 
     @classmethod
+    def editable_statuses(cls) -> frozenset["PaymentStatus"]:
+        """Statuses that allow modification."""
+        return frozenset({cls.PENDING})
+
+    @classmethod
+    def terminal_statuses(cls) -> frozenset["PaymentStatus"]:
+        """Statuses with no outgoing transitions."""
+        from app.modules.billing.constants import PAYMENT_TRANSITIONS
+
+        return frozenset(
+            status for status, targets in PAYMENT_TRANSITIONS.items() if not targets
+        )
+
+    def is_terminal(self) -> bool:
+        """Return ``True`` if this status has no outgoing transitions."""
+        return self in self.terminal_statuses()
+
+    def is_editable(self) -> bool:
+        """Return ``True`` if a payment in this status may be edited."""
+        return self in self.editable_statuses()
+
+    @classmethod
     def all_values(cls) -> frozenset[str]:
         return frozenset(member.value for member in cls)
 
@@ -120,6 +142,28 @@ class CreditNoteStatus(str, Enum):
     EXPIRED = "expired"
 
     @classmethod
+    def editable_statuses(cls) -> frozenset["CreditNoteStatus"]:
+        """Statuses that allow modification."""
+        return frozenset({cls.DRAFT})
+
+    @classmethod
+    def terminal_statuses(cls) -> frozenset["CreditNoteStatus"]:
+        """Statuses with no outgoing transitions."""
+        from app.modules.billing.constants import CREDIT_NOTE_TRANSITIONS
+
+        return frozenset(
+            status for status, targets in CREDIT_NOTE_TRANSITIONS.items() if not targets
+        )
+
+    def is_terminal(self) -> bool:
+        """Return ``True`` if this status has no outgoing transitions."""
+        return self in self.terminal_statuses()
+
+    def is_editable(self) -> bool:
+        """Return ``True`` if a credit note in this status may be edited."""
+        return self in self.editable_statuses()
+
+    @classmethod
     def all_values(cls) -> frozenset[str]:
         return frozenset(member.value for member in cls)
 
@@ -129,6 +173,28 @@ class ReceiptStatus(str, Enum):
 
     GENERATED = "generated"
     CANCELLED = "cancelled"
+
+    @classmethod
+    def editable_statuses(cls) -> frozenset["ReceiptStatus"]:
+        """Statuses that allow modification."""
+        return frozenset()
+
+    @classmethod
+    def terminal_statuses(cls) -> frozenset["ReceiptStatus"]:
+        """Statuses with no outgoing transitions."""
+        from app.modules.billing.constants import RECEIPT_TRANSITIONS
+
+        return frozenset(
+            status for status, targets in RECEIPT_TRANSITIONS.items() if not targets
+        )
+
+    def is_terminal(self) -> bool:
+        """Return ``True`` if this status has no outgoing transitions."""
+        return self in self.terminal_statuses()
+
+    def is_editable(self) -> bool:
+        """Return ``True`` if a receipt in this status may be edited."""
+        return self in self.editable_statuses()
 
     @classmethod
     def all_values(cls) -> frozenset[str]:

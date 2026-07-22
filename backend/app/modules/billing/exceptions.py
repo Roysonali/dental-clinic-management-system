@@ -144,6 +144,19 @@ class DocumentSequenceNotFound(BillingNotFoundError):
         )
 
 
+class PatientCreditNotFound(BillingNotFoundError):
+    """Raised when a patient credit id does not resolve to a record."""
+
+    code = "PATIENT_CREDIT_NOT_FOUND"
+    default_message = "Patient credit not found"
+
+    def __init__(self, patient_credit_id: Any, *, details: Any = None) -> None:
+        super().__init__(
+            f"Patient credit not found: {patient_credit_id}",
+            details=details or {"patient_credit_id": str(patient_credit_id)},
+        )
+
+
 # ==========================================================
 # Conflicts / invalid operations (409)
 # ==========================================================
@@ -171,6 +184,51 @@ class InvalidInvoiceStatusTransition(BillingConflictError):
     ) -> None:
         super().__init__(
             f"Invalid invoice status transition: {from_status} -> {to_status}",
+            details=details or {"from": from_status, "to": to_status},
+        )
+
+
+class InvalidPaymentStatusTransition(BillingConflictError):
+    """Raised for an illegal payment status transition."""
+
+    code = "INVALID_PAYMENT_STATUS_TRANSITION"
+    default_message = "Invalid payment status transition"
+
+    def __init__(
+        self, from_status: str, to_status: str, *, details: Any = None
+    ) -> None:
+        super().__init__(
+            f"Invalid payment status transition: {from_status} -> {to_status}",
+            details=details or {"from": from_status, "to": to_status},
+        )
+
+
+class InvalidReceiptStatusTransition(BillingConflictError):
+    """Raised for an illegal receipt status transition."""
+
+    code = "INVALID_RECEIPT_STATUS_TRANSITION"
+    default_message = "Invalid receipt status transition"
+
+    def __init__(
+        self, from_status: str, to_status: str, *, details: Any = None
+    ) -> None:
+        super().__init__(
+            f"Invalid receipt status transition: {from_status} -> {to_status}",
+            details=details or {"from": from_status, "to": to_status},
+        )
+
+
+class InvalidCreditNoteStatusTransition(BillingConflictError):
+    """Raised for an illegal credit note status transition."""
+
+    code = "INVALID_CREDIT_NOTE_STATUS_TRANSITION"
+    default_message = "Invalid credit note status transition"
+
+    def __init__(
+        self, from_status: str, to_status: str, *, details: Any = None
+    ) -> None:
+        super().__init__(
+            f"Invalid credit note status transition: {from_status} -> {to_status}",
             details=details or {"from": from_status, "to": to_status},
         )
 
@@ -244,6 +302,27 @@ class PaymentValidationFailed(BillingValidationError):
 
     code = "PAYMENT_VALIDATION_FAILED"
     default_message = "Payment validation failed"
+
+
+class ReceiptValidationFailed(BillingValidationError):
+    """Raised when receipt-level validation fails."""
+
+    code = "RECEIPT_VALIDATION_FAILED"
+    default_message = "Receipt validation failed"
+
+
+class CreditNoteValidationFailed(BillingValidationError):
+    """Raised when credit note-level validation fails."""
+
+    code = "CREDIT_NOTE_VALIDATION_FAILED"
+    default_message = "Credit note validation failed"
+
+
+class PatientCreditValidationFailed(BillingValidationError):
+    """Raised when patient credit-level validation fails."""
+
+    code = "PATIENT_CREDIT_VALIDATION_FAILED"
+    default_message = "Patient credit validation failed"
 
 
 # ==========================================================

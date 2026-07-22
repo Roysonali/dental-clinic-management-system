@@ -5,8 +5,8 @@ payments, receipts, credit notes, and financial reporting.
 
 This package contains the full billing module implementation including:
 domain enums, constants, exceptions, dependency providers, SQLAlchemy models,
-repositories, money/numbering/validation utilities, shared mixins, and shared
-DTOs. Service layer, routers, validators, and tests are implemented in
+repositories, money/numbering/validation utilities, shared mixins, shared
+DTOs, service layer, and validators. Routers and tests are implemented in
 subsequent sprints.
 """
 
@@ -28,6 +28,11 @@ from app.modules.billing.repositories import (
     ReceiptRepository,
 )
 from app.modules.billing.schemas import common as schemas_common
+from app.modules.billing.services import (
+    BaseService,
+    DocumentSequenceService,
+    InvoiceService,
+)
 from app.modules.billing.utils import (
     money,
     numbering,
@@ -36,13 +41,16 @@ from app.modules.billing.utils import (
 
 __all__ = [
     "AuditRepository",
+    "BaseService",
     "constants",
     "CreditNoteRepository",
     "dependencies",
     "DocumentSequenceRepository",
+    "DocumentSequenceService",
     "enums",
     "exceptions",
     "InvoiceRepository",
+    "InvoiceService",
     "money",
     "numbering",
     "PatientCreditRepository",
