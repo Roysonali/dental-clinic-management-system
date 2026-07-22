@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from decimal import Decimal
 from typing import Any, Mapping, Optional
 from uuid import UUID
 
@@ -468,6 +469,38 @@ class InvoiceRepository:
             .options(selectinload(Invoice.status_history))
         )
         return self.db.execute(stmt).scalar_one_or_none()
+
+    def get_total_allocated_for_invoice(self, invoice_id: UUID) -> Decimal:
+        """Compute the total non-refund amount allocated to an invoice.
+
+        Persistence-only operation — a simple SUM query with no business
+        logic. Returns zero if no allocations exist. No commit.
+        """
+        from app.modules.billing.models import PaymentAllocation
+
+        stmt = select(
+            func.coalesce(func.sum(PaymentAllocation.allocated_amount), 0)
+        ).where(
+            PaymentAllocation.invoice_id == invoice_id,
+            PaymentAllocation.is_refund == False,
+        )
+        result = self.db.execute(stmt).scalar()
+        return Decimal(str(result)) if result is not None else Decimal("0.00")
+
+    def get_invoice_grand_total(self, invoice_id: UUID) -> Decimal:
+        """Compute the grand total of an invoice from its line items.
+
+        Persistence-only operation — a simple SUM query with no business
+        logic. Returns zero if no items exist (or invoice is not found).
+        No commit.
+        """
+        stmt = select(
+            func.coalesce(func.sum(InvoiceItem.net_amount), 0)
+        ).where(
+            InvoiceItem.invoice_id == invoice_id
+        )
+        result = self.db.execute(stmt).scalar()
+        return Decimal(str(result)) if result is not None else Decimal("0.00")
 
     def get_complete_aggregate(
         self, invoice_id: UUID

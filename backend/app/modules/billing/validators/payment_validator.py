@@ -132,6 +132,32 @@ class PaymentValidator:
                 },
             )
 
+    def validate_allocatable(self, payment: Payment) -> None:
+        """Validate that ``payment`` is in a status that may be allocated.
+
+        Only payments in ``COMPLETED`` status may have allocations created
+        or modified. Allocations represent distribution of settled funds
+        to invoices.
+
+        Raises:
+            PaymentValidationFailed: If the payment is not COMPLETED.
+        """
+        current = (
+            payment.status
+            if isinstance(payment.status, PaymentStatus)
+            else PaymentStatus(payment.status)
+        )
+        if current != PaymentStatus.COMPLETED:
+            raise PaymentValidationFailed(
+                f"Payment {payment.id} is not in COMPLETED status "
+                f"(current: '{current.value}') and cannot be allocated.",
+                details={
+                    "payment_id": str(payment.id),
+                    "current_status": current.value,
+                    "required_status": PaymentStatus.COMPLETED.value,
+                },
+            )
+
     def validate_reversible(self, payment: Payment) -> None:
         """Validate that ``payment`` may be reversed.
 
@@ -273,6 +299,13 @@ class PaymentValidator:
         new_allocation_total: object,
     ) -> None:
         """Validate that the total allocated does not exceed the payment amount.
+
+        .. note::
+
+           This method is intentionally retained for future use by the
+           refund workflow (Sprint 5C.5+). It is not currently called by
+           any service method — the allocation flow computes over-allocation
+           inline to avoid an extra pass over the allocation collection.
 
         Args:
             payment: The payment being validated.

@@ -89,6 +89,7 @@ class PaymentStatus(str, Enum):
     FAILED = "failed"
     REFUNDED = "refunded"
     REVERSED = "reversed"
+    VOID = "void"
 
     @classmethod
     def editable_statuses(cls) -> frozenset["PaymentStatus"]:
@@ -224,6 +225,7 @@ class DocumentType(str, Enum):
     INVOICE = "invoice"
     RECEIPT = "receipt"
     CREDIT_NOTE = "credit_note"
+    PAYMENT = "payment"
 
     @classmethod
     def all_values(cls) -> frozenset[str]:
@@ -236,6 +238,8 @@ class AuditAction(str, Enum):
     CREATED = "created"
     UPDATED = "updated"
     STATUS_CHANGED = "status_changed"
+    COMPLETED = "completed"
+    FAILED = "failed"
     ISSUED = "issued"
     CANCELLED = "cancelled"
     VOIDED = "voided"
@@ -244,6 +248,7 @@ class AuditAction(str, Enum):
     REFUNDED = "refunded"
     CREDIT_APPLIED = "credit_applied"
     PRICE_OVERRIDDEN = "price_overridden"
+    DELETED = "deleted"
 
     @classmethod
     def all_values(cls) -> frozenset[str]:

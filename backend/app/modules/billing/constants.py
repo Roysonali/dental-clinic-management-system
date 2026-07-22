@@ -81,17 +81,20 @@ DOCUMENT_NUMBER_PREFIXES: dict[DocumentType, str] = {
     DocumentType.INVOICE: "INV-",
     DocumentType.RECEIPT: "RCT-",
     DocumentType.CREDIT_NOTE: "CN-",
+    DocumentType.PAYMENT: "PAY-",
 }
 
 DOCUMENT_NUMBER_MIN_DIGITS: dict[DocumentType, int] = {
     DocumentType.INVOICE: DEFAULT_SEQUENCE_MIN_DIGITS,
     DocumentType.RECEIPT: DEFAULT_SEQUENCE_MIN_DIGITS,
     DocumentType.CREDIT_NOTE: DEFAULT_SEQUENCE_MIN_DIGITS,
+    DocumentType.PAYMENT: DEFAULT_SEQUENCE_MIN_DIGITS,
 }
 
 INVOICE_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.INVOICE]
 RECEIPT_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.RECEIPT]
 CREDIT_NOTE_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.CREDIT_NOTE]
+PAYMENT_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.PAYMENT]
 
 # ==========================================================
 # Field length limits
@@ -197,6 +200,7 @@ PAYMENT_TRANSITIONS: dict[PaymentStatus, frozenset[PaymentStatus]] = {
         {
             PaymentStatus.COMPLETED,
             PaymentStatus.FAILED,
+            PaymentStatus.VOID,
         }
     ),
     PaymentStatus.COMPLETED: frozenset(
@@ -210,6 +214,7 @@ PAYMENT_TRANSITIONS: dict[PaymentStatus, frozenset[PaymentStatus]] = {
             PaymentStatus.PENDING,
         }
     ),
+    PaymentStatus.VOID: frozenset(),  # Terminal
     PaymentStatus.REFUNDED: frozenset(),  # Terminal
     PaymentStatus.REVERSED: frozenset(),  # Terminal
 }

@@ -63,6 +63,8 @@ from app.modules.billing.models import (  # noqa: E402
     Invoice,
     InvoiceItem,
     InvoiceStatusHistory,
+    Payment,
+    PaymentAllocation,
 )
 
 
@@ -167,7 +169,7 @@ def _seed_fk_stubs(db: Session) -> None:
     )
     db.add(treatment_plan_item)
 
-    document_sequence = DocumentSequence(
+    document_sequence_invoice = DocumentSequence(
         document_type="invoice",
         prefix="INV-",
         current_value=0,
@@ -175,7 +177,17 @@ def _seed_fk_stubs(db: Session) -> None:
         start_value=1,
         updated_by=_STUB_USER_ID,
     )
-    db.add(document_sequence)
+    db.add(document_sequence_invoice)
+
+    document_sequence_payment = DocumentSequence(
+        document_type="payment",
+        prefix="PAY-",
+        current_value=0,
+        min_digits=5,
+        start_value=1,
+        updated_by=_STUB_USER_ID,
+    )
+    db.add(document_sequence_payment)
 
     db.flush()
 
@@ -270,6 +282,48 @@ class InvoiceItemFactory:
         return obj
 
 
+class PaymentFactory:
+    _counter = 0
+
+    @classmethod
+    def _next_number(cls) -> str:
+        cls._counter += 1
+        return f"PAY-TEST-{cls._counter:06d}"
+
+    @classmethod
+    def build(cls, **kwargs) -> Payment:
+        now = datetime.now(timezone.utc)
+        defaults = dict(
+            id=uuid.uuid4(),
+            patient_id=_STUB_PATIENT_ID,
+            payment_number=cls._next_number(),
+            payment_method="cash",
+            total_amount=Decimal("100.00"),
+            payment_date=date.today(),
+            status="pending",
+            reference_number=None,
+            is_reversed=False,
+            reversal_reason=None,
+            notes=None,
+            created_by=_STUB_USER_ID,
+            updated_by=None,
+            created_at=now,
+            updated_at=now,
+            version=1,
+            doc_version=1,
+        )
+        defaults.update(kwargs)
+        return Payment(**defaults)
+
+    @classmethod
+    def create(cls, db: Session, **kwargs) -> Payment:
+        obj = cls.build(**kwargs)
+        db.add(obj)
+        db.flush()
+        db.refresh(obj)
+        return obj
+
+
 # ---------------------------------------------------------------------------
 # Entity fixtures
 # ---------------------------------------------------------------------------
@@ -283,6 +337,35 @@ def invoice_with_items(db) -> Invoice:
     inv = InvoiceFactory.create(db)
     InvoiceItemFactory.create(db, invoice_id=inv.id, sequence_number=1)
     InvoiceItemFactory.create(db, invoice_id=inv.id, sequence_number=2)
+    db.refresh(inv)
+    return inv
+
+
+@pytest.fixture
+def payment(db) -> Payment:
+    return PaymentFactory.create(db)
+
+
+@pytest.fixture
+def completed_payment(db) -> Payment:
+    """A payment already in COMPLETED status."""
+    from app.modules.billing.enums import PaymentStatus
+    return PaymentFactory.create(db, status=PaymentStatus.COMPLETED.value)
+
+
+@pytest.fixture
+def issued_invoice(db) -> Invoice:
+    """An invoice in ISSUED status with 2 line items (total=200)."""
+    from app.modules.billing.enums import InvoiceStatus
+    inv = InvoiceFactory.create(db, status=InvoiceStatus.ISSUED.value)
+    InvoiceItemFactory.create(
+        db, invoice_id=inv.id, sequence_number=1,
+        unit_price=Decimal("150.00"), net_amount=Decimal("150.00"),
+    )
+    InvoiceItemFactory.create(
+        db, invoice_id=inv.id, sequence_number=2,
+        unit_price=Decimal("50.00"), net_amount=Decimal("50.00"),
+    )
     db.refresh(inv)
     return inv
 
@@ -327,13 +410,97 @@ def invoice_service(db) -> InvoiceService:
     )
 
 
+@pytest.fixture
+def payment_service(db) -> PaymentService:
+    from app.modules.billing.repositories import (
+        AuditRepository,
+        DocumentSequenceRepository,
+        PaymentRepository,
+    )
+    from app.modules.billing.validators import (
+        DocumentSequenceValidator,
+        FinancialValidator,
+        PaymentValidator,
+    )
+    from app.modules.billing.services import (
+        DocumentSequenceService,
+        PaymentService,
+    )
+
+    payment_repo = PaymentRepository(db)
+    audit_repo = AuditRepository(db)
+    doc_seq_repo = DocumentSequenceRepository(db)
+    financial_validator = FinancialValidator()
+    payment_validator = PaymentValidator(payment_repo, financial_validator)
+    doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
+    document_sequence_service = DocumentSequenceService(
+        db, doc_seq_repo, doc_seq_validator
+    )
+
+    return PaymentService(
+        db=db,
+        payment_repo=payment_repo,
+        payment_validator=payment_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
+@pytest.fixture
+def payment_service_with_allocation(db) -> PaymentService:
+    """PaymentService with invoice dependencies for allocation operations."""
+    from app.modules.billing.repositories import (
+        AuditRepository,
+        DocumentSequenceRepository,
+        InvoiceRepository,
+        PaymentRepository,
+    )
+    from app.modules.billing.validators import (
+        DocumentSequenceValidator,
+        FinancialValidator,
+        InvoiceValidator,
+        PaymentValidator,
+    )
+    from app.modules.billing.services import (
+        DocumentSequenceService,
+        PaymentService,
+    )
+
+    payment_repo = PaymentRepository(db)
+    invoice_repo = InvoiceRepository(db)
+    audit_repo = AuditRepository(db)
+    doc_seq_repo = DocumentSequenceRepository(db)
+    financial_validator = FinancialValidator()
+    payment_validator = PaymentValidator(payment_repo, financial_validator)
+    invoice_validator = InvoiceValidator(invoice_repo, financial_validator)
+    doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
+    document_sequence_service = DocumentSequenceService(
+        db, doc_seq_repo, doc_seq_validator
+    )
+
+    return PaymentService(
+        db=db,
+        payment_repo=payment_repo,
+        payment_validator=payment_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+        invoice_repo=invoice_repo,
+        invoice_validator=invoice_validator,
+    )
+
+
 __all__ = [
     "_STUB_DOCTOR_ID",
     "_STUB_USER_ID",
     "_STUB_PATIENT_ID",
     "InvoiceFactory",
     "InvoiceItemFactory",
+    "PaymentFactory",
     "invoice",
     "invoice_with_items",
     "invoice_service",
+    "payment",
+    "payment_service",
 ]

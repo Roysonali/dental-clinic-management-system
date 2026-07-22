@@ -32,6 +32,7 @@ from app.modules.billing.services import (
     BaseService,
     DocumentSequenceService,
     InvoiceService,
+    PaymentService,
 )
 from app.modules.billing.utils import (
     money,

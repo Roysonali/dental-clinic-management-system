@@ -266,8 +266,30 @@ class InvoiceNumberAlreadyUsed(BillingConflictError):
         )
 
 
+class AllocationNotFound(BillingNotFoundError):
+    """Raised when a payment allocation id does not resolve."""
+
+    code = "ALLOCATION_NOT_FOUND"
+    default_message = "Payment allocation not found"
+
+    def __init__(self, allocation_id: Any, *, details: Any = None) -> None:
+        super().__init__(
+            f"Payment allocation not found: {allocation_id}",
+            details=details or {"allocation_id": str(allocation_id)},
+        )
+
+
 class PaymentAlreadyAllocated(BillingConflictError):
-    """Raised when a payment is allocated beyond its total amount."""
+    """Raised when a payment is allocated beyond its total amount.
+
+    .. note::
+
+       This exception is intentionally retained for future use by the
+       refund workflow (Sprint 5C.5+). The current allocation flow raises
+       ``PaymentExceedsInvoice`` instead for a more descriptive error
+       message. ``PaymentAlreadyAllocated`` will be raised by the refund
+       engine when a payment has no remaining unallocated amount to refund.
+    """
 
     code = "PAYMENT_ALREADY_ALLOCATED"
     default_message = "Payment allocation exceeds the available payment amount"
@@ -302,6 +324,19 @@ class PaymentValidationFailed(BillingValidationError):
 
     code = "PAYMENT_VALIDATION_FAILED"
     default_message = "Payment validation failed"
+
+
+class PaymentNotEditable(BillingConflictError):
+    """Raised when a non-pending payment is modified."""
+
+    code = "PAYMENT_NOT_EDITABLE"
+    default_message = "Payment is not editable in its current status"
+
+    def __init__(self, payment_id: Any, status: str, *, details: Any = None) -> None:
+        super().__init__(
+            f"Payment {payment_id} is not editable in status '{status}'",
+            details=details or {"payment_id": str(payment_id), "status": status},
+        )
 
 
 class ReceiptValidationFailed(BillingValidationError):
@@ -417,3 +452,10 @@ class SequenceReservationFailed(BillingException):
 
     code = "SEQUENCE_RESERVATION_FAILED"
     default_message = "Failed to reserve a document number"
+
+
+class PaymentCreationFailed(BillingException):
+    """Raised when payment persistence fails for a non-business reason."""
+
+    code = "PAYMENT_CREATION_FAILED"
+    default_message = "Failed to create payment"
