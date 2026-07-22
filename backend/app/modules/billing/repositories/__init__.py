@@ -22,6 +22,7 @@ from app.modules.billing.repositories.patient_credit_repository import (
 )
 from app.modules.billing.repositories.payment_repository import PaymentRepository
 from app.modules.billing.repositories.receipt_repository import ReceiptRepository
+from app.modules.billing.repositories.refund_repository import RefundRepository
 
 __all__ = [
     "AuditRepository",
@@ -31,4 +32,5 @@ __all__ = [
     "PatientCreditRepository",
     "PaymentRepository",
     "ReceiptRepository",
+    "RefundRepository",
 ]

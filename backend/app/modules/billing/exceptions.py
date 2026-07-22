@@ -233,6 +233,21 @@ class InvalidCreditNoteStatusTransition(BillingConflictError):
         )
 
 
+class InvalidRefundStatusTransition(BillingConflictError):
+    """Raised for an illegal refund status transition."""
+
+    code = "INVALID_REFUND_STATUS_TRANSITION"
+    default_message = "Invalid refund status transition"
+
+    def __init__(
+        self, from_status: str, to_status: str, *, details: Any = None
+    ) -> None:
+        super().__init__(
+            f"Invalid refund status transition: {from_status} -> {to_status}",
+            details=details or {"from": from_status, "to": to_status},
+        )
+
+
 class DuplicateInvoiceDetected(BillingConflictError):
     """Raised when an invoice number collides (should be rare)."""
 
@@ -276,6 +291,19 @@ class AllocationNotFound(BillingNotFoundError):
         super().__init__(
             f"Payment allocation not found: {allocation_id}",
             details=details or {"allocation_id": str(allocation_id)},
+        )
+
+
+class RefundNotFound(BillingNotFoundError):
+    """Raised when a refund id does not resolve to a record."""
+
+    code = "REFUND_NOT_FOUND"
+    default_message = "Refund not found"
+
+    def __init__(self, refund_id: Any, *, details: Any = None) -> None:
+        super().__init__(
+            f"Refund not found: {refund_id}",
+            details=details or {"refund_id": str(refund_id)},
         )
 
 
@@ -351,6 +379,13 @@ class CreditNoteValidationFailed(BillingValidationError):
 
     code = "CREDIT_NOTE_VALIDATION_FAILED"
     default_message = "Credit note validation failed"
+
+
+class RefundValidationFailed(BillingValidationError):
+    """Raised when refund-level validation fails."""
+
+    code = "REFUND_VALIDATION_FAILED"
+    default_message = "Refund validation failed"
 
 
 class PatientCreditValidationFailed(BillingValidationError):
@@ -459,3 +494,10 @@ class PaymentCreationFailed(BillingException):
 
     code = "PAYMENT_CREATION_FAILED"
     default_message = "Failed to create payment"
+
+
+class RefundCreationFailed(BillingException):
+    """Raised when refund persistence fails for a non-business reason."""
+
+    code = "REFUND_CREATION_FAILED"
+    default_message = "Failed to process refund"

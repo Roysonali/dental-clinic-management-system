@@ -6,6 +6,7 @@ from .invoice import Invoice, InvoiceStatusHistory
 from .invoice_item import InvoiceItem
 from .payment import Payment
 from .payment_allocation import PaymentAllocation
+from .refund import Refund
 from .receipt import Receipt, ReceiptInvoice
 from .credit_note import CreditNote
 from .patient_credit import PatientCredit
@@ -18,6 +19,7 @@ __all__ = [
     "InvoiceStatusHistory",
     "Payment",
     "PaymentAllocation",
+    "Refund",
     "Receipt",
     "ReceiptInvoice",
     "CreditNote",

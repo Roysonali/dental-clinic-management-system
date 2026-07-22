@@ -38,18 +38,21 @@ from app.modules.billing.constants import (
     INVOICE_TRANSITIONS,
     PAYMENT_TRANSITIONS,
     RECEIPT_TRANSITIONS,
+    REFUND_TRANSITIONS,
 )
 from app.modules.billing.enums import (
     CreditNoteStatus,
     InvoiceStatus,
     PaymentStatus,
     ReceiptStatus,
+    RefundStatus,
 )
 from app.modules.billing.exceptions import (
     InvalidCreditNoteStatusTransition,
     InvalidInvoiceStatusTransition,
     InvalidPaymentStatusTransition,
     InvalidReceiptStatusTransition,
+    InvalidRefundStatusTransition,
 )
 
 
@@ -112,6 +115,38 @@ def validate_payment_transition(
 
     if to_status not in allowed:
         raise InvalidPaymentStatusTransition(
+            from_status=from_status.value,
+            to_status=to_status.value,
+            details={
+                "current_status": from_status.value,
+                "new_status": to_status.value,
+                "allowed_transitions": sorted(s.value for s in allowed),
+            },
+        )
+
+
+def validate_refund_transition(
+    current_status: RefundStatus | str,
+    new_status: RefundStatus | str,
+) -> None:
+    """Validate that a refund may transition from ``current_status`` to ``new_status``.
+
+    Args:
+        current_status: The refund's current status (enum member or string value).
+        new_status: The requested target status.
+
+    Raises:
+        InvalidRefundStatusTransition: If the transition is not listed in
+            ``REFUND_TRANSITIONS``, or if either value is not a recognised
+            ``RefundStatus``.
+    """
+    from_status = _resolve_refund_status(current_status)
+    to_status = _resolve_refund_status(new_status)
+
+    allowed = REFUND_TRANSITIONS.get(from_status, frozenset())
+
+    if to_status not in allowed:
+        raise InvalidRefundStatusTransition(
             from_status=from_status.value,
             to_status=to_status.value,
             details={
@@ -227,10 +262,12 @@ def validate_transition(
             validate_receipt_transition(current_status, new_status)
         case "credit_note":
             validate_credit_note_transition(current_status, new_status)
+        case "refund":
+            validate_refund_transition(current_status, new_status)
         case _:
             raise ValueError(
                 f"Unknown billing aggregate: {aggregate!r}. "
-                f"Expected one of: invoice, payment, receipt, credit_note."
+                f"Expected one of: invoice, payment, receipt, credit_note, refund."
             )
 
 
@@ -262,7 +299,8 @@ def can_transition(
         validate_transition(aggregate, current_status, new_status)
         return True
     except (InvalidInvoiceStatusTransition, InvalidPaymentStatusTransition,
-            InvalidReceiptStatusTransition, InvalidCreditNoteStatusTransition):
+            InvalidReceiptStatusTransition, InvalidCreditNoteStatusTransition,
+            InvalidRefundStatusTransition):
         return False
     except ValueError:
         return False
@@ -295,10 +333,12 @@ def is_terminal_state(
             resolved = _resolve_receipt_status(status)
         case "credit_note":
             resolved = _resolve_credit_note_status(status)
+        case "refund":
+            resolved = _resolve_refund_status(status)
         case _:
             raise ValueError(
                 f"Unknown billing aggregate: {aggregate!r}. "
-                f"Expected one of: invoice, payment, receipt, credit_note."
+                f"Expected one of: invoice, payment, receipt, credit_note, refund."
             )
     return resolved.is_terminal()
 
@@ -330,10 +370,12 @@ def is_editable_state(
             resolved = _resolve_receipt_status(status)
         case "credit_note":
             resolved = _resolve_credit_note_status(status)
+        case "refund":
+            resolved = _resolve_refund_status(status)
         case _:
             raise ValueError(
                 f"Unknown billing aggregate: {aggregate!r}. "
-                f"Expected one of: invoice, payment, receipt, credit_note."
+                f"Expected one of: invoice, payment, receipt, credit_note, refund."
             )
     return resolved.is_editable()
 
@@ -371,16 +413,24 @@ def allowed_transitions(
 ) -> frozenset[CreditNoteStatus]: ...
 
 
+@overload
+def allowed_transitions(
+    status: RefundStatus,
+    aggregate: str = ...,
+) -> frozenset[RefundStatus]: ...
+
+
 def allowed_transitions(
     status: InvoiceStatus
     | PaymentStatus
     | ReceiptStatus
     | CreditNoteStatus
+    | RefundStatus
     | str,
     aggregate: str = "invoice",
 ) -> frozenset[
     InvoiceStatus
-] | frozenset[PaymentStatus] | frozenset[ReceiptStatus] | frozenset[CreditNoteStatus]:
+] | frozenset[PaymentStatus] | frozenset[ReceiptStatus] | frozenset[CreditNoteStatus] | frozenset[RefundStatus]:
     """Return the set of statuses that ``status`` may transition to.
 
     Args:
@@ -405,10 +455,13 @@ def allowed_transitions(
         case "credit_note":
             resolved = _resolve_credit_note_status(status)
             return CREDIT_NOTE_TRANSITIONS.get(resolved, frozenset())
+        case "refund":
+            resolved = _resolve_refund_status(status)
+            return REFUND_TRANSITIONS.get(resolved, frozenset())
         case _:
             raise ValueError(
                 f"Unknown billing aggregate: {aggregate!r}. "
-                f"Expected one of: invoice, payment, receipt, credit_note."
+                f"Expected one of: invoice, payment, receipt, credit_note, refund."
             )
 
 
@@ -477,6 +530,28 @@ def _resolve_receipt_status(status: ReceiptStatus | str) -> ReceiptStatus:
                 },
             )
     raise InvalidReceiptStatusTransition(
+        from_status=str(type(status).__name__),
+        to_status="unknown",
+        details={"received_type": type(status).__name__},
+    )
+
+
+def _resolve_refund_status(status: RefundStatus | str) -> RefundStatus:
+    if isinstance(status, RefundStatus):
+        return status
+    if isinstance(status, str):
+        try:
+            return RefundStatus(status)
+        except ValueError:
+            raise InvalidRefundStatusTransition(
+                from_status=status,
+                to_status="unknown",
+                details={
+                    "received": status,
+                    "expected_values": sorted(RefundStatus.all_values()),
+                },
+            )
+    raise InvalidRefundStatusTransition(
         from_status=str(type(status).__name__),
         to_status="unknown",
         details={"received_type": type(status).__name__},

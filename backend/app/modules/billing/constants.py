@@ -30,6 +30,7 @@ from app.modules.billing.enums import (
     InvoiceStatus,
     PaymentStatus,
     ReceiptStatus,
+    RefundStatus,
 )
 
 # ==========================================================
@@ -82,6 +83,7 @@ DOCUMENT_NUMBER_PREFIXES: dict[DocumentType, str] = {
     DocumentType.RECEIPT: "RCT-",
     DocumentType.CREDIT_NOTE: "CN-",
     DocumentType.PAYMENT: "PAY-",
+    DocumentType.REFUND: "RFD-",
 }
 
 DOCUMENT_NUMBER_MIN_DIGITS: dict[DocumentType, int] = {
@@ -89,12 +91,14 @@ DOCUMENT_NUMBER_MIN_DIGITS: dict[DocumentType, int] = {
     DocumentType.RECEIPT: DEFAULT_SEQUENCE_MIN_DIGITS,
     DocumentType.CREDIT_NOTE: DEFAULT_SEQUENCE_MIN_DIGITS,
     DocumentType.PAYMENT: DEFAULT_SEQUENCE_MIN_DIGITS,
+    DocumentType.REFUND: DEFAULT_SEQUENCE_MIN_DIGITS,
 }
 
 INVOICE_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.INVOICE]
 RECEIPT_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.RECEIPT]
 CREDIT_NOTE_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.CREDIT_NOTE]
 PAYMENT_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.PAYMENT]
+REFUND_NUMBER_PREFIX = DOCUMENT_NUMBER_PREFIXES[DocumentType.REFUND]
 
 # ==========================================================
 # Field length limits
@@ -103,6 +107,7 @@ INVOICE_NUMBER_MAX_LENGTH = 30
 PAYMENT_NUMBER_MAX_LENGTH = 30
 RECEIPT_NUMBER_MAX_LENGTH = 30
 CREDIT_NOTE_NUMBER_MAX_LENGTH = 30
+REFUND_NUMBER_MAX_LENGTH = 30
 CURRENCY_CODE_LENGTH = 3
 TRANSACTION_REFERENCE_MAX_LENGTH = 100
 PAYMENT_NOTES_MAX_LENGTH = 500
@@ -228,6 +233,22 @@ RECEIPT_TRANSITIONS: dict[ReceiptStatus, frozenset[ReceiptStatus]] = {
     ReceiptStatus.CANCELLED: frozenset(),  # Terminal
 }
 
+REFUND_TRANSITIONS: dict[RefundStatus, frozenset[RefundStatus]] = {
+    RefundStatus.PENDING: frozenset(
+        {
+            RefundStatus.APPROVED,
+            RefundStatus.REJECTED,
+        }
+    ),
+    RefundStatus.APPROVED: frozenset(
+        {
+            RefundStatus.COMPLETED,
+        }
+    ),
+    RefundStatus.REJECTED: frozenset(),  # Terminal
+    RefundStatus.COMPLETED: frozenset(),  # Terminal
+}
+
 CREDIT_NOTE_TRANSITIONS: dict[CreditNoteStatus, frozenset[CreditNoteStatus]] = {
     CreditNoteStatus.DRAFT: frozenset(
         {
@@ -292,6 +313,8 @@ __all__ = [
     "PAYMENT_NUMBER_MAX_LENGTH",
     "RECEIPT_NUMBER_MAX_LENGTH",
     "CREDIT_NOTE_NUMBER_MAX_LENGTH",
+    "REFUND_NUMBER_MAX_LENGTH",
+    "REFUND_NUMBER_PREFIX",
     "CURRENCY_CODE_LENGTH",
     "TRANSACTION_REFERENCE_MAX_LENGTH",
     "PAYMENT_NOTES_MAX_LENGTH",
@@ -314,6 +337,7 @@ __all__ = [
     "VALID_INVOICE_TRANSITIONS",
     "PAYMENT_TRANSITIONS",
     "RECEIPT_TRANSITIONS",
+    "REFUND_TRANSITIONS",
     "CREDIT_NOTE_TRANSITIONS",
     "is_valid_currency",
 ]

@@ -55,6 +55,9 @@ from app.modules.billing.validators.protocols import (
 from app.modules.billing.validators.receipt_validator import (
     ReceiptValidator,
 )
+from app.modules.billing.validators.refund_validator import (
+    RefundValidator,
+)
 from app.modules.billing.validators.state_machine import (
     allowed_transitions,
     can_transition,
@@ -64,6 +67,7 @@ from app.modules.billing.validators.state_machine import (
     validate_invoice_transition,
     validate_payment_transition,
     validate_receipt_transition,
+    validate_refund_transition,
     validate_transition,
 )
 
@@ -85,9 +89,12 @@ __all__ = [
     "PaymentValidator",
     "ReceiptRepositoryProtocol",
     "ReceiptValidator",
+    "RefundRepositoryProtocol",
+    "RefundValidator",
     "validate_credit_note_transition",
     "validate_invoice_transition",
     "validate_payment_transition",
     "validate_receipt_transition",
+    "validate_refund_transition",
     "validate_transition",
 ]

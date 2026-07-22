@@ -38,7 +38,7 @@ from app.modules.billing.exceptions import (
     ReceiptNotFound,
     ReceiptValidationFailed,
 )
-from app.modules.billing.models import Receipt
+from app.modules.billing.models import Payment, Receipt
 from app.modules.billing.validators.protocols import ReceiptRepositoryProtocol
 from app.modules.billing.validators.state_machine import (
     is_terminal_state,
@@ -60,6 +60,51 @@ class ReceiptValidator:
     # ==================================================================
     # Receipt lifecycle
     # ==================================================================
+
+    def validate_generatable(self, payment: Payment) -> None:
+        """Validate that a receipt can be generated for the given payment.
+
+        A receipt can be generated when:
+        1. The payment is in ``COMPLETED`` status.
+        2. No receipt already exists for this payment (``payment_id`` is
+           ``UNIQUE`` on the ``Receipt`` model).
+
+        Args:
+            payment: The payment entity (already loaded by the service).
+
+        Raises:
+            ReceiptValidationFailed: If the payment is not COMPLETED or a
+                receipt already exists.
+        """
+        from app.modules.billing.enums import PaymentStatus
+
+        current = (
+            payment.status
+            if isinstance(payment.status, PaymentStatus)
+            else PaymentStatus(payment.status)
+        )
+        if current != PaymentStatus.COMPLETED:
+            raise ReceiptValidationFailed(
+                f"Cannot generate receipt for payment {payment.id}: "
+                f"payment is in '{current.value}' status (must be COMPLETED).",
+                details={
+                    "payment_id": str(payment.id),
+                    "current_status": current.value,
+                    "required_status": PaymentStatus.COMPLETED.value,
+                },
+            )
+
+        existing = self._receipt_repo.find_by_payment(payment.id)
+        if existing is not None:
+            raise ReceiptValidationFailed(
+                f"A receipt already exists for payment {payment.id}: "
+                f"receipt {existing.receipt_number}.",
+                details={
+                    "payment_id": str(payment.id),
+                    "existing_receipt_id": str(existing.id),
+                    "existing_receipt_number": existing.receipt_number,
+                },
+            )
 
     def validate_receipt_exists(self, receipt_id: UUID) -> Receipt:
         """Fetch a receipt by id and raise ``ReceiptNotFound`` if missing.
@@ -103,6 +148,35 @@ class ReceiptValidator:
             never raises for standard receipts. It exists as a defensive
             guard for future status additions.
         """
+
+    def validate_regeneratable(self, receipt: Receipt) -> None:
+        """Validate that ``receipt`` may be regenerated.
+
+        Regeneration is allowed only from ``GENERATED`` status. A receipt
+        is always reproduced from its existing data — regeneration does
+        not create a new financial record.
+
+        Raises:
+            ReceiptValidationFailed: If the receipt is not in GENERATED
+                status.
+        """
+        current = (
+            receipt.status
+            if isinstance(receipt.status, ReceiptStatus)
+            else ReceiptStatus(receipt.status)
+        )
+        if current != ReceiptStatus.GENERATED:
+            raise ReceiptValidationFailed(
+                f"Cannot regenerate receipt {receipt.receipt_number}: "
+                f"receipt is in '{current.value}' status "
+                f"(must be GENERATED).",
+                details={
+                    "receipt_id": str(receipt.id),
+                    "receipt_number": receipt.receipt_number,
+                    "current_status": current.value,
+                    "required_status": ReceiptStatus.GENERATED.value,
+                },
+            )
 
     def validate_cancellable(self, receipt: Receipt) -> None:
         """Validate that a receipt can be cancelled.

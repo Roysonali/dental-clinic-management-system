@@ -65,6 +65,8 @@ from app.modules.billing.models import (  # noqa: E402
     InvoiceStatusHistory,
     Payment,
     PaymentAllocation,
+    Receipt,
+    Refund,
 )
 
 
@@ -188,6 +190,26 @@ def _seed_fk_stubs(db: Session) -> None:
         updated_by=_STUB_USER_ID,
     )
     db.add(document_sequence_payment)
+
+    document_sequence_receipt = DocumentSequence(
+        document_type="receipt",
+        prefix="RCT-",
+        current_value=0,
+        min_digits=5,
+        start_value=1,
+        updated_by=_STUB_USER_ID,
+    )
+    db.add(document_sequence_receipt)
+
+    document_sequence_refund = DocumentSequence(
+        document_type="refund",
+        prefix="RFD-",
+        current_value=0,
+        min_digits=5,
+        start_value=1,
+        updated_by=_STUB_USER_ID,
+    )
+    db.add(document_sequence_refund)
 
     db.flush()
 
@@ -491,6 +513,86 @@ def payment_service_with_allocation(db) -> PaymentService:
     )
 
 
+@pytest.fixture
+def receipt_service(db) -> ReceiptService:
+    """ReceiptService with all dependencies for receipt operations."""
+    from app.modules.billing.repositories import (
+        AuditRepository,
+        DocumentSequenceRepository,
+        PaymentRepository,
+        ReceiptRepository,
+    )
+    from app.modules.billing.validators import (
+        DocumentSequenceValidator,
+        ReceiptValidator,
+    )
+    from app.modules.billing.services import (
+        DocumentSequenceService,
+        ReceiptService,
+    )
+
+    receipt_repo = ReceiptRepository(db)
+    payment_repo = PaymentRepository(db)
+    audit_repo = AuditRepository(db)
+    doc_seq_repo = DocumentSequenceRepository(db)
+    receipt_validator = ReceiptValidator(receipt_repo)
+    doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
+    document_sequence_service = DocumentSequenceService(
+        db, doc_seq_repo, doc_seq_validator
+    )
+
+    return ReceiptService(
+        db=db,
+        receipt_repo=receipt_repo,
+        receipt_validator=receipt_validator,
+        payment_repo=payment_repo,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
+
+@pytest.fixture
+def refund_service(db) -> 'RefundService':
+    """RefundService with all dependencies for refund operations."""
+    from app.modules.billing.repositories import (
+        AuditRepository,
+        DocumentSequenceRepository,
+        PaymentRepository,
+    )
+    from app.modules.billing.repositories.refund_repository import RefundRepository
+    from app.modules.billing.validators import (
+        DocumentSequenceValidator,
+        FinancialValidator,
+    )
+    from app.modules.billing.validators.refund_validator import RefundValidator
+    from app.modules.billing.services import (
+        DocumentSequenceService,
+    )
+    from app.modules.billing.services.refund_service import RefundService
+
+    refund_repo = RefundRepository(db)
+    payment_repo = PaymentRepository(db)
+    audit_repo = AuditRepository(db)
+    doc_seq_repo = DocumentSequenceRepository(db)
+    financial_validator = FinancialValidator()
+    refund_validator = RefundValidator(refund_repo, financial_validator)
+    doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
+    document_sequence_service = DocumentSequenceService(
+        db, doc_seq_repo, doc_seq_validator
+    )
+
+    return RefundService(
+        db=db,
+        refund_repo=refund_repo,
+        payment_repo=payment_repo,
+        refund_validator=refund_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
 __all__ = [
     "_STUB_DOCTOR_ID",
     "_STUB_USER_ID",
@@ -503,4 +605,5 @@ __all__ = [
     "invoice_service",
     "payment",
     "payment_service",
+    "refund_service",
 ]

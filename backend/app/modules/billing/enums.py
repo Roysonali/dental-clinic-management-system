@@ -215,6 +215,48 @@ class CurrencyCode(str, Enum):
         return frozenset(member.value for member in cls)
 
 
+class RefundStatus(str, Enum):
+    """Lifecycle status of a refund request.
+
+    PENDING → APPROVED → COMPLETED
+    PENDING → REJECTED (terminal)
+
+    Completed refunds are immutable. Rejected refunds may be re-attempted
+    as a new request.
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    COMPLETED = "completed"
+
+    @classmethod
+    def editable_statuses(cls) -> frozenset["RefundStatus"]:
+        """Statuses that allow modification."""
+        return frozenset({cls.PENDING})
+
+    @classmethod
+    def terminal_statuses(cls) -> frozenset["RefundStatus"]:
+        """Statuses with no outgoing transitions."""
+        from app.modules.billing.constants import REFUND_TRANSITIONS
+
+        return frozenset(
+            status for status, targets in REFUND_TRANSITIONS.items() if not targets
+        )
+
+    def is_terminal(self) -> bool:
+        """Return ``True`` if this status has no outgoing transitions."""
+        return self in self.terminal_statuses()
+
+    def is_editable(self) -> bool:
+        """Return ``True`` if a refund in this status may be edited."""
+        return self in self.editable_statuses()
+
+    @classmethod
+    def all_values(cls) -> frozenset[str]:
+        return frozenset(member.value for member in cls)
+
+
 class DocumentType(str, Enum):
     """Document categories that own an independent sequential number series.
 
@@ -226,6 +268,7 @@ class DocumentType(str, Enum):
     RECEIPT = "receipt"
     CREDIT_NOTE = "credit_note"
     PAYMENT = "payment"
+    REFUND = "refund"
 
     @classmethod
     def all_values(cls) -> frozenset[str]:
@@ -249,6 +292,11 @@ class AuditAction(str, Enum):
     CREDIT_APPLIED = "credit_applied"
     PRICE_OVERRIDDEN = "price_overridden"
     DELETED = "deleted"
+    REGENERATED = "regenerated"
+    REFUND_CREATED = "refund_created"
+    REFUND_APPROVED = "refund_approved"
+    REFUND_REJECTED = "refund_rejected"
+    REFUND_COMPLETED = "refund_completed"
 
     @classmethod
     def all_values(cls) -> frozenset[str]:

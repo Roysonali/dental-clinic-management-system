@@ -151,6 +151,22 @@ class PatientCreditRepositoryProtocol:
         raise NotImplementedError
 
 
+class RefundRepositoryProtocol:
+    """Minimal refund repository interface for validators."""
+
+    def get_by_id(self, refund_id: UUID) -> Refund | None:
+        raise NotImplementedError
+
+    def get_by_refund_number(self, refund_number: str) -> Refund | None:
+        raise NotImplementedError
+
+    def exists(self, refund_id: UUID) -> bool:
+        raise NotImplementedError
+
+    def exists_by_refund_number(self, refund_number: str) -> bool:
+        raise NotImplementedError
+
+
 class DocumentSequenceRepositoryProtocol:
     """Minimal document sequence repository interface for validators."""
 
