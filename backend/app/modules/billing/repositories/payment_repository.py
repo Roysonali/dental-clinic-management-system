@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from decimal import Decimal
 from typing import Any, Mapping, Optional
 from uuid import UUID
 
@@ -395,6 +396,24 @@ class PaymentRepository:
         return {row.status: row.cnt for row in self.db.execute(stmt).all()}
 
     # ------------------------------------------------- aggregate retrieval
+    def get_total_allocated_for_payment(self, payment_id: UUID) -> Decimal:
+        """Compute the total non-refund amount allocated from a payment.
+
+        Sums all PaymentAllocation.allocated_amount where payment_id matches
+        and is_refund=False. Returns ZERO_MONEY if no allocations exist.
+        No commit.
+        """
+        from app.modules.billing.models import PaymentAllocation
+
+        stmt = select(
+            func.coalesce(func.sum(PaymentAllocation.allocated_amount), 0)
+        ).where(
+            PaymentAllocation.payment_id == payment_id,
+            PaymentAllocation.is_refund == False,
+        )
+        result = self.db.execute(stmt).scalar()
+        return Decimal(str(result)) if result is not None else Decimal("0.00")
+
     def get_with_allocations(self, payment_id: UUID) -> Optional[Payment]:
         """Load a payment with its ``allocations`` collection eagerly loaded.
 

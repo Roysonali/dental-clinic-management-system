@@ -502,6 +502,24 @@ class InvoiceRepository:
         result = self.db.execute(stmt).scalar()
         return Decimal(str(result)) if result is not None else Decimal("0.00")
 
+    def get_total_refunded_for_invoice(self, invoice_id: UUID) -> Decimal:
+        """Compute the total refund amount allocated to an invoice.
+
+        Sums all PaymentAllocation.allocated_amount where invoice_id matches
+        and is_refund=True. Returns ZERO_MONEY if no refund allocations exist.
+        No commit.
+        """
+        from app.modules.billing.models import PaymentAllocation
+
+        stmt = select(
+            func.coalesce(func.sum(PaymentAllocation.allocated_amount), 0)
+        ).where(
+            PaymentAllocation.invoice_id == invoice_id,
+            PaymentAllocation.is_refund == True,
+        )
+        result = self.db.execute(stmt).scalar()
+        return Decimal(str(result)) if result is not None else Decimal("0.00")
+
     def get_complete_aggregate(
         self, invoice_id: UUID
     ) -> Optional[Invoice]:

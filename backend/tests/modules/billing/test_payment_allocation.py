@@ -334,11 +334,6 @@ class TestAllocatePayment:
         self, db, payment_service_with_allocation, completed_payment, issued_invoice
     ):
         """Allocation exceeding the invoice's outstanding balance is rejected."""
-        # The issued_invoice has a total of 200.00 from items
-        # Payment has 100.00. Even though payment has enough, we allocate
-        # more than the invoice's grand total.
-        # But in this case, 100 <= 200 so it should work.
-        # Let's create a second payment that would over-allocate the invoice
         from app.modules.billing.enums import PaymentStatus
 
         pay1 = PaymentFactory.create(
@@ -359,6 +354,120 @@ class TestAllocatePayment:
                 payment_id=completed_payment.id,
                 invoice_id=issued_invoice.id,
                 amount=Decimal("50.00"),
+                allocated_by=_STUB_USER_ID,
+            )
+
+    def test_allocate_after_refund_reduces_outstanding(
+        self, db, payment_service_with_allocation, issued_invoice
+    ):
+        """Regression test: allocation after refund respects refunded amount.
+
+        BR-63: outstanding = grand_total - paid + refunded.
+
+        Scenario:
+        - Invoice grand_total = $200
+        - Payment of $200 fully allocates it (outstanding = $0)
+        - Refund of $50 increases outstanding to $50
+        - A new $30 payment can now be allocated
+        """
+        from app.modules.billing.enums import PaymentStatus
+
+        # ── 1. Create first payment and fully allocate ───────────
+        pay1 = PaymentFactory.create(
+            db, status=PaymentStatus.COMPLETED.value,
+            total_amount=Decimal("200.00"),
+        )
+        payment_service_with_allocation.allocate_payment(
+            payment_id=pay1.id,
+            invoice_id=issued_invoice.id,
+            amount=Decimal("200.00"),
+            allocated_by=_STUB_USER_ID,
+        )
+
+        # ── 2. Create a refund allocation on the invoice ─────────
+        from app.modules.billing.models import PaymentAllocation
+        refund_payment = PaymentFactory.create(
+            db, status=PaymentStatus.COMPLETED.value,
+            total_amount=Decimal("50.00"),
+        )
+        refund_alloc = PaymentAllocation(
+            payment_id=refund_payment.id,
+            invoice_id=issued_invoice.id,
+            allocated_amount=Decimal("50.00"),
+            is_refund=True,
+            refund_reason="Partial refund for testing",
+            created_by=_STUB_USER_ID,
+        )
+        db.add(refund_alloc)
+        db.flush()
+
+        # ── 3. Now allocate another payment — should succeed ─────
+        # Outstanding = 200 - 200 + 50 = 50, so $30 should work
+        pay2 = PaymentFactory.create(
+            db, status=PaymentStatus.COMPLETED.value,
+            total_amount=Decimal("30.00"),
+        )
+        allocation = payment_service_with_allocation.allocate_payment(
+            payment_id=pay2.id,
+            invoice_id=issued_invoice.id,
+            amount=Decimal("30.00"),
+            allocated_by=_STUB_USER_ID,
+        )
+        assert allocation.allocated_amount == Decimal("30.00")
+
+    def test_allocate_after_refund_cannot_exceed_adjusted_outstanding(
+        self, db, payment_service_with_allocation, issued_invoice
+    ):
+        """Regression test: allocation after refund cannot exceed adjusted outstanding.
+
+        Scenario:
+        - Invoice grand_total = $200
+        - Payment of $200 fully allocates it (outstanding = $0)
+        - Refund of $50 increases outstanding to $50
+        - A $60 payment allocation should be rejected (exceeds $50 outstanding)
+        """
+        from app.modules.billing.enums import PaymentStatus
+        from app.modules.billing.models import PaymentAllocation
+
+        # ── 1. Create first payment and fully allocate ───────────
+        pay1 = PaymentFactory.create(
+            db, status=PaymentStatus.COMPLETED.value,
+            total_amount=Decimal("200.00"),
+        )
+        payment_service_with_allocation.allocate_payment(
+            payment_id=pay1.id,
+            invoice_id=issued_invoice.id,
+            amount=Decimal("200.00"),
+            allocated_by=_STUB_USER_ID,
+        )
+
+        # ── 2. Create a refund allocation on the invoice ─────────
+        refund_payment = PaymentFactory.create(
+            db, status=PaymentStatus.COMPLETED.value,
+            total_amount=Decimal("50.00"),
+        )
+        refund_alloc = PaymentAllocation(
+            payment_id=refund_payment.id,
+            invoice_id=issued_invoice.id,
+            allocated_amount=Decimal("50.00"),
+            is_refund=True,
+            refund_reason="Partial refund for testing",
+            created_by=_STUB_USER_ID,
+        )
+        db.add(refund_alloc)
+        db.flush()
+
+        # ── 3. Try to allocate $60 — should fail ───────────────
+        # Outstanding = 200 - 200 + 50 = 50, so $60 should fail
+        pay2 = PaymentFactory.create(
+            db, status=PaymentStatus.COMPLETED.value,
+            total_amount=Decimal("60.00"),
+        )
+        with pytest.raises(PaymentExceedsInvoice):
+            payment_service_with_allocation.allocate_payment(
+                payment_id=pay2.id,
+                invoice_id=issued_invoice.id,
+                amount=Decimal("60.00"),
                 allocated_by=_STUB_USER_ID,
             )
 

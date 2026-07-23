@@ -927,7 +927,11 @@ class PaymentService(BaseService):
             total_allocated_to_invoice = (
                 self._invoice_repo.get_total_allocated_for_invoice(invoice_id)
             )
-            outstanding = grand_total - total_allocated_to_invoice
+            refunded_on_invoice = (
+                self._invoice_repo.get_total_refunded_for_invoice(invoice_id)
+            )
+            # outstanding = grand_total - paid + refunded (BR-63)
+            outstanding = grand_total - total_allocated_to_invoice + refunded_on_invoice
 
             if validated_amount > outstanding:
                 raise PaymentExceedsInvoice(

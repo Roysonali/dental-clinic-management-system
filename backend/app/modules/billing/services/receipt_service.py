@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -355,11 +355,7 @@ class ReceiptService(BaseService):
                 new_value={
                     "receipt_number": receipt.receipt_number,
                     "status": ReceiptStatus.GENERATED.value,
-                    "regenerated_at": __import__(
-                        "datetime"
-                    ).datetime.now(
-                        __import__("datetime").timezone.utc
-                    ).isoformat(),
+                    "regenerated_at": datetime.now(timezone.utc).isoformat(),
                 },
                 changed_by=regenerated_by,
                 reason="Receipt regenerated",
