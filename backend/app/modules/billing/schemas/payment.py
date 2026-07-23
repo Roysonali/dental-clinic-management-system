@@ -170,27 +170,58 @@ class PaymentCreateRequest(BillingCreateSchema, PaymentBase, BillingValidators):
         return stripped if stripped else None
 
 
-class PaymentUpdateRequest(BillingUpdateSchema, PaymentBase, BillingValidators):
+class PaymentUpdateRequest(BillingUpdateSchema, BillingValidators):
     """Request body for ``PATCH /payments/{id}``.
 
     All fields are optional. Only editable payments (PENDING) may be
     updated. Null values clear nullable fields.
+
+    Note: This schema intentionally does **not** inherit from
+    ``PaymentBase`` because PATCH semantics require every field to be
+    optional. ``PaymentBase.patient_id`` is required, which would violate
+    the PATCH contract. Fields are declared here explicitly with
+    ``Optional`` wrappers so callers can send a partial payload.
+
+    The service layer validates that immutable fields are not overwritten.
     """
 
-    total_amount: PositiveDecimal | None = Field(
+    patient_id: UUID | None = Field(
         default=None,
-        title="Total Amount",
-        description="Updated total payment amount.",
+        title="Patient ID",
+        description="Updated patient UUID.",
     )
     payment_method: PaymentMethod | None = Field(
         default=None,
         title="Payment Method",
         description="Updated payment method.",
     )
+    total_amount: PositiveDecimal | None = Field(
+        default=None,
+        title="Total Amount",
+        description="Updated total payment amount.",
+    )
     payment_date: date | None = Field(
         default=None,
         title="Payment Date",
         description="Updated payment date.",
+    )
+    reference_number: str | None = Field(
+        default=None,
+        max_length=100,
+        title="Reference Number",
+        description="Updated external transaction ID, cheque number, or gateway reference.",
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        title="Notes",
+        description="Updated free-text notes.",
+    )
+    reversal_reason: str | None = Field(
+        default=None,
+        max_length=500,
+        title="Reversal Reason",
+        description="Updated reversal reason.",
     )
 
 

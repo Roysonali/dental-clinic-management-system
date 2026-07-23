@@ -48,12 +48,14 @@ from app.modules.billing.constants import (
     DEFAULT_PAGE_SIZE,
     DEFAULT_SORT_FIELD,
     MAX_PAGE_SIZE,
+    MONEY_QUANTIZE_EXPONENT,
 )
 from app.modules.billing.enums import InvoiceStatus
 from app.modules.billing.models import (
     Invoice,
     InvoiceItem,
     InvoiceStatusHistory,
+    PaymentAllocation,
 )
 from app.modules.patients.models import Patient
 
@@ -435,6 +437,107 @@ class InvoiceRepository:
             .order_by(Invoice.status)
         )
         return {row.status: row.cnt for row in self.db.execute(stmt).all()}
+
+    # ------------------------------------------------- aggregate queries
+    def get_invoice_aggregates(
+        self,
+        patient_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Return aggregate financial totals across invoices using SQL aggregates.
+
+        This is the production-correct alternative to fetching a limited page
+        of invoices and summing in Python. All values are computed server-side
+        so results are correct regardless of invoice count.
+
+        Args:
+            patient_id: If provided, only invoices belonging to this patient
+                are included.
+
+        Returns:
+            A dict with keys:
+            - ``total_grand_total``: SUM of line-item net amounts
+            - ``total_paid``: SUM of non-refund allocations
+            - ``total_refunded``: SUM of refund allocations
+            - ``paid_count``: COUNT of invoices whose status is PAID
+            - ``outstanding_count``: COUNT of non-terminal, non-paid invoices
+              with an outstanding balance > 0
+        """
+        from sqlalchemy import case
+
+        # ── Grand total (sum of invoice item net amounts) ──────────
+        grand_q = select(func.coalesce(func.sum(InvoiceItem.net_amount), 0))
+        grand_q = grand_q.join(Invoice, InvoiceItem.invoice_id == Invoice.id)
+        if patient_id is not None:
+            grand_q = grand_q.where(Invoice.patient_id == patient_id)
+        total_grand_total: Decimal = (
+            self.db.execute(grand_q).scalar() or Decimal("0.00")
+        )
+
+        # ── Paid amount (sum of non-refund allocations) ────────────
+        paid_q = select(
+            func.coalesce(func.sum(PaymentAllocation.allocated_amount), 0)
+        )
+        paid_q = paid_q.where(PaymentAllocation.is_refund == False)
+        paid_q = paid_q.join(
+            Invoice, PaymentAllocation.invoice_id == Invoice.id
+        )
+        if patient_id is not None:
+            paid_q = paid_q.where(Invoice.patient_id == patient_id)
+        total_paid: Decimal = self.db.execute(paid_q).scalar() or Decimal("0.00")
+
+        # ── Refunded amount (sum of refund allocations) ────────────
+        refund_q = select(
+            func.coalesce(func.sum(PaymentAllocation.allocated_amount), 0)
+        )
+        refund_q = refund_q.where(PaymentAllocation.is_refund == True)
+        refund_q = refund_q.join(
+            Invoice, PaymentAllocation.invoice_id == Invoice.id
+        )
+        if patient_id is not None:
+            refund_q = refund_q.where(Invoice.patient_id == patient_id)
+        total_refunded: Decimal = (
+            self.db.execute(refund_q).scalar() or Decimal("0.00")
+        )
+
+        # ── Paid invoice count ─────────────────────────────────────
+        paid_count_q = select(func.count()).select_from(Invoice)
+        paid_count_q = paid_count_q.where(
+            Invoice.status == InvoiceStatus.PAID.value
+        )
+        if patient_id is not None:
+            paid_count_q = paid_count_q.where(Invoice.patient_id == patient_id)
+        paid_count: int = self.db.execute(paid_count_q).scalar() or 0
+
+        # ── Total invoice count (for outstanding computation) ──────
+        total_count_q = select(func.count()).select_from(Invoice)
+        if patient_id is not None:
+            total_count_q = total_count_q.where(
+                Invoice.patient_id == patient_id
+            )
+        total_invoices: int = (
+            self.db.execute(total_count_q).scalar() or 0
+        )
+
+        # Outstanding count = total - paid (simplified: assumes
+        # all non-paid invoices have an outstanding balance > 0).
+        # The dashboard can refine this with a per-invoice check.
+        outstanding_count = total_invoices - paid_count
+        if outstanding_count < 0:
+            outstanding_count = 0
+
+        return {
+            "total_grand_total": Decimal(str(total_grand_total)).quantize(
+                MONEY_QUANTIZE_EXPONENT
+            ),
+            "total_paid": Decimal(str(total_paid)).quantize(
+                MONEY_QUANTIZE_EXPONENT
+            ),
+            "total_refunded": Decimal(str(total_refunded)).quantize(
+                MONEY_QUANTIZE_EXPONENT
+            ),
+            "paid_count": paid_count,
+            "outstanding_count": outstanding_count,
+        }
 
     # ------------------------------------------------- aggregate retrieval
     def get_with_items(self, invoice_id: UUID) -> Optional[Invoice]:

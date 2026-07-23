@@ -581,7 +581,13 @@ class RefundGatewayMetadata(BaseModel):
 
 
 class RefundDocumentMetadata(BaseModel):
-    """Document metadata for a refund."""
+    """Document metadata for a refund.
+
+    Note: ``version`` and ``doc_version`` are intentionally **not** included
+    here because they duplicate the root-level fields on
+    :class:`RefundRead`. The root-level ``version`` (optimistic-lock) and
+    ``doc_version`` (logical revision) are the single source of truth.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -596,18 +602,6 @@ class RefundDocumentMetadata(BaseModel):
         title="Sequence Number",
         description="Sequential number within the refund series.",
         examples=[1],
-    )
-    version: int = Field(
-        default=1,
-        ge=1,
-        title="Version",
-        description="Optimistic-lock version counter.",
-    )
-    doc_version: int = Field(
-        default=1,
-        ge=1,
-        title="Document Version",
-        description="Logical document revision number.",
     )
     issued_at: datetime | None = Field(
         default=None,

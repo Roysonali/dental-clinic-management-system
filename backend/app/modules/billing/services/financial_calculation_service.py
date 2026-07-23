@@ -529,9 +529,13 @@ class FinancialCalculationService:
     ) -> PatientFinancialSummary:
         """Compute the aggregate financial position for a patient.
 
-        This method queries multiple repositories to build a point-in-time
-        snapshot of the patient's billing status. All monetary values are
+        This method queries multiple repositories using SQL aggregate
+        functions to build a point-in-time snapshot. All monetary values are
         quantized to the module's money scale.
+
+        Unlike the previous page-scanning implementation, this version
+        computes all totals server-side so results are correct regardless
+        of invoice/payment/credit-note count.
 
         Args:
             patient_id: UUID of the patient.
@@ -539,54 +543,25 @@ class FinancialCalculationService:
         Returns:
             A ``PatientFinancialSummary`` dataclass with all aggregated fields.
         """
-        invoices, inv_total = self._invoice_repo.find_by_patient(
-            patient_id, page=1, page_size=1000
+        # ── Use server-side aggregates for financial totals ──────────
+        invoice_aggs = self._invoice_repo.get_invoice_aggregates(
+            patient_id=patient_id
         )
-        payments, pay_total = self._payment_repo.find_by_patient(
-            patient_id, page=1, page_size=1000
+        payment_totals = self._payment_repo.get_payment_totals(
+            patient_id=patient_id
         )
-        credit_notes, cn_total = self._credit_note_repo.find_by_patient(
-            patient_id, page=1, page_size=1000
+        cn_totals = self._credit_note_repo.get_credit_note_totals(
+            patient_id=patient_id
         )
 
-        total_invoiced = ZERO_MONEY
-        total_paid = ZERO_MONEY
-        total_refunded = ZERO_MONEY
-        total_outstanding = ZERO_MONEY
-        total_credited = ZERO_MONEY
-        total_credit_remaining = ZERO_MONEY
-        paid_count = 0
-        outstanding_count = 0
-
-        for inv in invoices:
-            inv_id = inv.id
-            grand_total = self._invoice_repo.get_invoice_grand_total(inv_id)
-            paid = self._invoice_repo.get_total_allocated_for_invoice(inv_id)
-            refunded = self._invoice_repo.get_total_refunded_for_invoice(inv_id)
-            outstanding = (grand_total - paid + refunded).quantize(
-                MONEY_QUANTIZE_EXPONENT
-            )
-            if outstanding < ZERO_MONEY:
-                outstanding = ZERO_MONEY
-
-            total_invoiced += grand_total
-            total_paid += paid
-            total_refunded += refunded
-            total_outstanding += outstanding
-
-            status_val = (
-                inv.status.value
-                if isinstance(inv.status, InvoiceStatus)
-                else str(inv.status)
-            )
-            if status_val == InvoiceStatus.PAID.value:
-                paid_count += 1
-            elif outstanding > ZERO_MONEY:
-                outstanding_count += 1
-
-        for cn in credit_notes:
-            total_credited += cn.amount
-            total_credit_remaining += cn.remaining_balance
+        total_invoiced = invoice_aggs["total_grand_total"]
+        total_paid = invoice_aggs["total_paid"]
+        total_refunded = invoice_aggs["total_refunded"]
+        total_outstanding = (
+            total_invoiced - total_paid + total_refunded
+        ).quantize(MONEY_QUANTIZE_EXPONENT)
+        if total_outstanding < ZERO_MONEY:
+            total_outstanding = ZERO_MONEY
 
         return PatientFinancialSummary(
             patient_id=patient_id,
@@ -594,15 +569,18 @@ class FinancialCalculationService:
             total_paid=total_paid.quantize(MONEY_QUANTIZE_EXPONENT),
             total_refunded=total_refunded.quantize(MONEY_QUANTIZE_EXPONENT),
             total_outstanding=total_outstanding.quantize(MONEY_QUANTIZE_EXPONENT),
-            total_credited=total_credited.quantize(MONEY_QUANTIZE_EXPONENT),
-            total_credit_remaining=total_credit_remaining.quantize(
+            total_credited=cn_totals["total_amount"].quantize(
                 MONEY_QUANTIZE_EXPONENT
             ),
-            invoice_count=inv_total,
-            paid_invoice_count=paid_count,
-            outstanding_invoice_count=outstanding_count,
-            payment_count=pay_total,
-            credit_note_count=cn_total,
+            total_credit_remaining=cn_totals["total_remaining"].quantize(
+                MONEY_QUANTIZE_EXPONENT
+            ),
+            invoice_count=invoice_aggs["paid_count"]
+            + invoice_aggs["outstanding_count"],
+            paid_invoice_count=invoice_aggs["paid_count"],
+            outstanding_invoice_count=invoice_aggs["outstanding_count"],
+            payment_count=payment_totals["payment_count"],
+            credit_note_count=cn_totals["credit_note_count"],
         )
 
     # ==================================================================
@@ -612,70 +590,44 @@ class FinancialCalculationService:
     def calculate_billing_totals(self) -> BillingTotals:
         """Compute aggregate billing-wide totals for the entire system.
 
-        This is a dashboard-level summary. For large datasets, consider
-        caching or using a materialized view in production.
+        This is a dashboard-level summary. Unlike the previous page-scanning
+        implementation, all values are computed via SQL aggregate functions
+        so results are correct regardless of data volume.
+
+        For large datasets, consider caching or using a materialized view
+        in production.
 
         Returns:
             A ``BillingTotals`` dataclass with all aggregated fields.
         """
-        invoices_list, inv_total = self._invoice_repo.list(
-            page=1, page_size=1000
-        )
-        payments_list, pay_total = self._payment_repo.list(
-            page=1, page_size=1000
-        )
-        credit_notes_list, cn_total = self._credit_note_repo.list(
-            page=1, page_size=1000
-        )
+        # ── Use server-side aggregates for financial totals ──────────
+        invoice_aggs = self._invoice_repo.get_invoice_aggregates()
+        payment_totals = self._payment_repo.get_payment_totals()
+        cn_totals = self._credit_note_repo.get_credit_note_totals()
 
-        total_invoiced = ZERO_MONEY
-        total_collected = ZERO_MONEY
-        total_refunded = ZERO_MONEY
-        total_outstanding = ZERO_MONEY
-        total_credited = ZERO_MONEY
-        paid_count = 0
-        outstanding_count = 0
-
-        for inv in invoices_list:
-            inv_id = inv.id
-            grand_total = self._invoice_repo.get_invoice_grand_total(inv_id)
-            paid = self._invoice_repo.get_total_allocated_for_invoice(inv_id)
-            refunded = self._invoice_repo.get_total_refunded_for_invoice(inv_id)
-            outstanding = (grand_total - paid + refunded).quantize(
-                MONEY_QUANTIZE_EXPONENT
-            )
-            if outstanding < ZERO_MONEY:
-                outstanding = ZERO_MONEY
-
-            total_invoiced += grand_total
-            total_collected += paid
-            total_refunded += refunded
-            total_outstanding += outstanding
-
-            status_val = (
-                inv.status.value
-                if isinstance(inv.status, InvoiceStatus)
-                else str(inv.status)
-            )
-            if status_val == InvoiceStatus.PAID.value:
-                paid_count += 1
-            elif outstanding > ZERO_MONEY:
-                outstanding_count += 1
-
-        for cn in credit_notes_list:
-            total_credited += cn.amount
+        total_invoiced = invoice_aggs["total_grand_total"]
+        total_paid = invoice_aggs["total_paid"]
+        total_refunded = invoice_aggs["total_refunded"]
+        total_outstanding = (
+            total_invoiced - total_paid + total_refunded
+        ).quantize(MONEY_QUANTIZE_EXPONENT)
+        if total_outstanding < ZERO_MONEY:
+            total_outstanding = ZERO_MONEY
 
         return BillingTotals(
             total_invoiced=total_invoiced.quantize(MONEY_QUANTIZE_EXPONENT),
-            total_collected=total_collected.quantize(MONEY_QUANTIZE_EXPONENT),
+            total_collected=total_paid.quantize(MONEY_QUANTIZE_EXPONENT),
             total_refunded=total_refunded.quantize(MONEY_QUANTIZE_EXPONENT),
             total_outstanding=total_outstanding.quantize(MONEY_QUANTIZE_EXPONENT),
-            total_credited=total_credited.quantize(MONEY_QUANTIZE_EXPONENT),
-            invoice_count=inv_total,
-            paid_invoice_count=paid_count,
-            outstanding_invoice_count=outstanding_count,
-            payment_count=pay_total,
-            credit_note_count=cn_total,
+            total_credited=cn_totals["total_amount"].quantize(
+                MONEY_QUANTIZE_EXPONENT
+            ),
+            invoice_count=invoice_aggs["paid_count"]
+            + invoice_aggs["outstanding_count"],
+            paid_invoice_count=invoice_aggs["paid_count"],
+            outstanding_invoice_count=invoice_aggs["outstanding_count"],
+            payment_count=payment_totals["payment_count"],
+            credit_note_count=cn_totals["credit_note_count"],
         )
 
     # ==================================================================

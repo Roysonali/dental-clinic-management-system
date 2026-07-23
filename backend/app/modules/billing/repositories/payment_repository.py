@@ -45,6 +45,7 @@ from app.modules.billing.constants import (
     DEFAULT_PAGE_SIZE,
     DEFAULT_SORT_FIELD,
     MAX_PAGE_SIZE,
+    ZERO_MONEY,
 )
 from app.modules.billing.enums import PaymentMethod, PaymentStatus
 from app.modules.billing.models import (
@@ -375,6 +376,41 @@ class PaymentRepository:
             sort_by=sort_by,
             sort_order=sort_order,
         )
+
+    # ------------------------------------------------------ totals (aggregate)
+    def get_payment_totals(
+        self, patient_id: UUID | None = None
+    ) -> dict[str, Any]:
+        """Return aggregate payment totals using SQL aggregate functions.
+
+        This is the production-correct alternative to fetching a limited page
+        and summing in Python. All values are computed server-side so results
+        are correct regardless of payment count.
+
+        Args:
+            patient_id: If provided, only payments for this patient are
+                included.
+
+        Returns:
+            A dict with keys:
+            - ``total_amount``: SUM of all payment total_amount values
+            - ``payment_count``: COUNT of all matching payments
+        """
+        filters = []
+        if patient_id is not None:
+            filters.append(Payment.patient_id == patient_id)
+
+        stmt = select(
+            func.coalesce(func.sum(Payment.total_amount), 0),
+            func.count().label("cnt"),
+        ).select_from(Payment)
+        if filters:
+            stmt = stmt.where(*filters)
+        row = self.db.execute(stmt).one()
+        return {
+            "total_amount": Decimal(str(row[0])) if row[0] is not None else ZERO_MONEY,
+            "payment_count": row[1] or 0,
+        }
 
     # ------------------------------------------------------------ statistics
     def count_grouped_by_status(self) -> dict[str, int]:

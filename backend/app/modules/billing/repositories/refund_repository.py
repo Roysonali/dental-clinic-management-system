@@ -14,20 +14,30 @@ Scope
 Conventions follow the DensCare repository pattern: constructor takes a
 ``Session``; queries use the SQLAlchemy 2.x ``select()`` API; mutations call
 ``flush()`` but never ``commit()`` / ``rollback()``.
+
+Sorting follows the same allowlist pattern used by
+:class:`~app.modules.billing.repositories.InvoiceRepository` and
+:class:`~app.modules.billing.repositories.PaymentRepository` — arbitrary
+``getattr()`` sorting is replaced with a controlled ``_SORT_FIELDS`` dict.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 from uuid import UUID
 
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
-from app.modules.billing.constants import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, ZERO_MONEY
+from app.modules.billing.constants import (
+    DEFAULT_PAGE_SIZE,
+    DEFAULT_SORT_FIELD,
+    MAX_PAGE_SIZE,
+    ZERO_MONEY,
+)
 from app.modules.billing.enums import RefundStatus
 from app.modules.billing.models import Refund
 
@@ -51,6 +61,18 @@ class RefundRepository:
             "updated_by",
         }
     )
+
+    _SORT_FIELDS: dict[str, ColumnElement[Any]] = {
+        "created_at": Refund.created_at,
+        "updated_at": Refund.updated_at,
+        "refund_number": Refund.refund_number,
+        "amount": Refund.amount,
+        "status": Refund.status,
+    }
+
+    _ALLOWED_SORT_FIELDS: frozenset[str] = frozenset(_SORT_FIELDS)
+
+    _DEFAULT_SORT_FIELD = DEFAULT_SORT_FIELD
 
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -115,6 +137,13 @@ class RefundRepository:
         self.db.flush()
         return refund
 
+    @classmethod
+    def _resolve_sort_field(cls, sort_by: Optional[str]) -> str:
+        """Return ``sort_by`` if allowed, otherwise the default sort field."""
+        if sort_by in cls._ALLOWED_SORT_FIELDS:
+            return sort_by
+        return cls._DEFAULT_SORT_FIELD
+
     # ---------------------------------------------------------------- list
     def list(
         self,
@@ -125,11 +154,23 @@ class RefundRepository:
         sort_by: str | None = None,
         sort_order: str = "desc",
     ) -> tuple[list[Refund], int]:
-        """Return a paginated, filterable list of refunds."""
-        page, page_size = self._normalize_pagination(page, page_size)
+        """Return a paginated, filterable list of refunds.
 
-        sort_field = sort_by if sort_by else "created_at"
-        sort_column = getattr(Refund, sort_field, Refund.created_at)
+        Args:
+            payment_id: Filter by payment UUID.
+            status: Filter by refund status (``RefundStatus`` value or raw
+                string).
+            page: 1-based page number (clamped to >= 1).
+            page_size: Page size (clamped to ``[1, MAX_PAGE_SIZE]``).
+            sort_by: Optional sort field (defaults to ``created_at``).
+            sort_order: ``"asc"`` or ``"desc"``.
+
+        Returns:
+            A tuple of ``(items, total)``.
+        """
+        page, page_size = self._normalize_pagination(page, page_size)
+        sort_field = self._resolve_sort_field(sort_by)
+        sort_column = self._SORT_FIELDS[sort_field]
         order_expr = sort_column.asc() if sort_order == "asc" else sort_column.desc()
 
         filters = []

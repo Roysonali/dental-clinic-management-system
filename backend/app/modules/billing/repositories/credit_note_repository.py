@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from decimal import Decimal
 from typing import Any, Mapping, Optional
 from uuid import UUID
 
@@ -41,6 +42,7 @@ from app.modules.billing.constants import (
     DEFAULT_PAGE_SIZE,
     DEFAULT_SORT_FIELD,
     MAX_PAGE_SIZE,
+    ZERO_MONEY,
 )
 from app.modules.billing.enums import CreditNoteStatus
 from app.modules.billing.models import CreditNote
@@ -370,6 +372,43 @@ class CreditNoteRepository:
             sort_by=sort_by,
             sort_order=sort_order,
         )
+
+    # --------------------------------------------------- totals (aggregate)
+    def get_credit_note_totals(
+        self, patient_id: UUID | None = None
+    ) -> dict[str, Any]:
+        """Return aggregate credit note totals using SQL aggregate functions.
+
+        All values are computed server-side so results are correct regardless
+        of credit note count.
+
+        Args:
+            patient_id: If provided, only credit notes for this patient are
+                included.
+
+        Returns:
+            A dict with keys:
+            - ``total_amount``: SUM of all credit note amount values
+            - ``total_remaining``: SUM of all remaining_balance values
+            - ``credit_note_count``: COUNT of all matching credit notes
+        """
+        filters = []
+        if patient_id is not None:
+            filters.append(CreditNote.patient_id == patient_id)
+
+        stmt = select(
+            func.coalesce(func.sum(CreditNote.amount), 0),
+            func.coalesce(func.sum(CreditNote.remaining_balance), 0),
+            func.count().label("cnt"),
+        ).select_from(CreditNote)
+        if filters:
+            stmt = stmt.where(*filters)
+        row = self.db.execute(stmt).one()
+        return {
+            "total_amount": Decimal(str(row[0])) if row[0] is not None else ZERO_MONEY,
+            "total_remaining": Decimal(str(row[1])) if row[1] is not None else ZERO_MONEY,
+            "credit_note_count": row[2] or 0,
+        }
 
     # ------------------------------------------------------------ statistics
     def count_grouped_by_status(self) -> dict[str, int]:
