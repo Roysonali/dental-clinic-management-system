@@ -30,6 +30,7 @@ from app.modules.billing.repositories import (
 from app.modules.billing.schemas import common as schemas_common
 from app.modules.billing.services import (
     BaseService,
+    CreditNoteService,
     DocumentSequenceService,
     InvoiceService,
     PaymentService,
@@ -45,6 +46,7 @@ __all__ = [
     "BaseService",
     "constants",
     "CreditNoteRepository",
+    "CreditNoteService",
     "dependencies",
     "DocumentSequenceRepository",
     "DocumentSequenceService",

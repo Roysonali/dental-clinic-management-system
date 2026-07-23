@@ -211,6 +211,16 @@ def _seed_fk_stubs(db: Session) -> None:
     )
     db.add(document_sequence_refund)
 
+    document_sequence_credit_note = DocumentSequence(
+        document_type="credit_note",
+        prefix="CN-",
+        current_value=0,
+        min_digits=5,
+        start_value=1,
+        updated_by=_STUB_USER_ID,
+    )
+    db.add(document_sequence_credit_note)
+
     db.flush()
 
 
@@ -593,6 +603,53 @@ def refund_service(db) -> 'RefundService':
     )
 
 
+@pytest.fixture
+def credit_note_service(db) -> 'CreditNoteService':
+    """CreditNoteService with all dependencies for credit note operations."""
+    from app.modules.billing.repositories import (
+        AuditRepository,
+        DocumentSequenceRepository,
+        InvoiceRepository,
+    )
+    from app.modules.billing.repositories.credit_note_repository import (
+        CreditNoteRepository,
+    )
+    from app.modules.billing.validators import (
+        DocumentSequenceValidator,
+        FinancialValidator,
+    )
+    from app.modules.billing.validators.credit_note_validator import (
+        CreditNoteValidator,
+    )
+    from app.modules.billing.services import (
+        DocumentSequenceService,
+    )
+    from app.modules.billing.services.credit_note_service import (
+        CreditNoteService,
+    )
+
+    credit_note_repo = CreditNoteRepository(db)
+    invoice_repo = InvoiceRepository(db)
+    audit_repo = AuditRepository(db)
+    doc_seq_repo = DocumentSequenceRepository(db)
+    financial_validator = FinancialValidator()
+    credit_note_validator = CreditNoteValidator(credit_note_repo, financial_validator)
+    doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
+    document_sequence_service = DocumentSequenceService(
+        db, doc_seq_repo, doc_seq_validator
+    )
+
+    return CreditNoteService(
+        db=db,
+        credit_note_repo=credit_note_repo,
+        invoice_repo=invoice_repo,
+        credit_note_validator=credit_note_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
 __all__ = [
     "_STUB_DOCTOR_ID",
     "_STUB_USER_ID",
@@ -606,4 +663,5 @@ __all__ = [
     "payment",
     "payment_service",
     "refund_service",
+    "credit_note_service",
 ]

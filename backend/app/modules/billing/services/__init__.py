@@ -20,6 +20,9 @@ The service layer does NOT own:
 from __future__ import annotations
 
 from app.modules.billing.services.base import BaseService
+from app.modules.billing.services.credit_note_service import (
+    CreditNoteService,
+)
 from app.modules.billing.services.document_sequence_service import (
     DocumentSequenceService,
 )
@@ -33,6 +36,7 @@ from app.modules.billing.services.refund_service import RefundService
 
 __all__ = [
     "BaseService",
+    "CreditNoteService",
     "DocumentSequenceService",
     "InvoiceService",
     "PaymentService",

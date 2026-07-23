@@ -496,6 +496,13 @@ class PaymentCreationFailed(BillingException):
     default_message = "Failed to create payment"
 
 
+class CreditNoteCreationFailed(BillingException):
+    """Raised when credit note persistence fails for a non-business reason."""
+
+    code = "CREDIT_NOTE_CREATION_FAILED"
+    default_message = "Failed to create credit note"
+
+
 class RefundCreationFailed(BillingException):
     """Raised when refund persistence fails for a non-business reason."""
 
