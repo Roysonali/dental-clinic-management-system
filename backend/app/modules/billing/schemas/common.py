@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 from typing import Generic, TypeVar
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -68,7 +70,7 @@ class MoneyBreakdown(BaseModel):
     grand_total: Decimal = Field(
         ...,
         title="Grand Total",
-        description="Derived total: subtotal - discount + tax.",
+        description="Final monetary total after all applicable adjustments and taxes.",
     )
     currency_code: str = Field(
         ...,
@@ -96,6 +98,18 @@ class InvoiceStatusTransition(BaseModel):
         description="Target status the invoice can transition to.",
         examples=["issued"],
     )
+
+
+class SortOrder(str, Enum):
+    """Sort direction for list endpoints."""
+
+    ASC = "asc"
+    DESC = "desc"
+
+    @classmethod
+    def all_values(cls) -> frozenset[str]:
+        """All valid sort-order string values."""
+        return frozenset(member.value for member in cls)
 
 
 class PaginationMeta(BaseModel):
@@ -144,16 +158,94 @@ class ErrorResponse(BaseModel):
     success: bool = Field(
         default=False, title="Success", description="Always false for errors."
     )
-    message: str = Field(..., title="Message", description="Top-level error message.")
     error: ErrorDetail = Field(..., title="Error", description="Structured error.")
 
 
+class AuditInfo(BaseModel):
+    """Lightweight audit envelope embedded in response DTOs."""
+
+    model_config = ConfigDict(frozen=True)
+
+    created_by: UUID = Field(
+        ...,
+        title="Created By",
+        description="User who created the record.",
+    )
+    updated_by: UUID | None = Field(
+        default=None,
+        title="Updated By",
+        description="User who last modified the record.",
+    )
+    created_at: datetime = Field(
+        ...,
+        title="Created At",
+        description="Record creation timestamp (UTC).",
+    )
+    updated_at: datetime = Field(
+        ...,
+        title="Updated At",
+        description="Last modification timestamp (UTC).",
+    )
+
+
+class DocumentSequenceInfo(BaseModel):
+    """Document sequence configuration snapshot."""
+
+    model_config = ConfigDict(frozen=True)
+
+    document_type: str = Field(
+        ...,
+        title="Document Type",
+        description="Billing document category.",
+    )
+    current_value: int = Field(
+        ...,
+        ge=0,
+        title="Current Value",
+        description="Last consumed sequence value.",
+    )
+    prefix: str = Field(
+        ...,
+        title="Prefix",
+        description="Number prefix, e.g. ``INV-``.",
+    )
+    min_digits: int = Field(
+        ...,
+        ge=1,
+        title="Min Digits",
+        description="Zero-padding width for the sequence number.",
+    )
+
+
+class VersionInfo(BaseModel):
+    """Document versioning envelope."""
+
+    model_config = ConfigDict(frozen=True)
+
+    version: int = Field(
+        ...,
+        ge=1,
+        title="Version",
+        description="Optimistic-lock version counter.",
+    )
+    doc_version: int = Field(
+        ...,
+        ge=1,
+        title="Document Version",
+        description="Logical document revision number.",
+    )
+
+
 __all__ = [
-    "Money",
-    "MoneyBreakdown",
-    "InvoiceStatusTransition",
-    "PaginationMeta",
-    "PaginatedResponse",
+    "AuditInfo",
+    "DocumentSequenceInfo",
     "ErrorDetail",
     "ErrorResponse",
+    "InvoiceStatusTransition",
+    "Money",
+    "MoneyBreakdown",
+    "PaginatedResponse",
+    "PaginationMeta",
+    "SortOrder",
+    "VersionInfo",
 ]
