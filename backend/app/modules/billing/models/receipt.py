@@ -21,6 +21,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -137,8 +138,8 @@ class Receipt(Base):
         comment="Receipt lifecycle status.",
     )
 
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    created_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -176,8 +177,6 @@ class Receipt(Base):
             + ")",
             name="ck_receipt_status",
         ),
-        Index("ix_receipts_payment", "payment_id"),
-        Index("ix_receipts_number", "receipt_number"),
         Index("ix_receipts_date", "receipt_date"),
         Index("ix_receipts_status", "status"),
         Index("ix_receipts_created_at", "created_at"),

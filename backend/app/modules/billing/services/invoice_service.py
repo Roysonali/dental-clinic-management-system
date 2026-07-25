@@ -324,12 +324,15 @@ class InvoiceService(BaseService):
             # ── 3. Validate issuable ──────────────────────────────
             self._invoice_validator.validate_issuable(invoice)
 
-            # ── 4. Reserve document number ────────────────────────
+            # ── 4. Capture pre-mutation state for audit ───────────
+            previous_status = invoice.status
+
+            # ── 5. Reserve document number ────────────────────────
             document_number = self._document_sequence_service.reserve_next_number(
                 DocumentType.INVOICE, issued_by
             )
 
-            # ── 5. Mutate aggregate ───────────────────────────────
+            # ── 6. Mutate aggregate ───────────────────────────────
             invoice.invoice_number = document_number
             invoice.status = InvoiceStatus.ISSUED
             invoice.updated_by = issued_by
@@ -342,12 +345,15 @@ class InvoiceService(BaseService):
             )
             invoice.status_history.append(status_entry)
 
-            # ── 6. Audit ─────────────────────────────────────────
+            # ── 7. Audit ─────────────────────────────────────────
             audit_log = BillingAuditLog(
                 entity_type="invoice",
                 entity_id=invoice.id,
                 action=AuditAction.ISSUED,
-                old_value={"status": InvoiceStatus.DRAFT.value},
+                old_value={"status": previous_status.value
+                    if isinstance(previous_status, InvoiceStatus)
+                    else str(previous_status)
+                },
                 new_value={
                     "status": InvoiceStatus.ISSUED.value,
                     "invoice_number": document_number,
@@ -356,7 +362,7 @@ class InvoiceService(BaseService):
             )
             self._audit_repo.create(audit_log)
 
-            # ── 7. Commit ─────────────────────────────────────────
+            # ── 8. Commit ─────────────────────────────────────────
             self._commit()
 
             logger.info(

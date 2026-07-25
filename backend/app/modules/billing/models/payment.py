@@ -21,6 +21,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -145,8 +146,8 @@ class Payment(Base, VersioningMixin):
         comment="Free-text notes.",
     )
 
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    created_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -157,8 +158,8 @@ class Payment(Base, VersioningMixin):
         nullable=False,
     )
 
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+    updated_by: Mapped[int | None] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )
@@ -228,7 +229,6 @@ class Payment(Base, VersioningMixin):
         Index("ix_payments_patient", "patient_id"),
         Index("ix_payments_status", "status"),
         Index("ix_payments_payment_date", "payment_date"),
-        Index("ix_payments_number", "payment_number"),
         Index("ix_payments_created_at", "created_at"),
         Index("ix_payments_method_status", "payment_method", "status"),
         Index("ix_payments_patient_status", "patient_id", "status"),

@@ -21,6 +21,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     Text,
     Uuid,
@@ -97,8 +98,8 @@ class PatientCredit(Base):
         comment="Optional expiry for credit-note-sourced credits.",
     )
 
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    created_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -109,8 +110,8 @@ class PatientCredit(Base):
         nullable=False,
     )
 
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+    updated_by: Mapped[int | None] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )

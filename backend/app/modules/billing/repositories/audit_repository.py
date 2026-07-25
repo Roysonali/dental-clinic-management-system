@@ -31,7 +31,6 @@ from sqlalchemy.orm import Session
 
 from app.modules.billing.constants import (
     DEFAULT_PAGE_SIZE,
-    DEFAULT_SORT_FIELD,
     MAX_PAGE_SIZE,
 )
 from app.modules.billing.models import BillingAuditLog
@@ -55,7 +54,7 @@ class AuditRepository:
 
     _ALLOWED_SORT_FIELDS: frozenset[str] = frozenset(_SORT_FIELDS)
 
-    _DEFAULT_SORT_FIELD = DEFAULT_SORT_FIELD
+    _DEFAULT_SORT_FIELD = "changed_at"
 
     def __init__(self, db: Session) -> None:
         self.db = db

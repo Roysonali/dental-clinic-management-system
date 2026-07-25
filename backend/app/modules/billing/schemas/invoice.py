@@ -223,6 +223,28 @@ class InvoiceCreateRequest(BillingCreateSchema, InvoiceBase, BillingValidators):
     )
 
 
+class InvoiceDraftUpdateRequest(BillingUpdateSchema):
+    """Request body for ``PATCH /billing/invoices/{id}``.
+
+    Only supports updating ``notes`` and ``due_date`` on Draft invoices.
+    All fields are optional — omitted fields are not modified.
+    """
+
+    notes: str | None = Field(
+        default=None,
+        max_length=2000,
+        title="Notes",
+        description="Updated free-text notes for the invoice.",
+        examples=["Patient requested itemized breakdown."],
+    )
+    due_date: date | None = Field(
+        default=None,
+        title="Due Date",
+        description="Updated payment due date. Must be >= invoice_date.",
+        examples=["2026-09-22"],
+    )
+
+
 class InvoiceUpdateRequest(BillingUpdateSchema, BillingValidators):
     """Request body for ``PATCH /invoices/{id}``.
 
@@ -862,6 +884,7 @@ __all__ = [
     "InvoiceStatusTransitionRequest",
     "InvoiceStatusTransitionResponse",
     "InvoiceSummary",
+    "InvoiceDraftUpdateRequest",
     "InvoiceUpdateRequest",
     "PatientSummary",
     "TreatmentPlanSummary",

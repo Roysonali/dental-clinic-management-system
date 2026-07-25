@@ -20,6 +20,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -99,8 +100,8 @@ class Refund(Base, VersioningMixin):
         comment="Refund lifecycle status.",
     )
 
-    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+    reviewed_by: Mapped[int | None] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
         comment="User who approved or rejected the refund.",
@@ -118,8 +119,8 @@ class Refund(Base, VersioningMixin):
         comment="Reason for rejection (required when status=REJECTED).",
     )
 
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    created_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -130,8 +131,8 @@ class Refund(Base, VersioningMixin):
         nullable=False,
     )
 
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+    updated_by: Mapped[int | None] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )
@@ -190,7 +191,6 @@ class Refund(Base, VersioningMixin):
         ),
         Index("ix_refunds_payment", "payment_id"),
         Index("ix_refunds_status", "status"),
-        Index("ix_refunds_number", "refund_number"),
         Index("ix_refunds_created_at", "created_at"),
         Index("ix_refunds_payment_status", "payment_id", "status"),
     )

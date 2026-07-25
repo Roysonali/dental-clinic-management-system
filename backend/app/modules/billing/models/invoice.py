@@ -20,6 +20,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -82,8 +83,8 @@ class InvoiceStatusHistory(Base):
         comment="New status after the transition.",
     )
 
-    changed_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    changed_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -220,8 +221,8 @@ class Invoice(Base, VersioningMixin):
         comment="Required when status transitions to Void.",
     )
 
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    created_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -232,8 +233,8 @@ class Invoice(Base, VersioningMixin):
         nullable=False,
     )
 
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+    updated_by: Mapped[int | None] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )
@@ -343,7 +344,6 @@ class Invoice(Base, VersioningMixin):
         Index("ix_invoices_currency", "currency_code"),
         Index("ix_invoices_invoice_date", "invoice_date"),
         Index("ix_invoices_due_date", "due_date"),
-        Index("ix_invoices_number", "invoice_number"),
         Index("ix_invoices_created_at", "created_at"),
         Index(
             "ix_invoices_active_status",

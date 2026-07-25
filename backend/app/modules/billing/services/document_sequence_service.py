@@ -53,6 +53,8 @@ from app.modules.billing.validators import DocumentSequenceValidator
 
 from app.modules.billing.services.base import BaseService
 
+logger = logging.getLogger(__name__)
+
 
 class DocumentSequenceService(BaseService):
     """Service-layer orchestrator for document sequence numbering.
@@ -134,13 +136,26 @@ class DocumentSequenceService(BaseService):
             )
             self._sequence_repo.persist_consumption_log(consumption_log)
 
-            self._commit()
+            # NOTE: Deliberately no self._commit() here. The caller (e.g.
+            # InvoiceService.issue_invoice) owns the transaction and shares
+            # the same SQLAlchemy session. Committing here would persist the
+            # sequence increment + consumption log independently, creating a
+            # financial-integrity gap: if the caller's subsequent operations
+            # fail and roll back, the sequence number is already consumed.
+            # By deferring the commit to the caller, the increment and
+            # consumption-log insert become part of the same atomic
+            # transaction as the rest of the caller's work.
+            #
+            # The repository flush() calls (increment + persist_consumption_log)
+            # still detect constraint violations immediately. On failure, this
+            # method rolls back its local changes; the caller propagates the
+            # rollback, which is a safe no-op on an already-rolled-back session.
 
             document_number = (
                 f"{updated_sequence.prefix}"
                 f"{updated_sequence.current_value:0{updated_sequence.min_digits}d}"
             )
-            self._logger.info(
+            logger.info(
                 "Reserved %s number: %s",
                 validated_type,
                 document_number,
@@ -156,7 +171,7 @@ class DocumentSequenceService(BaseService):
 
         except (IntegrityError, SQLAlchemyError):
             self._db.rollback()
-            self._logger.exception(
+            logger.exception(
                 "Failed to reserve sequence for %s",
                 validated_type,
             )

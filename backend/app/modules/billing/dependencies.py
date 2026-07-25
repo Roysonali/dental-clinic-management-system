@@ -1,24 +1,29 @@
 """Billing Module — Dependency injection.
 
-Foundation-stage dependency providers for the Billing module.
+Provides ``Depends()``-compatible callables that wire up the full
+service-layer stack (repository → validator → service) for the
+billing routers.
 
-This file establishes the FastAPI dependency plumbing without constructing
-repositories, validators, or services (those are implemented in a later
-sprint). It re-exports the shared SQLAlchemy session dependency
-(``get_db``) so that every billing dependency resolves the request-scoped
-``Session`` from a single, consistent source, and provides a structured
-logger accessor used across the module.
+Every dependency uses a factory function that creates a fresh
+service instance per request, taking the SQLAlchemy ``Session``
+from the existing ``get_db`` dependency.
 
-Later sprints extend this module with factory functions such as
-``get_invoice_service`` that build the full stack
-(repository → validator → service) per request, exactly like the Treatment
-Plan module's ``dependencies.py``.
+Usage example::
+
+    @router.get("/invoices/{invoice_id}")
+    def get_invoice(
+        invoice_id: UUID,
+        service: InvoiceService = Depends(get_invoice_service),
+    ):
+        ...
 
 Architecture boundary
 ---------------------
-* Dependencies never store request-scoped state on module globals.
-* Dependencies never commit, roll back, or manage the session lifecycle — that
-  remains the responsibility of :func:`app.database.session.get_db`.
+* Builds validators and repositories inside the dependency so that
+  the router never constructs them manually.
+* Never stores request-scoped state on module globals.
+* Never commits, rolls back, or manages the session lifecycle — that
+  remains the responsibility of the service layer.
 """
 
 from __future__ import annotations
@@ -29,6 +34,38 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
+from app.modules.billing.repositories import (
+    AuditRepository,
+    CreditNoteRepository,
+    DocumentSequenceRepository,
+    InvoiceRepository,
+    PaymentRepository,
+    ReceiptRepository,
+)
+from app.modules.billing.repositories.refund_repository import RefundRepository
+from app.modules.billing.services import (
+    DocumentSequenceService,
+    InvoiceService,
+    PaymentService,
+)
+from app.modules.billing.services.billing_orchestration_service import (
+    BillingOrchestrationService,
+)
+from app.modules.billing.services.credit_note_service import CreditNoteService
+from app.modules.billing.services.financial_calculation_service import (
+    FinancialCalculationService,
+)
+from app.modules.billing.services.receipt_service import ReceiptService
+from app.modules.billing.services.refund_service import RefundService
+from app.modules.billing.validators import (
+    CreditNoteValidator,
+    DocumentSequenceValidator,
+    FinancialValidator,
+    InvoiceValidator,
+    PaymentValidator,
+    ReceiptValidator,
+)
+from app.modules.billing.validators.refund_validator import RefundValidator
 
 
 def get_billing_logger() -> logging.Logger:
@@ -60,8 +97,384 @@ def get_billing_session(
     return db
 
 
+# ======================================================================
+# InvoiceService dependency
+# ======================================================================
+
+
+def get_invoice_service(
+    db: Session = Depends(get_billing_session),
+) -> InvoiceService:
+    """Build an ``InvoiceService`` with its full dependency stack.
+
+    Injects the active SQLAlchemy ``Session``, then constructs:
+    ``InvoiceRepository`` → ``FinancialValidator``
+    → ``InvoiceValidator``
+    → ``DocumentSequenceRepository`` → ``DocumentSequenceValidator``
+    → ``DocumentSequenceService``
+    → ``AuditRepository``
+    → ``InvoiceService``
+
+    Returns:
+        A fully-wired ``InvoiceService`` ready for request handling.
+    """
+    invoice_repo = InvoiceRepository(db)
+    financial_validator = FinancialValidator()
+    invoice_validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+    )
+    sequence_repo = DocumentSequenceRepository(db)
+    sequence_validator = DocumentSequenceValidator(sequence_repo)
+    document_sequence_service = DocumentSequenceService(
+        db=db,
+        sequence_repo=sequence_repo,
+        sequence_validator=sequence_validator,
+    )
+    audit_repo = AuditRepository(db)
+
+    return InvoiceService(
+        db=db,
+        invoice_repo=invoice_repo,
+        invoice_validator=invoice_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
+def get_payment_service(
+    db: Session = Depends(get_billing_session),
+) -> PaymentService:
+    """Build a ``PaymentService`` with its full dependency stack.
+
+    Injects the active SQLAlchemy ``Session``, then constructs:
+    ``PaymentRepository`` → ``FinancialValidator``
+    → ``PaymentValidator``
+    → ``DocumentSequenceRepository`` → ``DocumentSequenceValidator``
+    → ``DocumentSequenceService``
+    → ``InvoiceRepository``
+    → ``InvoiceValidator``
+    → ``AuditRepository``
+    → ``PaymentService``
+
+    Note:
+        ``InvoiceRepository`` and ``InvoiceValidator`` are required for
+        allocation operations (lock invoice + validate payable). They are
+        optional in the ``PaymentService`` constructor — the service raises
+        ``RuntimeError`` if allocation is attempted without them.
+
+    Returns:
+        A fully-wired ``PaymentService`` ready for request handling.
+    """
+    payment_repo = PaymentRepository(db)
+    financial_validator = FinancialValidator()
+    payment_validator = PaymentValidator(
+        payment_repo=payment_repo,
+        financial_validator=financial_validator,
+    )
+    sequence_repo = DocumentSequenceRepository(db)
+    sequence_validator = DocumentSequenceValidator(sequence_repo)
+    document_sequence_service = DocumentSequenceService(
+        db=db,
+        sequence_repo=sequence_repo,
+        sequence_validator=sequence_validator,
+    )
+    invoice_repo = InvoiceRepository(db)
+    invoice_validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+    )
+    audit_repo = AuditRepository(db)
+
+    return PaymentService(
+        db=db,
+        payment_repo=payment_repo,
+        payment_validator=payment_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+        invoice_repo=invoice_repo,
+        invoice_validator=invoice_validator,
+    )
+
+
+
+# ======================================================================
+# ReceiptService dependency
+# ======================================================================
+
+
+def get_receipt_service(
+    db: Session = Depends(get_billing_session),
+) -> ReceiptService:
+    """Build a ``ReceiptService`` with its full dependency stack.
+
+    Injects the active SQLAlchemy ``Session``, then constructs:
+    ``ReceiptRepository`` → ``ReceiptValidator``
+    → ``PaymentRepository``
+    → ``DocumentSequenceRepository`` → ``DocumentSequenceValidator``
+    → ``DocumentSequenceService``
+    → ``AuditRepository``
+    → ``ReceiptService``
+
+    Returns:
+        A fully-wired ``ReceiptService`` ready for request handling.
+    """
+    receipt_repo = ReceiptRepository(db)
+    receipt_validator = ReceiptValidator(receipt_repo)
+    payment_repo = PaymentRepository(db)
+    sequence_repo = DocumentSequenceRepository(db)
+    sequence_validator = DocumentSequenceValidator(sequence_repo)
+    document_sequence_service = DocumentSequenceService(
+        db=db,
+        sequence_repo=sequence_repo,
+        sequence_validator=sequence_validator,
+    )
+    audit_repo = AuditRepository(db)
+
+    return ReceiptService(
+        db=db,
+        receipt_repo=receipt_repo,
+        receipt_validator=receipt_validator,
+        payment_repo=payment_repo,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
+# ======================================================================
+# RefundService dependency
+# ======================================================================
+
+
+def get_refund_service(
+    db: Session = Depends(get_billing_session),
+) -> RefundService:
+    """Build a ``RefundService`` with its full dependency stack.
+
+    Injects the active SQLAlchemy ``Session``, then constructs:
+    ``RefundRepository`` → ``RefundValidator``
+    → ``FinancialValidator``
+    → ``PaymentRepository``
+    → ``DocumentSequenceRepository`` → ``DocumentSequenceValidator``
+    → ``DocumentSequenceService``
+    → ``AuditRepository``
+    → ``RefundService``
+
+    Returns:
+        A fully-wired ``RefundService`` ready for request handling.
+    """
+    refund_repo = RefundRepository(db)
+    payment_repo = PaymentRepository(db)
+    financial_validator = FinancialValidator()
+    refund_validator = RefundValidator(
+        refund_repo=refund_repo,
+        financial_validator=financial_validator,
+    )
+    sequence_repo = DocumentSequenceRepository(db)
+    sequence_validator = DocumentSequenceValidator(sequence_repo)
+    document_sequence_service = DocumentSequenceService(
+        db=db,
+        sequence_repo=sequence_repo,
+        sequence_validator=sequence_validator,
+    )
+    audit_repo = AuditRepository(db)
+
+    return RefundService(
+        db=db,
+        refund_repo=refund_repo,
+        payment_repo=payment_repo,
+        refund_validator=refund_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
+# ======================================================================
+# CreditNoteService dependency
+# ======================================================================
+
+
+def get_credit_note_service(
+    db: Session = Depends(get_billing_session),
+) -> CreditNoteService:
+    """Build a ``CreditNoteService`` with its full dependency stack.
+
+    Injects the active SQLAlchemy ``Session``, then constructs:
+    ``CreditNoteRepository`` → ``CreditNoteValidator``
+    → ``FinancialValidator``
+    → ``InvoiceRepository``
+    → ``DocumentSequenceRepository`` → ``DocumentSequenceValidator``
+    → ``DocumentSequenceService``
+    → ``AuditRepository``
+    → ``CreditNoteService``
+
+    Returns:
+        A fully-wired ``CreditNoteService`` ready for request handling.
+    """
+    credit_note_repo = CreditNoteRepository(db)
+    invoice_repo = InvoiceRepository(db)
+    financial_validator = FinancialValidator()
+    credit_note_validator = CreditNoteValidator(
+        credit_note_repo=credit_note_repo,
+        financial_validator=financial_validator,
+    )
+    sequence_repo = DocumentSequenceRepository(db)
+    sequence_validator = DocumentSequenceValidator(sequence_repo)
+    document_sequence_service = DocumentSequenceService(
+        db=db,
+        sequence_repo=sequence_repo,
+        sequence_validator=sequence_validator,
+    )
+    audit_repo = AuditRepository(db)
+
+    return CreditNoteService(
+        db=db,
+        credit_note_repo=credit_note_repo,
+        invoice_repo=invoice_repo,
+        credit_note_validator=credit_note_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+
+# ======================================================================
+# BillingOrchestrationService dependency
+# ======================================================================
+
+
+def get_billing_orchestration_service(
+    db: Session = Depends(get_billing_session),
+) -> BillingOrchestrationService:
+    """Build a ``BillingOrchestrationService`` with its full dependency stack.
+
+    Wires every domain service required by the orchestrator along with
+    ``FinancialCalculationService`` for read-only aggregation.
+
+    Returns:
+        A fully-wired ``BillingOrchestrationService`` ready for reporting
+        and dashboard workflows.
+    """
+    # ── Repository layer ──────────────────────────────────────────────
+    invoice_repo = InvoiceRepository(db)
+    payment_repo = PaymentRepository(db)
+    refund_repo = RefundRepository(db)
+    credit_note_repo = CreditNoteRepository(db)
+    receipt_repo = ReceiptRepository(db)
+    sequence_repo = DocumentSequenceRepository(db)
+    audit_repo = AuditRepository(db)
+
+    # ── Validator layer ───────────────────────────────────────────────
+    financial_validator = FinancialValidator()
+    invoice_validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+    )
+    payment_validator = PaymentValidator(
+        payment_repo=payment_repo,
+        financial_validator=financial_validator,
+    )
+    receipt_validator = ReceiptValidator(receipt_repo)
+    sequence_validator = DocumentSequenceValidator(sequence_repo)
+    credit_note_validator = CreditNoteValidator(
+        credit_note_repo=credit_note_repo,
+        financial_validator=financial_validator,
+    )
+    refund_validator = RefundValidator(
+        refund_repo=refund_repo,
+        financial_validator=financial_validator,
+    )
+
+    # ── Document Sequence Service (shared) ────────────────────────────
+    document_sequence_service = DocumentSequenceService(
+        db=db,
+        sequence_repo=sequence_repo,
+        sequence_validator=sequence_validator,
+    )
+
+    # ── Domain services ───────────────────────────────────────────────
+    invoice_service = InvoiceService(
+        db=db,
+        invoice_repo=invoice_repo,
+        invoice_validator=invoice_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+    payment_service = PaymentService(
+        db=db,
+        payment_repo=payment_repo,
+        payment_validator=payment_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+        invoice_repo=invoice_repo,
+        invoice_validator=invoice_validator,
+    )
+
+    receipt_service = ReceiptService(
+        db=db,
+        receipt_repo=receipt_repo,
+        receipt_validator=receipt_validator,
+        payment_repo=payment_repo,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+    refund_service = RefundService(
+        db=db,
+        refund_repo=refund_repo,
+        payment_repo=payment_repo,
+        refund_validator=refund_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+    credit_note_service = CreditNoteService(
+        db=db,
+        credit_note_repo=credit_note_repo,
+        invoice_repo=invoice_repo,
+        credit_note_validator=credit_note_validator,
+        financial_validator=financial_validator,
+        document_sequence_service=document_sequence_service,
+        audit_repo=audit_repo,
+    )
+
+    # ── Financial Calculation Service (read-only) ─────────────────────
+    financial_calc_service = FinancialCalculationService(
+        invoice_repo=invoice_repo,
+        payment_repo=payment_repo,
+        refund_repo=refund_repo,
+        credit_note_repo=credit_note_repo,
+        financial_validator=financial_validator,
+    )
+
+    # ── Orchestration Service ─────────────────────────────────────────
+    return BillingOrchestrationService(
+        db=db,
+        invoice_service=invoice_service,
+        payment_service=payment_service,
+        refund_service=refund_service,
+        credit_note_service=credit_note_service,
+        receipt_service=receipt_service,
+        financial_calc_service=financial_calc_service,
+    )
+
+
 __all__ = [
     "get_db",
     "get_billing_logger",
     "get_billing_session",
+    "get_invoice_service",
+    "get_payment_service",
+    "get_receipt_service",
+    "get_refund_service",
+    "get_credit_note_service",
+    "get_billing_orchestration_service",
 ]
+

@@ -162,8 +162,16 @@ class CreditNoteService(BaseService):
             CreditNoteValidationFailed: If business rules are violated.
         """
         try:
-            # ── 1. Validate invoice exists ─────────────────────────
-            invoice = self._invoice_repo.get_by_id(invoice_id)
+            # ── 1. Lock invoice and validate existence ──────────────
+            # Acquire a row-level lock (SELECT ... FOR UPDATE) on the
+            # invoice to prevent concurrent modification of items or
+            # status between validation and the final commit. Without
+            # this lock, another transaction could change the invoice
+            # grand total (by adding/removing line items on a Draft
+            # invoice) or transition the invoice to a terminal state
+            # after the validation check below passes (Sprint 10B.2
+            # finding CC-01).
+            invoice = self._invoice_repo.get_for_update(invoice_id)
             if invoice is None:
                 raise InvoiceNotFound(invoice_id)
 
@@ -173,6 +181,9 @@ class CreditNoteService(BaseService):
             )
 
             # ── 2b. Validate amount against invoice grand total (BR-91, FI-CN-002) ─
+            # The grand total SUM query is safe because the invoice row
+            # is locked: no other transaction can modify its items until
+            # this transaction commits.
             grand_total = self._invoice_repo.get_invoice_grand_total(invoice_id)
             if validated_amount > grand_total:
                 raise BillingFinancialError(

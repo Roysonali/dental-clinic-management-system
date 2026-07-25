@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     Uuid,
@@ -83,8 +84,8 @@ class BillingAuditLog(Base):
         comment="New state snapshot (JSON, NULL for deletion events).",
     )
 
-    changed_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    changed_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )

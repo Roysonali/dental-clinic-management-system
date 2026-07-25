@@ -77,8 +77,8 @@ class SequenceConsumptionLog(Base):
         comment="When the number was reserved.",
     )
 
-    reserved_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    reserved_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         comment="User who triggered the reservation.",
@@ -182,8 +182,8 @@ class DocumentSequence(Base):
         comment="Last increment timestamp.",
     )
 
-    updated_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    updated_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         comment="User who last triggered an increment.",

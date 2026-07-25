@@ -212,6 +212,22 @@ class ReceiptCreateRequest(BillingCreateSchema, ReceiptBase, BillingValidators):
     )
 
 
+class ReceiptGenerateRequest(BillingBaseModel):
+    """Request body for ``POST /receipts`` — router-level DTO.
+
+    Exposes ONLY the fields consumed by ``ReceiptService.generate_receipt()``.
+    The service assigns the sequential receipt number, amount, and date
+    internally.
+    """
+
+    payment_id: UUID = Field(
+        ...,
+        title="Payment ID",
+        description="UUID of the payment to acknowledge (must be COMPLETED and not already receipted).",
+        examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+    )
+
+
 class ReceiptUpdateRequest(BillingUpdateSchema, BillingValidators):
     """Request body for ``PATCH /receipts/{id}``.
 
@@ -888,6 +904,7 @@ __all__ = [
     "ReceiptCreateRequest",
     "ReceiptDocumentMetadata",
     "ReceiptFilter",
+    "ReceiptGenerateRequest",
     "ReceiptFinancialSummary",
     "ReceiptInvoiceSummary",
     "ReceiptListResponse",

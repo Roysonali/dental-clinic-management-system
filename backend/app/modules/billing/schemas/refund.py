@@ -214,13 +214,34 @@ class RefundBase(BillingBaseModel):
 # ======================================================================
 
 
-class RefundCreateRequest(BillingCreateSchema, RefundBase, BillingValidators):
+class RefundCreateRequest(BillingBaseModel):
     """Request body for ``POST /refunds``.
 
-    Creates a new refund in ``PENDING`` status. The service layer assigns
-    the sequential refund number, validates the payment, and persists the
-    aggregate.
+    Exposes ONLY the fields consumed by ``RefundService.create_refund()``.
+    The service assigns the sequential refund number, validates the payment,
+    and persists the aggregate.
     """
+
+    payment_id: UUID = Field(
+        ...,
+        title="Payment ID",
+        description="UUID of the payment being refunded (must be COMPLETED).",
+        examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+    )
+    amount: PositiveDecimal = Field(
+        ...,
+        title="Amount",
+        description="Refund amount (must be greater than zero; may be less than or equal to the original payment amount).",
+        examples=[Decimal("500.00")],
+    )
+    reason: str = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        title="Reason",
+        description="Reason for the refund.",
+        examples=["Patient cancelled treatment."],
+    )
 
     @field_validator("reason", mode="before")
     @classmethod

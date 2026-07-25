@@ -150,8 +150,8 @@ class InvoiceItem(Base, VersioningMixin):
         comment="Reason for price override from treatment plan estimate.",
     )
 
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    created_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -162,8 +162,8 @@ class InvoiceItem(Base, VersioningMixin):
         nullable=False,
     )
 
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+    updated_by: Mapped[int | None] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )

@@ -170,6 +170,29 @@ class PaymentCreateRequest(BillingCreateSchema, PaymentBase, BillingValidators):
         return stripped if stripped else None
 
 
+class PaymentMetadataUpdateRequest(BillingUpdateSchema):
+    """Request body for ``PATCH /billing/payments/{id}``.
+
+    Only supports updating ``reference_number`` and ``notes`` on Pending
+    payments. All fields are optional — omitted fields are not modified.
+    """
+
+    reference_number: str | None = Field(
+        default=None,
+        max_length=100,
+        title="Reference Number",
+        description="Updated external transaction ID, cheque number, or gateway reference.",
+        examples=["TXN-1234567890"],
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        title="Notes",
+        description="Updated free-text notes for the payment.",
+        examples=["Paid via online gateway."],
+    )
+
+
 class PaymentUpdateRequest(BillingUpdateSchema, BillingValidators):
     """Request body for ``PATCH /payments/{id}``.
 
@@ -356,25 +379,7 @@ class PaymentFilter(BillingBaseModel):
     )
 
 
-class PaymentStatusTransitionRequest(BillingBaseModel):
-    """Request body for payment status transition endpoints.
 
-    The service/validator layer enforces allowed transitions.
-    """
-
-    to_status: PaymentStatus = Field(
-        ...,
-        title="To Status",
-        description="Target payment status.",
-        examples=["completed"],
-    )
-    reason: str | None = Field(
-        default=None,
-        max_length=500,
-        title="Reason",
-        description="Free-text reason for the transition (required for terminal transitions).",
-        examples=["Payment confirmed by gateway."],
-    )
 
 
 # ======================================================================
@@ -899,7 +904,7 @@ __all__ = [
     "PaymentMethodSummary",
     "PaymentRead",
     "PaymentSearchRequest",
-    "PaymentStatusTransitionRequest",
+    "PaymentMetadataUpdateRequest",
     "PaymentStatusTransitionResponse",
     "PaymentSummary",
     "PaymentUpdateRequest",

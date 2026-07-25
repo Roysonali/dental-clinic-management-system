@@ -7,7 +7,7 @@ Payment, Receipt, and Refund aggregates.
 
 from __future__ import annotations
 
-from app.modules.billing.schemas import base, common, invoice, invoice_item, metadata, mixins, pagination, payment, receipt, refund, summaries, types, validators
+from app.modules.billing.schemas import base, common, credit_note, invoice, invoice_item, metadata, mixins, pagination, payment, receipt, refund, summaries, types, validators
 
 __all__ = [
     # Base classes
@@ -23,6 +23,10 @@ __all__ = [
     "mixins",
     # Pagination
     "pagination",
+    # Domain schemas
+    "credit_note",
+    # Dashboard / reporting schemas
+    "dashboard",
     # Domain schemas
     "payment",
     # Domain schemas

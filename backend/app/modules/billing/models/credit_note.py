@@ -19,6 +19,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -134,8 +135,8 @@ class CreditNote(Base, VersioningMixin):
         comment="Required when status transitions to Void.",
     )
 
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    created_by: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -146,8 +147,8 @@ class CreditNote(Base, VersioningMixin):
         nullable=False,
     )
 
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+    updated_by: Mapped[int | None] = mapped_column(
+        Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )
@@ -216,7 +217,6 @@ class CreditNote(Base, VersioningMixin):
         Index("ix_credit_notes_patient", "patient_id"),
         Index("ix_credit_notes_status", "status"),
         Index("ix_credit_notes_expiry", "expiry_date"),
-        Index("ix_credit_notes_number", "credit_note_number"),
         Index("ix_credit_notes_created_at", "created_at"),
     )
 

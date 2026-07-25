@@ -442,6 +442,48 @@ def register_exception_handlers(app) -> None:
         PatientRecordException,
         patient_record_exception_handler,
     )
+
+    from app.modules.billing.exceptions import (
+        BillingConflictError,
+        BillingException,
+        BillingFinancialError,
+        BillingNotFoundError,
+        BillingValidationError,
+    )
+
+    _BILLING_EXCEPTION_MAP: dict[type[BillingException], int] = {
+        BillingNotFoundError: status.HTTP_404_NOT_FOUND,
+        BillingConflictError: status.HTTP_409_CONFLICT,
+        BillingValidationError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+        BillingFinancialError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    }
+
+    async def billing_exception_handler(
+        request: Request,
+        exc: BillingException,
+    ) -> JSONResponse:
+        http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+        for cls in type(exc).__mro__:
+            if cls in _BILLING_EXCEPTION_MAP:
+                http_status = _BILLING_EXCEPTION_MAP[cls]
+                break
+
+        logger.warning(
+            "Billing exception handled: code=%s, status=%d, path=%s",
+            exc.code,
+            http_status,
+            request.url.path,
+        )
+        return _error_response(
+            message=exc.message,
+            details=exc.details,
+            status_code=http_status,
+        )
+
+    app.add_exception_handler(
+        BillingException,
+        billing_exception_handler,
+    )
     app.add_exception_handler(
         HTTPException,
         http_exception_handler,
