@@ -50,6 +50,11 @@ class PatientRepository:
 
     
 
+    def exists(self, patient_id: UUID) -> bool:
+        """Return ``True`` if a patient with the given id exists."""
+        stmt = select(Patient.id).where(Patient.id == patient_id).limit(1)
+        return self.db.execute(stmt).first() is not None
+
     def get_by_id(
         self,
         patient_id: UUID,

@@ -717,3 +717,17 @@ class TreatmentPlanRepository:
             .limit(1)
         )
         return self.db.execute(stmt).first() is not None
+
+    # ------------------------------------------------- item lookup (Sprint 12A.1)
+    def get_item_plan_id(self, item_id: UUID) -> UUID | None:
+        """Return the ``plan_id`` that owns the given treatment plan item.
+
+        Returns ``None`` if the item does not exist. Single query collapses
+        both existence check and metadata fetch.
+        """
+        stmt = (
+            select(TreatmentPlanItem.plan_id)
+            .where(TreatmentPlanItem.id == item_id)
+            .limit(1)
+        )
+        return self.db.execute(stmt).scalar_one_or_none()

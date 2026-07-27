@@ -31,6 +31,11 @@ class AppointmentRepository:
 
         return appointment
 
+    def exists(self, appointment_id: UUID) -> bool:
+        """Return ``True`` if an appointment with the given id exists."""
+        stmt = select(Appointment.id).where(Appointment.id == appointment_id).limit(1)
+        return self.db.execute(stmt).first() is not None
+
     def get_by_id(
         self,
         appointment_id: UUID,

@@ -42,6 +42,9 @@ from app.modules.doctors.exceptions import (
     SpecializationNotFound as SpecializationNotFoundEx,
     SpecializationValidationFailed as SpecializationValidationFailedEx,
 )
+from app.modules.appointments.exceptions import (
+    AppointmentException,
+)
 from app.modules.patients.exceptions import (
     DuplicatePatientDetected,
     InvalidPatientOperation,
@@ -184,6 +187,10 @@ _TREATMENT_PLAN_EXCEPTION_MAP: dict[type[TreatmentPlanException], int] = {
     TreatmentPlanPatientAcknowledgmentExists: status.HTTP_409_CONFLICT,
 }
 
+_APPOINTMENT_EXCEPTION_MAP: dict[type[AppointmentException], int] = {
+    AppointmentException: status.HTTP_400_BAD_REQUEST,
+}
+
 _PATIENT_RECORD_EXCEPTION_MAP: dict[type[PatientRecordException], int] = {
     PatientRecordNotFound: status.HTTP_404_NOT_FOUND,
     PatientRecordConflict: status.HTTP_409_CONFLICT,
@@ -310,6 +317,51 @@ async def treatment_plan_exception_handler(
     return _error_response(
         message=exc.message,
         details=exc.details,
+        status_code=http_status,
+    )
+
+
+async def appointment_exception_handler(
+    request: Request,
+    exc: AppointmentException,
+) -> JSONResponse:
+    """Handle any AppointmentException subclass and map it to the correct HTTP status.
+
+    Mapping:
+    * AppointmentNotFoundException → 404
+    * AppointmentValidationException → 422
+    * AppointmentConflictException → 409
+    * InvalidAppointmentStatusTransition → 409
+    * Base AppointmentException → 400
+    """
+    from app.modules.appointments.exceptions import (
+        AppointmentConflictException,
+        AppointmentNotFoundException,
+        AppointmentValidationException,
+        InvalidAppointmentStatusTransition,
+    )
+
+    handler_map: dict[type[AppointmentException], int] = {
+        AppointmentNotFoundException: status.HTTP_404_NOT_FOUND,
+        AppointmentValidationException: status.HTTP_422_UNPROCESSABLE_CONTENT,
+        AppointmentConflictException: status.HTTP_409_CONFLICT,
+        InvalidAppointmentStatusTransition: status.HTTP_409_CONFLICT,
+    }
+    http_status = status.HTTP_400_BAD_REQUEST
+    for cls in type(exc).__mro__:
+        if cls in handler_map:
+            http_status = handler_map[cls]
+            break
+
+    logger.warning(
+        "Appointment exception handled: type=%s, status=%d, path=%s",
+        type(exc).__name__,
+        http_status,
+        request.url.path,
+    )
+    return _error_response(
+        message=str(exc.message) if hasattr(exc, 'message') else str(exc),
+        details=None,
         status_code=http_status,
     )
 
@@ -441,6 +493,53 @@ def register_exception_handlers(app) -> None:
     app.add_exception_handler(
         PatientRecordException,
         patient_record_exception_handler,
+    )
+
+    app.add_exception_handler(
+        AppointmentException,
+        appointment_exception_handler,
+    )
+
+    from app.modules.billing.exceptions import (
+        BillingConflictError,
+        BillingException,
+        BillingFinancialError,
+        BillingNotFoundError,
+        BillingValidationError,
+    )
+
+    _BILLING_EXCEPTION_MAP: dict[type[BillingException], int] = {
+        BillingNotFoundError: status.HTTP_404_NOT_FOUND,
+        BillingConflictError: status.HTTP_409_CONFLICT,
+        BillingValidationError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+        BillingFinancialError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    }
+
+    async def billing_exception_handler(
+        request: Request,
+        exc: BillingException,
+    ) -> JSONResponse:
+        http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+        for cls in type(exc).__mro__:
+            if cls in _BILLING_EXCEPTION_MAP:
+                http_status = _BILLING_EXCEPTION_MAP[cls]
+                break
+
+        logger.warning(
+            "Billing exception handled: code=%s, status=%d, path=%s",
+            exc.code,
+            http_status,
+            request.url.path,
+        )
+        return _error_response(
+            message=exc.message,
+            details=exc.details,
+            status_code=http_status,
+        )
+
+    app.add_exception_handler(
+        BillingException,
+        billing_exception_handler,
     )
     app.add_exception_handler(
         HTTPException,
