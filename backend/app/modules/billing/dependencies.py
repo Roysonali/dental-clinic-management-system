@@ -109,20 +109,45 @@ def get_invoice_service(
 
     Injects the active SQLAlchemy ``Session``, then constructs:
     ``InvoiceRepository`` → ``FinancialValidator``
-    → ``InvoiceValidator``
+    → ``InvoiceValidator`` (with FK reference protocols)
     → ``DocumentSequenceRepository`` → ``DocumentSequenceValidator``
     → ``DocumentSequenceService``
     → ``AuditRepository``
     → ``InvoiceService``
 
+    FK reference repositories (Patient, Doctor, Appointment, TreatmentPlan)
+    are wired to ``InvoiceValidator`` for Sprint 12A application-layer
+    foreign-key validation before persistence.
+
     Returns:
         A fully-wired ``InvoiceService`` ready for request handling.
     """
+    from app.modules.patients.repository import PatientRepository
+    from app.modules.doctors.repositories.doctor_repository import DoctorRepository
+    from app.modules.appointments.repository import AppointmentRepository
+    from app.modules.treatment.repositories.treatment_plan_repository import (
+        TreatmentPlanRepository,
+    )
+    from app.modules.patient_records.repositories import (
+        DiagnosisRepository,
+    )
+
     invoice_repo = InvoiceRepository(db)
+    patient_repo = PatientRepository(db)
+    doctor_repo = DoctorRepository(db)
+    appointment_repo = AppointmentRepository(db)
+    treatment_plan_repo = TreatmentPlanRepository(db)
+    diagnosis_repo = DiagnosisRepository(db)
     financial_validator = FinancialValidator()
     invoice_validator = InvoiceValidator(
         invoice_repo=invoice_repo,
         financial_validator=financial_validator,
+        patient_repo=patient_repo,
+        appointment_repo=appointment_repo,
+        doctor_repo=doctor_repo,
+        treatment_plan_repo=treatment_plan_repo,
+        treatment_plan_item_repo=treatment_plan_repo,
+        diagnosis_repo=diagnosis_repo,
     )
     sequence_repo = DocumentSequenceRepository(db)
     sequence_validator = DocumentSequenceValidator(sequence_repo)
@@ -167,11 +192,15 @@ def get_payment_service(
     Returns:
         A fully-wired ``PaymentService`` ready for request handling.
     """
+    from app.modules.patients.repository import PatientRepository
+
     payment_repo = PaymentRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
     payment_validator = PaymentValidator(
         payment_repo=payment_repo,
         financial_validator=financial_validator,
+        patient_repo=patient_repo,
     )
     sequence_repo = DocumentSequenceRepository(db)
     sequence_validator = DocumentSequenceValidator(sequence_repo)
@@ -180,10 +209,30 @@ def get_payment_service(
         sequence_repo=sequence_repo,
         sequence_validator=sequence_validator,
     )
+    from app.modules.doctors.repositories.doctor_repository import DoctorRepository
+    from app.modules.appointments.repository import AppointmentRepository
+    from app.modules.treatment.repositories.treatment_plan_repository import (
+        TreatmentPlanRepository,
+    )
+    from app.modules.patient_records.repositories import (
+        DiagnosisRepository,
+    )
+
     invoice_repo = InvoiceRepository(db)
+    patient_repo = PatientRepository(db)
+    doctor_repo = DoctorRepository(db)
+    appointment_repo = AppointmentRepository(db)
+    treatment_plan_repo = TreatmentPlanRepository(db)
+    diagnosis_repo = DiagnosisRepository(db)
     invoice_validator = InvoiceValidator(
         invoice_repo=invoice_repo,
         financial_validator=financial_validator,
+        patient_repo=patient_repo,
+        appointment_repo=appointment_repo,
+        doctor_repo=doctor_repo,
+        treatment_plan_repo=treatment_plan_repo,
+        treatment_plan_item_repo=treatment_plan_repo,
+        diagnosis_repo=diagnosis_repo,
     )
     audit_repo = AuditRepository(db)
 
@@ -314,12 +363,16 @@ def get_credit_note_service(
     Returns:
         A fully-wired ``CreditNoteService`` ready for request handling.
     """
+    from app.modules.patients.repository import PatientRepository
+
     credit_note_repo = CreditNoteRepository(db)
     invoice_repo = InvoiceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
     credit_note_validator = CreditNoteValidator(
         credit_note_repo=credit_note_repo,
         financial_validator=financial_validator,
+        patient_repo=patient_repo,
     )
     sequence_repo = DocumentSequenceRepository(db)
     sequence_validator = DocumentSequenceValidator(sequence_repo)
@@ -369,19 +422,42 @@ def get_billing_orchestration_service(
 
     # ── Validator layer ───────────────────────────────────────────────
     financial_validator = FinancialValidator()
+    from app.modules.patients.repository import PatientRepository
+    from app.modules.doctors.repositories.doctor_repository import DoctorRepository
+    from app.modules.appointments.repository import AppointmentRepository
+    from app.modules.treatment.repositories.treatment_plan_repository import (
+        TreatmentPlanRepository,
+    )
+    from app.modules.patient_records.repositories import (
+        DiagnosisRepository,
+    )
+
+    patient_repo = PatientRepository(db)
+    doctor_repo = DoctorRepository(db)
+    appointment_repo = AppointmentRepository(db)
+    treatment_plan_repo = TreatmentPlanRepository(db)
+    diagnosis_repo = DiagnosisRepository(db)
     invoice_validator = InvoiceValidator(
         invoice_repo=invoice_repo,
         financial_validator=financial_validator,
+        patient_repo=patient_repo,
+        appointment_repo=appointment_repo,
+        doctor_repo=doctor_repo,
+        treatment_plan_repo=treatment_plan_repo,
+        treatment_plan_item_repo=treatment_plan_repo,
+        diagnosis_repo=diagnosis_repo,
     )
     payment_validator = PaymentValidator(
         payment_repo=payment_repo,
         financial_validator=financial_validator,
+        patient_repo=patient_repo,
     )
     receipt_validator = ReceiptValidator(receipt_repo)
     sequence_validator = DocumentSequenceValidator(sequence_repo)
     credit_note_validator = CreditNoteValidator(
         credit_note_repo=credit_note_repo,
         financial_validator=financial_validator,
+        patient_repo=patient_repo,
     )
     refund_validator = RefundValidator(
         refund_repo=refund_repo,

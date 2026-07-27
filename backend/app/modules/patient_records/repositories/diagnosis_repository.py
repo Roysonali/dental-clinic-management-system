@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.modules.patient_records.enums import DiagnosisType
 from app.modules.patient_records.exceptions import DiagnosisNotFound
 from app.modules.patient_records.models import PatientRecordDiagnosis
+from app.modules.patient_records.models.patient_record import PatientRecord
 
 # ---------------------------------------------------------------------------
 # Whitelist of fields callers may modify via update().
@@ -275,6 +276,30 @@ class DiagnosisRepository:
         stmt = self._apply_base_filter(stmt, include_deleted=include_deleted)
 
         return self.db.execute(stmt).first() is not None
+
+    def get_patient_id(
+        self,
+        diagnosis_id: UUID,
+        *,
+        include_deleted: bool = False,
+    ) -> Optional[UUID]:
+        """Return the ``patient_id`` associated with a diagnosis.
+
+        Joins through ``PatientRecord`` to resolve the owning patient.
+        Returns ``None`` if the diagnosis does not exist.
+        """
+        stmt = (
+            select(PatientRecord.patient_id)
+            .select_from(PatientRecordDiagnosis)
+            .join(
+                PatientRecord,
+                PatientRecordDiagnosis.patient_record_id == PatientRecord.id,
+            )
+            .where(PatientRecordDiagnosis.id == diagnosis_id)
+            .limit(1)
+        )
+        stmt = self._apply_base_filter(stmt, include_deleted=include_deleted)
+        return self.db.execute(stmt).scalar_one_or_none()
 
     def count(
         self,

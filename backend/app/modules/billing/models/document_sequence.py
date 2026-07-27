@@ -35,7 +35,6 @@ from app.modules.billing.constants import (
     SEQUENCE_CONSUMPTION_STATUS_MAX_LENGTH,
     SEQUENCE_DOCUMENT_TYPE_MAX_LENGTH,
 )
-from app.modules.billing.mixins.audit import AuditMixin
 
 if TYPE_CHECKING:
     from app.modules.auth.models import User
@@ -182,14 +181,16 @@ class DocumentSequence(Base):
         comment="Last increment timestamp.",
     )
 
-    updated_by: Mapped[int] = mapped_column(
+    updated_by: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
-        comment="User who last triggered an increment.",
+        nullable=True,
+        comment="Optional administrative metadata. NULL for system-initialized "
+        "sequences. Detailed reservation audit is maintained by "
+        "SequenceConsumptionLog.",
     )
 
-    updater: Mapped["User"] = relationship(
+    updater: Mapped["User | None"] = relationship(
         "User",
         foreign_keys=[updated_by],
         lazy="selectin",

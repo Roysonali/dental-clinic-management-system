@@ -127,7 +127,7 @@ class InvoiceService(BaseService):
         invoice_number: str,
         currency_code: str,
         items: list[dict[str, Any]],
-        created_by: UUID,
+        created_by: int,
         *,
         treatment_plan_id: UUID | None = None,
         appointment_id: UUID | None = None,
@@ -143,11 +143,13 @@ class InvoiceService(BaseService):
         2. Validate invoice number format and uniqueness.
         3. Resolve invoice date and due date defaults.
         4. Validate invoice date range.
-        5. Build the ``Invoice`` aggregate root.
-        6. Validate and normalise line items, assign sequence numbers.
-        7. Create the initial ``InvoiceStatusHistory`` entry.
-        8. Persist the aggregate via ``invoice_repo.create()``.
-        9. Commit the transaction.
+        5. Validate all foreign-key references exist before persistence
+           (Sprint 12A — application-layer FK hardening).
+        6. Build the ``Invoice`` aggregate root.
+        7. Validate and normalise line items, assign sequence numbers.
+        8. Create the initial ``InvoiceStatusHistory`` entry.
+        9. Persist the aggregate via ``invoice_repo.create()``.
+        10. Commit the transaction.
 
         Args:
             patient_id: UUID of the invoice owner.
@@ -159,7 +161,8 @@ class InvoiceService(BaseService):
                 keys include ``sequence_number``, ``discount_type``,
                 ``discount_value``, ``plan_item_id``, ``diagnosis_id``,
                 ``original_price``, and ``override_reason``.
-            created_by: UUID of the user creating the invoice.
+            created_by: Integer ID of the user creating the invoice
+                (auth.users.id = INTEGER).
             treatment_plan_id: Optional linked treatment plan UUID.
             appointment_id: Optional linked appointment UUID.
             doctor_id: Optional linked doctor UUID.
@@ -174,6 +177,12 @@ class InvoiceService(BaseService):
             history populated.
 
         Raises:
+            PatientNotFound: If ``patient_id`` does not resolve.
+            TreatmentPlanNotFound: If ``treatment_plan_id`` is provided but
+                does not resolve.
+            AppointmentNotFoundException: If ``appointment_id`` is provided
+                but does not resolve.
+            DoctorNotFound: If ``doctor_id`` is provided but does not resolve.
             InvoiceValidationFailed: If a business validation fails.
             InvoiceNumberAlreadyUsed: If the invoice number is taken.
             InvoiceCreationFailed: If a database error occurs.
@@ -208,7 +217,13 @@ class InvoiceService(BaseService):
                     details={"item_count": 0},
                 )
 
-            # ── 6. Build the aggregate ────────────────────────────
+            # ── 6. Validate FK references exist (Sprint 12A) ──────
+            self._invoice_validator.validate_patient_exists(patient_id)
+            self._invoice_validator.validate_treatment_plan_exists(treatment_plan_id)
+            self._invoice_validator.validate_appointment_exists(appointment_id)
+            self._invoice_validator.validate_doctor_exists(doctor_id)
+
+            # ── 7. Build the aggregate ────────────────────────────
             invoice = Invoice(
                 patient_id=patient_id,
                 treatment_plan_id=treatment_plan_id,
@@ -223,10 +238,10 @@ class InvoiceService(BaseService):
                 created_by=created_by,
             )
 
-            # ── 7. Validate and attach line items ─────────────────
+            # ── 8. Validate and attach line items ─────────────────
             self._validate_and_attach_items(invoice, items, created_by)
 
-            # ── 8. Create initial status history entry ────────────
+            # ── 9. Create initial status history entry ────────────
             status_entry = InvoiceStatusHistory(
                 from_status=None,
                 to_status=InvoiceStatus.DRAFT.value,
@@ -235,7 +250,7 @@ class InvoiceService(BaseService):
             )
             invoice.status_history.append(status_entry)
 
-            # ── 9. Persist and commit ─────────────────────────────
+            # ── 10. Persist and commit ────────────────────────────
             self._invoice_repo.create(invoice)
             self._commit()
 
@@ -272,7 +287,7 @@ class InvoiceService(BaseService):
     def issue_invoice(
         self,
         invoice_id: UUID,
-        issued_by: UUID,
+        issued_by: int,
     ) -> Invoice:
         """Transition a Draft invoice to Issued status.
 
@@ -290,7 +305,8 @@ class InvoiceService(BaseService):
 
         Args:
             invoice_id: UUID of the invoice to issue.
-            issued_by: UUID of the user issuing the invoice.
+            issued_by: Integer ID of the user issuing the invoice
+                (auth.users.id = INTEGER).
 
         Returns:
             The updated ``Invoice`` aggregate with ``Issued`` status.
@@ -401,7 +417,7 @@ class InvoiceService(BaseService):
     def cancel_invoice(
         self,
         invoice_id: UUID,
-        cancelled_by: UUID,
+        cancelled_by: int,
         cancellation_reason: str,
     ) -> Invoice:
         """Cancel an invoice and record the cancellation reason.
@@ -418,7 +434,8 @@ class InvoiceService(BaseService):
 
         Args:
             invoice_id: UUID of the invoice to cancel.
-            cancelled_by: UUID of the user cancelling the invoice.
+            cancelled_by: Integer ID of the user cancelling the invoice
+                (auth.users.id = INTEGER).
             cancellation_reason: The reason for cancellation. Must be
                 non-empty.
 
@@ -521,7 +538,7 @@ class InvoiceService(BaseService):
     def update_draft_invoice(
         self,
         invoice_id: UUID,
-        updated_by: UUID,
+        updated_by: int,
         *,
         notes: str | None = None,
         due_date: date | None = None,
@@ -538,7 +555,8 @@ class InvoiceService(BaseService):
 
         Args:
             invoice_id: UUID of the invoice to update.
-            updated_by: UUID of the user performing the update.
+            updated_by: Integer ID of the user performing the update
+                (auth.users.id = INTEGER).
             notes: Optional replacement notes.
             due_date: Optional replacement due date.
             items: Optional replacement line items. If omitted, existing
@@ -740,12 +758,15 @@ class InvoiceService(BaseService):
         self,
         invoice: Invoice,
         items: list[dict[str, Any]],
-        created_by: UUID,
+        created_by: int,
     ) -> None:
         """Validate line-item data and attach them to ``invoice``.
 
         Assigns sequence numbers (1-based) if omitted. Does not persist —
         persistence is deferred to ``repo.create()`` via the cascade.
+
+        Validates FK references for ``plan_item_id`` and ``diagnosis_id``
+        via the validator (Sprint 12A.1 — line-item FK hardening).
 
         Args:
             invoice: The aggregate root being built.
@@ -755,6 +776,10 @@ class InvoiceService(BaseService):
         Raises:
             InvoiceValidationFailed: If an item is invalid or sequences
                 collide.
+            ItemNotFound: If a ``plan_item_id`` references a non-existent
+                treatment plan item.
+            DiagnosisNotFound: If a ``diagnosis_id`` references a non-existent
+                diagnosis.
         """
         seen_sequences: set[int] = set()
         for idx, item_data in enumerate(items, start=1):
@@ -795,6 +820,20 @@ class InvoiceService(BaseService):
             )
             self._financial.validate_non_negative_amount(net_amount, field="net_amount")
 
+            # ── Sprint 12A.1: Validate line-item FK references ──────
+            plan_item_id = item_data.get("plan_item_id")
+            diagnosis_id = item_data.get("diagnosis_id")
+            self._invoice_validator.validate_line_item_plan_item(
+                plan_item_id=plan_item_id,
+                treatment_plan_id=invoice.treatment_plan_id,
+                item_index=idx,
+            )
+            self._invoice_validator.validate_line_item_diagnosis(
+                diagnosis_id=diagnosis_id,
+                patient_id=invoice.patient_id,
+                item_index=idx,
+            )
+
             sequence = item_data.get("sequence_number")
             if sequence is None:
                 sequence = idx
@@ -831,8 +870,8 @@ class InvoiceService(BaseService):
                 discount_type=discount_type,
                 discount_value=discount_value,
                 net_amount=net_amount,
-                plan_item_id=item_data.get("plan_item_id"),
-                diagnosis_id=item_data.get("diagnosis_id"),
+                plan_item_id=plan_item_id,
+                diagnosis_id=diagnosis_id,
                 original_price=item_data.get("original_price"),
                 override_reason=item_data.get("override_reason"),
                 created_by=created_by,
@@ -843,7 +882,7 @@ class InvoiceService(BaseService):
         self,
         invoice: Invoice,
         items: list[dict[str, Any]],
-        updated_by: UUID,
+        updated_by: int,
     ) -> None:
         """Replace all line items on a draft invoice.
 

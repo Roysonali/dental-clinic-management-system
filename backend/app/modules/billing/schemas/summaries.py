@@ -47,11 +47,11 @@ class CreatorSummary(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID = Field(
+    id: int = Field(
         ...,
         title="User ID",
-        description="Unique user identifier.",
-        examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+        description="Unique user identifier (auth.users.id — INTEGER PK).",
+        examples=[1],
     )
     full_name: str | None = Field(
         default=None,

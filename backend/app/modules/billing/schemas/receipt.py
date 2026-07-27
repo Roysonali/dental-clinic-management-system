@@ -457,10 +457,11 @@ class ReceiptStatusTransitionResponse(BillingResponseSchema):
         title="Changed At",
         description="Timestamp when the transition was applied.",
     )
-    changed_by: UUID = Field(
+    changed_by: int = Field(
         ...,
         title="Changed By",
-        description="User who performed the transition.",
+        description="User ID who performed the transition (auth.users.id).",
+        examples=[1],
     )
 
 
@@ -550,11 +551,11 @@ class ReceiptPrintMetadata(BaseModel):
         title="Last Printed At",
         description="Timestamp of the most recent print.",
     )
-    printed_by: UUID | None = Field(
+    printed_by: int | None = Field(
         default=None,
         title="Printed By",
-        description="User who last printed this receipt.",
-        examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+        description="User ID who last printed this receipt (auth.users.id).",
+        examples=[1],
     )
     template_version: str | None = Field(
         default=None,

@@ -53,7 +53,10 @@ from app.modules.billing.exceptions import (
 )
 from app.modules.billing.models import Payment, PaymentAllocation
 from app.modules.billing.validators.financial_validator import FinancialValidator
-from app.modules.billing.validators.protocols import PaymentRepositoryProtocol
+from app.modules.billing.validators.protocols import (
+    PatientRepositoryProtocol,
+    PaymentRepositoryProtocol,
+)
 from app.modules.billing.validators.state_machine import (
     is_editable_state,
     is_terminal_state,
@@ -69,15 +72,19 @@ class PaymentValidator:
             existence, uniqueness, and allocation lookups.
         financial_validator: ``FinancialValidator`` instance for monetary
             validations.
+        patient_repo: Optional ``PatientRepositoryProtocol`` for patient
+            existence checks (Sprint 12A FK hardening).
     """
 
     def __init__(
         self,
         payment_repo: PaymentRepositoryProtocol,
         financial_validator: FinancialValidator,
+        patient_repo: PatientRepositoryProtocol | None = None,
     ) -> None:
         self._payment_repo = payment_repo
         self._financial = financial_validator
+        self._patient_repo = patient_repo
 
     # ==================================================================
     # Payment lifecycle
@@ -477,6 +484,30 @@ class PaymentValidator:
                 f"Payment date must be a date, got {type(payment_date).__name__!r}",
                 details={"payment_date": str(payment_date)},
             )
+
+    # ==================================================================
+    # Foreign-key existence validation (Sprint 12A)
+    # ==================================================================
+
+    def validate_patient_exists(self, patient_id: UUID) -> None:
+        """Validate that a patient with the given id exists.
+
+        Raises ``PatientNotFound`` (404) if the patient does not exist.
+        Uses ``PatientRepositoryProtocol`` for the lookup — no persistence
+        or transaction management.
+
+        Raises:
+            PatientNotFound: If ``patient_id`` does not resolve to an existing
+                patient record.
+        """
+        if self._patient_repo is None:
+            raise RuntimeError(
+                "PatientRepositoryProtocol is required for patient existence "
+                "validation but was not provided to PaymentValidator"
+            )
+        if not self._patient_repo.exists(patient_id):
+            from app.modules.patients.exceptions import PatientNotFound
+            raise PatientNotFound()
 
 
 __all__ = ["PaymentValidator"]

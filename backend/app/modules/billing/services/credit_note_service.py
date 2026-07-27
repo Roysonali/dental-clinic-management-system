@@ -136,14 +136,17 @@ class CreditNoteService(BaseService):
         """Create a new credit note in DRAFT status.
 
         Workflow:
-        1. Validate invoice exists.
-        2. Validate amount is positive.
-        3. Validate reason is non-empty and within length limit.
-        4. Reserve a credit note number via ``DocumentSequenceService``.
-        5. Build the ``CreditNote`` aggregate root.
-        6. Create a ``BillingAuditLog`` entry.
-        7. Persist via ``credit_note_repo.create()``.
-        8. Commit the transaction.
+        1. Validate patient exists (Sprint 12A FK hardening).
+        2. Lock invoice and validate existence.
+        3. Validate amount is positive.
+        4. Validate amount against invoice grand total (BR-91).
+        5. Validate reason is non-empty and within length limit.
+        6. Validate expiry date if provided.
+        7. Reserve a credit note number via ``DocumentSequenceService``.
+        8. Build the ``CreditNote`` aggregate root.
+        9. Create a ``BillingAuditLog`` entry.
+        10. Persist via ``credit_note_repo.create()``.
+        11. Commit the transaction.
 
         Args:
             invoice_id: UUID of the invoice being credited.
@@ -157,12 +160,16 @@ class CreditNoteService(BaseService):
             The newly created ``CreditNote`` aggregate in ``DRAFT`` status.
 
         Raises:
+            PatientNotFound: If ``patient_id`` does not resolve.
             InvoiceNotFound: If ``invoice_id`` does not resolve.
             BillingValidationError: If amount or reason validation fails.
             CreditNoteValidationFailed: If business rules are violated.
         """
         try:
-            # ── 1. Lock invoice and validate existence ──────────────
+            # ── 1. Validate patient exists (Sprint 12A FK hardening) ─
+            self._credit_note_validator.validate_patient_exists(patient_id)
+
+            # ── 2. Lock invoice and validate existence ──────────────
             # Acquire a row-level lock (SELECT ... FOR UPDATE) on the
             # invoice to prevent concurrent modification of items or
             # status between validation and the final commit. Without
@@ -175,12 +182,12 @@ class CreditNoteService(BaseService):
             if invoice is None:
                 raise InvoiceNotFound(invoice_id)
 
-            # ── 2. Validate amount ──────────────────────────────────
+            # ── 3. Validate amount ──────────────────────────────────
             validated_amount = self._financial.validate_positive_amount(
                 amount, field="amount"
             )
 
-            # ── 2b. Validate amount against invoice grand total (BR-91, FI-CN-002) ─
+            # ── 4. Validate amount against invoice grand total (BR-91, FI-CN-002) ─
             # The grand total SUM query is safe because the invoice row
             # is locked: no other transaction can modify its items until
             # this transaction commits.
@@ -196,21 +203,21 @@ class CreditNoteService(BaseService):
                     },
                 )
 
-            # ── 3. Validate reason ──────────────────────────────────
+            # ── 5. Validate reason ──────────────────────────────────
             validated_reason = self._credit_note_validator.validate_reason(reason)
 
-            # ── 4. Validate expiry date if provided ─────────────────
+            # ── 6. Validate expiry date if provided ─────────────────
             if expiry_date is not None:
                 self._credit_note_validator.validate_expiry_date(expiry_date)
 
-            # ── 5. Reserve credit note number ───────────────────────
+            # ── 7. Reserve credit note number ───────────────────────
             credit_note_number = (
                 self._document_sequence_service.reserve_next_number(
                     DocumentType.CREDIT_NOTE, created_by
                 )
             )
 
-            # ── 6. Build the aggregate ──────────────────────────────
+            # ── 8. Build the aggregate ──────────────────────────────
             credit_note = CreditNote(
                 invoice_id=invoice_id,
                 patient_id=patient_id,
@@ -223,10 +230,10 @@ class CreditNoteService(BaseService):
                 created_by=created_by,
             )
 
-            # ── 7. Persist ──────────────────────────────────────────
+            # ── 9. Persist ──────────────────────────────────────────
             self._credit_note_repo.create(credit_note)
 
-            # ── 8. Audit ────────────────────────────────────────────
+            # ── 10. Audit ───────────────────────────────────────────
             audit_log = BillingAuditLog(
                 entity_type="credit_note",
                 entity_id=credit_note.id,
@@ -246,7 +253,7 @@ class CreditNoteService(BaseService):
             )
             self._audit_repo.create(audit_log)
 
-            # ── 9. Commit ───────────────────────────────────────────
+            # ── 11. Commit ──────────────────────────────────────────
             self._commit()
 
             logger.info(

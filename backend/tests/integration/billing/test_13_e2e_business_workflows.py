@@ -104,11 +104,17 @@ pytestmark = pytest.mark.postgres
 
 
 def _build_invoice_service(db):
+    from app.modules.patients.repository import PatientRepository
     invoice_repo = InvoiceRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
-    invoice_validator = InvoiceValidator(invoice_repo, financial_validator)
+    invoice_validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     doc_seq_service = DocumentSequenceService(db, doc_seq_repo, doc_seq_validator)
     return InvoiceService(
@@ -119,13 +125,23 @@ def _build_invoice_service(db):
 
 
 def _build_payment_service(db):
+    from app.modules.patients.repository import PatientRepository
     payment_repo = PaymentRepository(db)
     invoice_repo = InvoiceRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
-    payment_validator = PaymentValidator(payment_repo, financial_validator)
-    invoice_validator = InvoiceValidator(invoice_repo, financial_validator)
+    payment_validator = PaymentValidator(
+        payment_repo=payment_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
+    invoice_validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     doc_seq_service = DocumentSequenceService(db, doc_seq_repo, doc_seq_validator)
     return PaymentService(
@@ -168,12 +184,18 @@ def _build_refund_service(db):
 
 
 def _build_credit_note_service(db):
+    from app.modules.patients.repository import PatientRepository
     credit_note_repo = CreditNoteRepository(db)
     invoice_repo = InvoiceRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
-    credit_note_validator = CreditNoteValidator(credit_note_repo, financial_validator)
+    credit_note_validator = CreditNoteValidator(
+        credit_note_repo=credit_note_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     doc_seq_service = DocumentSequenceService(db, doc_seq_repo, doc_seq_validator)
     return CreditNoteService(

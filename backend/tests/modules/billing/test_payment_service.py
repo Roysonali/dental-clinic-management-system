@@ -73,12 +73,18 @@ def payment_service(db):
         DocumentSequenceService,
         PaymentService,
     )
+    from app.modules.patients.repository import PatientRepository
 
     payment_repo = PaymentRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
-    payment_validator = PaymentValidator(payment_repo, financial_validator)
+    payment_validator = PaymentValidator(
+        payment_repo=payment_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     document_sequence_service = DocumentSequenceService(
         db, doc_seq_repo, doc_seq_validator

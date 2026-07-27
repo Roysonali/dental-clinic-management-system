@@ -64,14 +64,14 @@ class ReceiptMapper:
     def to_model(
         request: ReceiptCreateRequest,
         receipt_number: str,
-        created_by: UUID,
+        created_by: int,
     ) -> Receipt:
         """Convert a ``ReceiptCreateRequest`` DTO to a ``Receipt`` ORM model.
 
         Args:
             request: The validated create request DTO.
             receipt_number: The assigned sequential receipt number.
-            created_by: UUID of the user creating the receipt.
+            created_by: User ID of the receipt creator (auth.users.id = int).
 
         Returns:
             A ``Receipt`` instance ready for persistence.
@@ -295,7 +295,7 @@ class ReceiptMapper:
         from_status: ReceiptStatus,
         to_status: ReceiptStatus,
         changed_at: datetime,
-        changed_by: UUID,
+        changed_by: int,
     ) -> ReceiptStatusTransitionResponse:
         """Build a status transition response from a receipt and transition data.
 
@@ -304,7 +304,7 @@ class ReceiptMapper:
             from_status: The previous status.
             to_status: The new status.
             changed_at: Timestamp when the transition occurred.
-            changed_by: UUID of the user who performed the transition.
+            changed_by: User ID who performed the transition (auth.users.id = int).
 
         Returns:
             A ``ReceiptStatusTransitionResponse``.

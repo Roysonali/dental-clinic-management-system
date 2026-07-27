@@ -6,6 +6,7 @@ Tests cover:
 - delete_draft_invoice
 - get_invoice
 - search_invoices
+- FK existence validation (Sprint 12A)
 """
 
 from __future__ import annotations
@@ -35,7 +36,11 @@ from app.modules.billing.models import (
 )
 
 from tests.modules.billing.conftest import (
-    _STUB_USER_ID,
+    _STUB_PATIENT_ID,
+    _STUB_USER_INT_ID,
+    _STUB_DOCTOR_ID,
+    _STUB_APPOINTMENT_ID,
+    _STUB_TREATMENT_PLAN_ID,
     InvoiceFactory,
     InvoiceItemFactory,
 )
@@ -62,19 +67,42 @@ def invoice_service(db):
         DocumentSequenceService,
         InvoiceService,
     )
+    from app.modules.patients.repository import PatientRepository
+    from app.modules.doctors.repositories.doctor_repository import DoctorRepository
+    from app.modules.appointments.repository import AppointmentRepository
+    from app.modules.treatment.repositories.treatment_plan_repository import (
+        TreatmentPlanRepository,
+    )
+    from app.modules.patient_records.repositories import (
+        DiagnosisRepository,
+    )
 
-    repo = InvoiceRepository(db)
+    invoice_repo = InvoiceRepository(db)
+    patient_repo = PatientRepository(db)
+    doctor_repo = DoctorRepository(db)
+    appointment_repo = AppointmentRepository(db)
+    treatment_plan_repo = TreatmentPlanRepository(db)
+    diagnosis_repo = DiagnosisRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
     financial_validator = FinancialValidator()
-    validator = InvoiceValidator(repo, financial_validator)
+    validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+        appointment_repo=appointment_repo,
+        doctor_repo=doctor_repo,
+        treatment_plan_repo=treatment_plan_repo,
+        treatment_plan_item_repo=treatment_plan_repo,
+        diagnosis_repo=diagnosis_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     document_sequence_service = DocumentSequenceService(
         db, doc_seq_repo, doc_seq_validator
     )
     return InvoiceService(
         db=db,
-        invoice_repo=repo,
+        invoice_repo=invoice_repo,
         invoice_validator=validator,
         financial_validator=financial_validator,
         document_sequence_service=document_sequence_service,
@@ -116,11 +144,11 @@ def sample_items():
 class TestInvoiceServiceCreate:
     def test_create_invoice_success(self, invoice_service, sample_items):
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000001",
             currency_code="USD",
             items=sample_items,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         assert invoice.id is not None
         assert invoice.status == InvoiceStatus.DRAFT
@@ -129,11 +157,11 @@ class TestInvoiceServiceCreate:
 
     def test_create_invoice_stores_items(self, db, invoice_service, sample_items):
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000002",
             currency_code="USD",
             items=sample_items,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         # Verify items are persisted
         db.refresh(invoice)
@@ -146,11 +174,11 @@ class TestInvoiceServiceCreate:
         self, db, invoice_service, sample_items
     ):
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000003",
             currency_code="USD",
             items=sample_items,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         assert invoice.items[0].sequence_number == 1
         assert invoice.items[1].sequence_number == 2
@@ -159,11 +187,11 @@ class TestInvoiceServiceCreate:
         self, db, invoice_service, sample_items
     ):
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000004",
             currency_code="USD",
             items=sample_items,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         # Item 1: 150 * 1 - 0 = 150
         # Item 2: 80 * 2 - 10 = 150
@@ -189,11 +217,11 @@ class TestInvoiceServiceCreate:
             },
         ]
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000005",
             currency_code="USD",
             items=items,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         seqs = [item.sequence_number for item in invoice.items]
         # Should be re-sorted by sequence_number
@@ -202,7 +230,7 @@ class TestInvoiceServiceCreate:
     def test_create_invoice_negative_unit_price_raises(self, invoice_service):
         with pytest.raises(NegativeAmountNotAllowed):
             invoice_service.create_invoice(
-                patient_id=_STUB_USER_ID,
+                patient_id=_STUB_PATIENT_ID,
                 invoice_number="INV-000006",
                 currency_code="USD",
                 items=[
@@ -212,13 +240,13 @@ class TestInvoiceServiceCreate:
                         "unit_price": Decimal("-10.00"),
                     }
                 ],
-                created_by=_STUB_USER_ID,
+                created_by=_STUB_USER_INT_ID,
             )
 
     def test_create_invoice_duplicate_sequence_raises(self, invoice_service):
         with pytest.raises(InvoiceValidationFailed):
             invoice_service.create_invoice(
-                patient_id=_STUB_USER_ID,
+                patient_id=_STUB_PATIENT_ID,
                 invoice_number="INV-000007",
                 currency_code="USD",
                 items=[
@@ -235,53 +263,391 @@ class TestInvoiceServiceCreate:
                         "sequence_number": 1,
                     },
                 ],
-                created_by=_STUB_USER_ID,
+                created_by=_STUB_USER_INT_ID,
             )
 
     def test_create_invoice_duplicate_number_raises(self, db, invoice_service):
         invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000008",
             currency_code="USD",
             items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         with pytest.raises(InvoiceNumberAlreadyUsed):
             invoice_service.create_invoice(
-                patient_id=_STUB_USER_ID,
+                patient_id=_STUB_PATIENT_ID,
                 invoice_number="INV-000008",
                 currency_code="USD",
                 items=[{"description": "Item 2", "quantity": 1, "unit_price": Decimal("50.00")}],
-                created_by=_STUB_USER_ID,
+                created_by=_STUB_USER_INT_ID,
             )
 
     def test_create_invoice_no_items_raises(self, invoice_service):
         with pytest.raises(InvoiceValidationFailed):
             invoice_service.create_invoice(
-                patient_id=_STUB_USER_ID,
+                patient_id=_STUB_PATIENT_ID,
                 invoice_number="INV-000009",
                 currency_code="USD",
                 items=[],
-                created_by=_STUB_USER_ID,
+                created_by=_STUB_USER_INT_ID,
             )
 
     def test_create_invoice_invalid_currency_raises(self, invoice_service):
         with pytest.raises(BillingValidationError):
             invoice_service.create_invoice(
-                patient_id=_STUB_USER_ID,
+                patient_id=_STUB_PATIENT_ID,
                 invoice_number="INV-000010",
                 currency_code="INVALID",
                 items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
-                created_by=_STUB_USER_ID,
+                created_by=_STUB_USER_INT_ID,
             )
+
+    # ==================================================================
+    # FK existence validation (Sprint 12A)
+    # ==================================================================
+
+    def test_create_invoice_invalid_patient_id_raises(self, invoice_service):
+        """Non-existent patient_id raises PatientNotFound (404)."""
+        from app.modules.patients.exceptions import PatientNotFound
+
+        with pytest.raises(PatientNotFound):
+            invoice_service.create_invoice(
+                patient_id=uuid.uuid4(),
+                invoice_number="INV-FK-001",
+                currency_code="USD",
+                items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+                created_by=_STUB_USER_INT_ID,
+            )
+
+    def test_create_invoice_invalid_treatment_plan_id_raises(self, invoice_service):
+        """Non-existent treatment_plan_id raises PlanNotFound (404)."""
+        from app.modules.treatment.exceptions import PlanNotFound
+
+        with pytest.raises(PlanNotFound):
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-FK-002",
+                currency_code="USD",
+                items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+                created_by=_STUB_USER_INT_ID,
+                treatment_plan_id=uuid.uuid4(),
+            )
+
+    def test_create_invoice_invalid_appointment_id_raises(self, invoice_service):
+        """Non-existent appointment_id raises AppointmentNotFoundException (404)."""
+        from app.modules.appointments.exceptions import AppointmentNotFoundException
+
+        with pytest.raises(AppointmentNotFoundException):
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-FK-003",
+                currency_code="USD",
+                items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+                created_by=_STUB_USER_INT_ID,
+                appointment_id=uuid.uuid4(),
+            )
+
+    def test_create_invoice_invalid_doctor_id_raises(self, invoice_service):
+        """Non-existent doctor_id raises DoctorNotFound (404)."""
+        from app.modules.doctors.exceptions import DoctorNotFound
+
+        with pytest.raises(DoctorNotFound):
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-FK-004",
+                currency_code="USD",
+                items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+                created_by=_STUB_USER_INT_ID,
+                doctor_id=uuid.uuid4(),
+            )
+
+    def test_create_invoice_null_optional_fks_succeeds(self, invoice_service):
+        """Optional FK fields (treatment_plan_id, appointment_id, doctor_id)
+        can be None without raising validation errors."""
+        from app.modules.patients.exceptions import PatientNotFound
+
+        invoice = invoice_service.create_invoice(
+            patient_id=_STUB_PATIENT_ID,
+            invoice_number="INV-FK-005",
+            currency_code="USD",
+            items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+            created_by=_STUB_USER_INT_ID,
+            treatment_plan_id=None,
+            appointment_id=None,
+            doctor_id=None,
+        )
+        assert invoice is not None
+        assert invoice.treatment_plan_id is None
+        assert invoice.appointment_id is None
+        assert invoice.doctor_id is None
+
+    def test_create_invoice_valid_fk_references_succeeds(self, invoice_service):
+        """Valid FK references (all provided) pass validation."""
+        invoice = invoice_service.create_invoice(
+            patient_id=_STUB_PATIENT_ID,
+            invoice_number="INV-FK-006",
+            currency_code="USD",
+            items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+            created_by=_STUB_USER_INT_ID,
+            treatment_plan_id=_STUB_TREATMENT_PLAN_ID,
+            appointment_id=_STUB_APPOINTMENT_ID,
+            doctor_id=_STUB_DOCTOR_ID,
+        )
+        assert invoice is not None
+        assert invoice.treatment_plan_id == _STUB_TREATMENT_PLAN_ID
+        assert invoice.appointment_id == _STUB_APPOINTMENT_ID
+        assert invoice.doctor_id == _STUB_DOCTOR_ID
+
+    def test_create_invoice_no_http_500_for_invalid_fk(self, invoice_service):
+        """Invalid FK references do NOT raise InvoiceCreationFailed (500).
+
+        Instead they raise specific domain exceptions (PatientNotFound,
+        PlanNotFound, etc.) that map to HTTP 4xx responses.
+        """
+        from app.modules.patients.exceptions import PatientNotFound
+
+        with pytest.raises(PatientNotFound):
+            invoice_service.create_invoice(
+                patient_id=uuid.uuid4(),
+                invoice_number="INV-FK-007",
+                currency_code="USD",
+                items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+                created_by=_STUB_USER_INT_ID,
+            )
+        # Also verify InvoiceCreationFailed is NOT raised
+        from app.modules.billing.exceptions import InvoiceCreationFailed
+
+        try:
+            invoice_service.create_invoice(
+                patient_id=uuid.uuid4(),
+                invoice_number="INV-FK-008",
+                currency_code="USD",
+                items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
+                created_by=_STUB_USER_INT_ID,
+            )
+        except InvoiceCreationFailed:
+            pytest.fail("Invalid FK should not raise InvoiceCreationFailed (500)")
+        except PatientNotFound:
+            pass  # Expected domain exception
+
+    # ==================================================================
+    # Line-item FK validation (Sprint 12A.1)
+    # ==================================================================
+
+    def test_create_invoice_valid_plan_item_id_succeeds(self, invoice_service):
+        """Providing a valid plan_item_id with matching treatment_plan_id succeeds."""
+        from tests.modules.billing.conftest import (
+            _STUB_TREATMENT_PLAN_ITEM_ID,
+            _STUB_TREATMENT_PLAN_ID,
+        )
+
+        invoice = invoice_service.create_invoice(
+            patient_id=_STUB_PATIENT_ID,
+            invoice_number="INV-LI-001",
+            currency_code="USD",
+            items=[{
+                "description": "Root canal",
+                "quantity": 1,
+                "unit_price": Decimal("100.00"),
+                "plan_item_id": _STUB_TREATMENT_PLAN_ITEM_ID,
+            }],
+            created_by=_STUB_USER_INT_ID,
+            treatment_plan_id=_STUB_TREATMENT_PLAN_ID,
+        )
+        assert invoice is not None
+        assert invoice.items[0].plan_item_id == _STUB_TREATMENT_PLAN_ITEM_ID
+
+    def test_create_invoice_invalid_plan_item_id_raises(self, invoice_service):
+        """Non-existent plan_item_id raises ItemNotFound (404)."""
+        from app.modules.treatment.exceptions import ItemNotFound
+
+        with pytest.raises(ItemNotFound):
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-LI-002",
+                currency_code="USD",
+                items=[{
+                    "description": "Root canal",
+                    "quantity": 1,
+                    "unit_price": Decimal("100.00"),
+                    "plan_item_id": uuid.uuid4(),
+                }],
+                created_by=_STUB_USER_INT_ID,
+                treatment_plan_id=_STUB_TREATMENT_PLAN_ID,
+            )
+
+    def test_create_invoice_plan_item_wrong_plan_raises(self, db, invoice_service):
+        """plan_item_id from a different treatment plan is rejected."""
+        from tests.modules.billing.conftest import (
+            _STUB_TREATMENT_PLAN_ITEM_ID,
+            _STUB_TREATMENT_PLAN_ID,
+            _STUB_DOCTOR_ID,
+            _STUB_PATIENT_ID,
+        )
+        from app.modules.treatment.models import TreatmentPlan, TreatmentPlanItem
+        from decimal import Decimal
+
+        # Create a second treatment plan (different from the one owning the item)
+        second_plan = TreatmentPlan(
+            id=uuid.uuid4(),
+            plan_code="TP-TEST-002",
+            patient_id=_STUB_PATIENT_ID,
+            doctor_id=_STUB_DOCTOR_ID,
+            status="draft",
+            current_version=1,
+            is_active=True,
+        )
+        db.add(second_plan)
+        db.flush()
+
+        # The existing _STUB_TREATMENT_PLAN_ITEM_ID belongs to _STUB_TREATMENT_PLAN_ID
+        # If we set invoice.treatment_plan_id to second_plan.id, the item's plan
+        # won't match, triggering the ownership validation.
+        with pytest.raises(InvoiceValidationFailed):
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-LI-003",
+                currency_code="USD",
+                items=[{
+                    "description": "Root canal",
+                    "quantity": 1,
+                    "unit_price": Decimal("100.00"),
+                    "plan_item_id": _STUB_TREATMENT_PLAN_ITEM_ID,
+                }],
+                created_by=_STUB_USER_INT_ID,
+                treatment_plan_id=second_plan.id,  # Different from item's plan
+            )
+
+    def test_create_invoice_plan_item_no_treatment_plan_succeeds(self, invoice_service):
+        """plan_item_id without a treatment_plan_id on the invoice is accepted
+        (plan_item_id FK is still validated for existence)."""
+        from tests.modules.billing.conftest import _STUB_TREATMENT_PLAN_ITEM_ID
+
+        invoice = invoice_service.create_invoice(
+            patient_id=_STUB_PATIENT_ID,
+            invoice_number="INV-LI-004",
+            currency_code="USD",
+            items=[{
+                "description": "Root canal",
+                "quantity": 1,
+                "unit_price": Decimal("100.00"),
+                "plan_item_id": _STUB_TREATMENT_PLAN_ITEM_ID,
+            }],
+            created_by=_STUB_USER_INT_ID,
+            treatment_plan_id=None,  # No plan on invoice — ownership check skipped
+        )
+        assert invoice is not None
+
+    def test_create_invoice_valid_diagnosis_id_succeeds(self, invoice_service):
+        """Providing a valid diagnosis_id with matching patient succeeds."""
+        from tests.modules.billing.conftest import _STUB_DIAGNOSIS_ID
+
+        invoice = invoice_service.create_invoice(
+            patient_id=_STUB_PATIENT_ID,
+            invoice_number="INV-LI-005",
+            currency_code="USD",
+            items=[{
+                "description": "Consultation",
+                "quantity": 1,
+                "unit_price": Decimal("50.00"),
+                "diagnosis_id": _STUB_DIAGNOSIS_ID,
+            }],
+            created_by=_STUB_USER_INT_ID,
+        )
+        assert invoice is not None
+        assert invoice.items[0].diagnosis_id == _STUB_DIAGNOSIS_ID
+
+    def test_create_invoice_invalid_diagnosis_id_raises(self, invoice_service):
+        """Non-existent diagnosis_id raises DiagnosisNotFound (404)."""
+        from app.modules.patient_records.exceptions import DiagnosisNotFound
+
+        with pytest.raises(DiagnosisNotFound):
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-LI-006",
+                currency_code="USD",
+                items=[{
+                    "description": "Consultation",
+                    "quantity": 1,
+                    "unit_price": Decimal("50.00"),
+                    "diagnosis_id": uuid.uuid4(),
+                }],
+                created_by=_STUB_USER_INT_ID,
+            )
+
+    def test_create_invoice_diagnosis_wrong_patient_raises(self, invoice_service):
+        """diagnosis_id belonging to a different patient is rejected."""
+        from tests.modules.billing.conftest import _STUB_DIAGNOSIS_WRONG_PATIENT_ID
+
+        with pytest.raises(InvoiceValidationFailed):
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-LI-007",
+                currency_code="USD",
+                items=[{
+                    "description": "Consultation",
+                    "quantity": 1,
+                    "unit_price": Decimal("50.00"),
+                    "diagnosis_id": _STUB_DIAGNOSIS_WRONG_PATIENT_ID,
+                }],
+                created_by=_STUB_USER_INT_ID,
+            )
+
+    def test_create_invoice_null_line_item_fks_succeeds(self, invoice_service):
+        """Line items without plan_item_id and diagnosis_id pass validation."""
+        invoice = invoice_service.create_invoice(
+            patient_id=_STUB_PATIENT_ID,
+            invoice_number="INV-LI-008",
+            currency_code="USD",
+            items=[{
+                "description": "Simple service",
+                "quantity": 1,
+                "unit_price": Decimal("50.00"),
+                # No plan_item_id, no diagnosis_id
+            }],
+            created_by=_STUB_USER_INT_ID,
+        )
+        assert invoice is not None
+        assert invoice.items[0].plan_item_id is None
+        assert invoice.items[0].diagnosis_id is None
+
+    def test_create_invoice_no_http_500_for_invalid_line_item_fk(self, invoice_service):
+        """Invalid line-item FK references do NOT raise InvoiceCreationFailed (500).
+
+        Instead they raise specific domain exceptions (ItemNotFound,
+        DiagnosisNotFound) that map to HTTP 4xx.
+        """
+        from app.modules.treatment.exceptions import ItemNotFound
+        from tests.modules.billing.conftest import _STUB_TREATMENT_PLAN_ID
+
+        # Verify ItemNotFound (404) is raised for invalid plan_item_id
+        try:
+            invoice_service.create_invoice(
+                patient_id=_STUB_PATIENT_ID,
+                invoice_number="INV-LI-009",
+                currency_code="USD",
+                items=[{
+                    "description": "Item",
+                    "quantity": 1,
+                    "unit_price": Decimal("50.00"),
+                    "plan_item_id": uuid.uuid4(),
+                }],
+                created_by=_STUB_USER_INT_ID,
+                treatment_plan_id=_STUB_TREATMENT_PLAN_ID,
+            )
+        except InvoiceCreationFailed:
+            pytest.fail("Invalid line-item FK should not raise InvoiceCreationFailed (500)")
+        except ItemNotFound:
+            pass  # Expected domain exception
 
     def test_create_invoice_status_history_created(self, db, invoice_service):
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000011",
             currency_code="USD",
             items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         db.refresh(invoice)
         assert len(invoice.status_history) >= 1
@@ -289,11 +655,11 @@ class TestInvoiceServiceCreate:
 
     def test_create_invoice_defaults_due_date(self, db, invoice_service):
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000012",
             currency_code="USD",
             items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
         )
         expected = invoice.invoice_date + __import__("datetime").timedelta(days=30)
         assert invoice.due_date == expected
@@ -301,11 +667,11 @@ class TestInvoiceServiceCreate:
     def test_create_invoice_uses_provided_due_date(self, db, invoice_service):
         expected_due = date(2026, 12, 31)
         invoice = invoice_service.create_invoice(
-            patient_id=_STUB_USER_ID,
+            patient_id=_STUB_PATIENT_ID,
             invoice_number="INV-000013",
             currency_code="USD",
             items=[{"description": "Item", "quantity": 1, "unit_price": Decimal("50.00")}],
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
             due_date=expected_due,
         )
         assert invoice.due_date == expected_due
@@ -320,7 +686,7 @@ class TestInvoiceServiceUpdateDraft:
     def test_update_draft_invoice_notes(self, db, invoice_service, invoice):
         updated = invoice_service.update_draft_invoice(
             invoice_id=invoice.id,
-            updated_by=_STUB_USER_ID,
+            updated_by=_STUB_USER_INT_ID,
             notes="Updated notes",
         )
         assert updated.notes == "Updated notes"
@@ -329,7 +695,7 @@ class TestInvoiceServiceUpdateDraft:
         new_due = date(2026, 12, 31)
         updated = invoice_service.update_draft_invoice(
             invoice_id=invoice.id,
-            updated_by=_STUB_USER_ID,
+            updated_by=_STUB_USER_INT_ID,
             due_date=new_due,
         )
         assert updated.due_date == new_due
@@ -344,7 +710,7 @@ class TestInvoiceServiceUpdateDraft:
 
         updated = invoice_service.update_draft_invoice(
             invoice_id=invoice.id,
-            updated_by=_STUB_USER_ID,
+            updated_by=_STUB_USER_INT_ID,
             items=[
                 {
                     "description": "New item",
@@ -361,7 +727,7 @@ class TestInvoiceServiceUpdateDraft:
         with pytest.raises(InvoiceNotFound):
             invoice_service.update_draft_invoice(
                 invoice_id=uuid.uuid4(),
-                updated_by=_STUB_USER_ID,
+                updated_by=_STUB_USER_INT_ID,
             )
 
     def test_update_draft_invoice_not_editable_raises(
@@ -371,14 +737,14 @@ class TestInvoiceServiceUpdateDraft:
         with pytest.raises(InvoiceNotEditable):
             invoice_service.update_draft_invoice(
                 invoice_id=issued_invoice.id,
-                updated_by=_STUB_USER_ID,
+                updated_by=_STUB_USER_INT_ID,
             )
 
     def test_update_draft_invoice_empty_items_raises(self, invoice_service, invoice):
         with pytest.raises(InvoiceValidationFailed):
             invoice_service.update_draft_invoice(
                 invoice_id=invoice.id,
-                updated_by=_STUB_USER_ID,
+                updated_by=_STUB_USER_INT_ID,
                 items=[],
             )
 
@@ -427,7 +793,7 @@ class TestInvoiceServiceIssue:
     def test_issue_invoice_success(self, db, invoice_service, invoice_with_items):
         invoice = invoice_service.issue_invoice(
             invoice_id=invoice_with_items.id,
-            issued_by=_STUB_USER_ID,
+            issued_by=_STUB_USER_INT_ID,
         )
         assert invoice.status == InvoiceStatus.ISSUED
         assert invoice.invoice_number == "INV-00001"
@@ -439,7 +805,7 @@ class TestInvoiceServiceIssue:
         with pytest.raises(InvoiceNotFound):
             invoice_service.issue_invoice(
                 invoice_id=uuid.uuid4(),
-                issued_by=_STUB_USER_ID,
+                issued_by=_STUB_USER_INT_ID,
             )
 
     def test_issue_invoice_not_issuable_raises(self, db, invoice_service):
@@ -447,14 +813,14 @@ class TestInvoiceServiceIssue:
         with pytest.raises(InvalidInvoiceStatusTransition):
             invoice_service.issue_invoice(
                 invoice_id=issued_invoice.id,
-                issued_by=_STUB_USER_ID,
+                issued_by=_STUB_USER_INT_ID,
             )
 
     def test_issue_invoice_no_items_raises(self, db, invoice_service, invoice):
         with pytest.raises(InvoiceValidationFailed):
             invoice_service.issue_invoice(
                 invoice_id=invoice.id,
-                issued_by=_STUB_USER_ID,
+                issued_by=_STUB_USER_INT_ID,
             )
 
     def test_issue_invoice_creates_audit_log(self, db, invoice_service, invoice_with_items):
@@ -462,7 +828,7 @@ class TestInvoiceServiceIssue:
 
         invoice_service.issue_invoice(
             invoice_id=invoice_with_items.id,
-            issued_by=_STUB_USER_ID,
+            issued_by=_STUB_USER_INT_ID,
         )
         audit_repo = AuditRepository(db)
         logs, _ = audit_repo.find_by_entity(
@@ -481,7 +847,7 @@ class TestInvoiceServiceCancel:
     def test_cancel_invoice_success(self, db, invoice_service, invoice):
         invoice = invoice_service.cancel_invoice(
             invoice_id=invoice.id,
-            cancelled_by=_STUB_USER_ID,
+            cancelled_by=_STUB_USER_INT_ID,
             cancellation_reason="Patient request",
         )
         assert invoice.status == InvoiceStatus.CANCELLED
@@ -495,7 +861,7 @@ class TestInvoiceServiceCancel:
         with pytest.raises(InvoiceNotFound):
             invoice_service.cancel_invoice(
                 invoice_id=uuid.uuid4(),
-                cancelled_by=_STUB_USER_ID,
+                cancelled_by=_STUB_USER_INT_ID,
                 cancellation_reason="Test",
             )
 
@@ -506,7 +872,7 @@ class TestInvoiceServiceCancel:
         with pytest.raises(InvalidInvoiceStatusTransition):
             invoice_service.cancel_invoice(
                 invoice_id=cancelled_invoice.id,
-                cancelled_by=_STUB_USER_ID,
+                cancelled_by=_STUB_USER_INT_ID,
                 cancellation_reason="Double cancel",
             )
 
@@ -519,7 +885,7 @@ class TestInvoiceServiceCancel:
         with pytest.raises(InvalidInvoiceStatusTransition):
             invoice_service.cancel_invoice(
                 invoice_id=paid_invoice.id,
-                cancelled_by=_STUB_USER_ID,
+                cancelled_by=_STUB_USER_INT_ID,
                 cancellation_reason="Refund request",
             )
         db.refresh(paid_invoice)
@@ -538,7 +904,7 @@ class TestInvoiceServiceCancel:
         with pytest.raises(InvoiceValidationFailed):
             invoice_service.cancel_invoice(
                 invoice_id=invoice.id,
-                cancelled_by=_STUB_USER_ID,
+                cancelled_by=_STUB_USER_INT_ID,
                 cancellation_reason="   ",
             )
 
@@ -547,7 +913,7 @@ class TestInvoiceServiceCancel:
 
         invoice_service.cancel_invoice(
             invoice_id=invoice.id,
-            cancelled_by=_STUB_USER_ID,
+            cancelled_by=_STUB_USER_INT_ID,
             cancellation_reason="Test cancel",
         )
         audit_repo = AuditRepository(db)

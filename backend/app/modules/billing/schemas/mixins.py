@@ -38,17 +38,23 @@ class TimestampMixin:
 
 
 class AuditMixin:
-    """Mixin adding audit user-tracking fields."""
+    """Mixin adding audit user-tracking fields.
 
-    created_by: UUID = Field(
+    Note: ``created_by`` and ``updated_by`` are ``int`` because
+    ``auth.users.id`` is an INTEGER primary key (not UUID).
+    """
+
+    created_by: int = Field(
         ...,
         title="Created By",
-        description="UUID of the user who created the record.",
+        description="ID of the user who created the record (auth.users.id).",
+        examples=[1],
     )
-    updated_by: UUID | None = Field(
+    updated_by: int | None = Field(
         default=None,
         title="Updated By",
-        description="UUID of the user who last modified the record.",
+        description="ID of the user who last modified the record (auth.users.id).",
+        examples=[1],
     )
 
 

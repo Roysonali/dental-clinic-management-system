@@ -53,7 +53,10 @@ from app.modules.billing.exceptions import (
 )
 from app.modules.billing.models import CreditNote
 from app.modules.billing.validators.financial_validator import FinancialValidator
-from app.modules.billing.validators.protocols import CreditNoteRepositoryProtocol
+from app.modules.billing.validators.protocols import (
+    CreditNoteRepositoryProtocol,
+    PatientRepositoryProtocol,
+)
 from app.modules.billing.validators.state_machine import (
     is_editable_state,
     is_terminal_state,
@@ -69,15 +72,19 @@ class CreditNoteValidator:
             credit note existence, uniqueness, and lookups.
         financial_validator: ``FinancialValidator`` instance for monetary
             validations.
+        patient_repo: Optional ``PatientRepositoryProtocol`` for patient
+            existence checks (Sprint 12A FK hardening).
     """
 
     def __init__(
         self,
         credit_note_repo: CreditNoteRepositoryProtocol,
         financial_validator: FinancialValidator,
+        patient_repo: PatientRepositoryProtocol | None = None,
     ) -> None:
         self._credit_note_repo = credit_note_repo
         self._financial = financial_validator
+        self._patient_repo = patient_repo
 
     # ==================================================================
     # Credit note lifecycle
@@ -440,6 +447,30 @@ class CreditNoteValidator:
                 },
             )
         return reason
+
+    # ==================================================================
+    # Foreign-key existence validation (Sprint 12A)
+    # ==================================================================
+
+    def validate_patient_exists(self, patient_id: UUID) -> None:
+        """Validate that a patient with the given id exists.
+
+        Raises ``PatientNotFound`` (404) if the patient does not exist.
+        Uses ``PatientRepositoryProtocol`` for the lookup — no persistence
+        or transaction management.
+
+        Raises:
+            PatientNotFound: If ``patient_id`` does not resolve to an existing
+                patient record.
+        """
+        if self._patient_repo is None:
+            raise RuntimeError(
+                "PatientRepositoryProtocol is required for patient existence "
+                "validation but was not provided to CreditNoteValidator"
+            )
+        if not self._patient_repo.exists(patient_id):
+            from app.modules.patients.exceptions import PatientNotFound
+            raise PatientNotFound()
 
 
 __all__ = ["CreditNoteValidator"]

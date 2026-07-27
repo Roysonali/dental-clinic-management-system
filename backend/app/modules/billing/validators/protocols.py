@@ -6,6 +6,7 @@ validator layer decoupled from full repository implementations.
 
 from __future__ import annotations
 
+from typing import Optional
 from uuid import UUID
 
 from app.modules.billing.models import (
@@ -16,6 +17,60 @@ from app.modules.billing.models import (
     Payment,
     Receipt,
 )
+
+
+class PatientRepositoryProtocol:
+    """Minimal patient repository interface for validators."""
+
+    def exists(self, patient_id: UUID) -> bool:
+        raise NotImplementedError
+
+
+class AppointmentRepositoryProtocol:
+    """Minimal appointment repository interface for validators."""
+
+    def exists(self, appointment_id: UUID) -> bool:
+        raise NotImplementedError
+
+
+class DoctorRepositoryProtocol:
+    """Minimal doctor repository interface for validators."""
+
+    def exists(self, doctor_id: UUID) -> bool:
+        raise NotImplementedError
+
+
+class TreatmentPlanRepositoryProtocol:
+    """Minimal treatment plan repository interface for validators."""
+
+    def exists(self, plan_id: UUID) -> bool:
+        raise NotImplementedError
+
+
+class TreatmentPlanItemRepositoryProtocol:
+    """Minimal treatment plan item repository interface for validators.
+
+    Used for line-item FK validation (Sprint 12A.1).
+    Returns ``None`` from ``get_item_plan_id`` when the item does not exist,
+    collapsing the existence check and metadata fetch into a single query.
+    """
+
+    def get_item_plan_id(self, item_id: UUID) -> UUID | None:
+        """Return the ``plan_id`` that owns the item, or ``None`` if missing."""
+        raise NotImplementedError
+
+
+class DiagnosisRepositoryProtocol:
+    """Minimal diagnosis repository interface for validators.
+
+    Used for line-item FK validation (Sprint 12A.1).
+    Returns ``None`` from ``get_patient_id`` when the diagnosis does not exist,
+    collapsing the existence check and metadata fetch into a single query.
+    """
+
+    def get_patient_id(self, diagnosis_id: UUID) -> UUID | None:
+        """Return the ``patient_id`` that owns the diagnosis, or ``None`` if missing."""
+        raise NotImplementedError
 
 
 class InvoiceRepositoryProtocol:

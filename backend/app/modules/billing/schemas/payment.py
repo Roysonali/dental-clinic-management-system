@@ -413,10 +413,11 @@ class PaymentStatusTransitionResponse(BillingResponseSchema):
         title="Changed At",
         description="Timestamp when the transition was applied.",
     )
-    changed_by: UUID = Field(
+    changed_by: int = Field(
         ...,
         title="Changed By",
-        description="User who performed the transition.",
+        description="User ID who performed the transition (auth.users.id).",
+        examples=[1],
     )
 
 

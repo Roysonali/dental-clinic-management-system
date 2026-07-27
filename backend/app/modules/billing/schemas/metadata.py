@@ -47,10 +47,11 @@ class AuditMetadata(BaseModel):
         description="Audit action verb (e.g. ``created``, ``status_changed``).",
         examples=["created"],
     )
-    changed_by: UUID = Field(
+    changed_by: int = Field(
         ...,
         title="Changed By",
-        description="User who performed the action.",
+        description="User ID who performed the action (auth.users.id).",
+        examples=[1],
     )
     occurred_at: datetime = Field(
         ...,

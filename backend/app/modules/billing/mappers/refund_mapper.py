@@ -60,14 +60,14 @@ class RefundMapper:
     def to_model(
         request: RefundCreateRequest,
         refund_number: str,
-        created_by: UUID,
+        created_by: int,
     ) -> Refund:
         """Convert a ``RefundCreateRequest`` DTO to a ``Refund`` ORM model.
 
         Args:
             request: The validated create request DTO.
             refund_number: The assigned sequential refund number.
-            created_by: UUID of the user creating the refund.
+            created_by: User ID of the refund creator (auth.users.id = int).
 
         Returns:
             A ``Refund`` instance ready for persistence.
@@ -314,7 +314,7 @@ class RefundMapper:
         from_status: RefundStatus,
         to_status: RefundStatus,
         changed_at: datetime,
-        changed_by: UUID,
+        changed_by: int,
     ) -> RefundStatusTransitionResponse:
         """Build a status transition response from a refund and transition data.
 
@@ -323,7 +323,7 @@ class RefundMapper:
             from_status: The previous status.
             to_status: The new status.
             changed_at: Timestamp when the transition occurred.
-            changed_by: UUID of the user who performed the transition.
+            changed_by: User ID who performed the transition (auth.users.id = int).
 
         Returns:
             A ``RefundStatusTransitionResponse``.

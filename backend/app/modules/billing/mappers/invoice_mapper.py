@@ -66,7 +66,7 @@ class InvoiceMapper:
     def to_model(
         request: InvoiceCreateRequest,
         invoice_number: str,
-        created_by: UUID,
+        created_by: int,
     ) -> Invoice:
         """Convert an ``InvoiceCreateRequest`` DTO to an ``Invoice`` ORM model.
 
@@ -76,7 +76,7 @@ class InvoiceMapper:
         Args:
             request: The validated create request DTO.
             invoice_number: The assigned sequential invoice number.
-            created_by: UUID of the user creating the invoice.
+            created_by: User ID of the invoice creator (auth.users.id = int).
 
         Returns:
             An ``Invoice`` instance ready for persistence (without items).
@@ -101,14 +101,14 @@ class InvoiceMapper:
     def to_item_models(
         request_items: list[InvoiceItemCreate],
         invoice_id: UUID,
-        created_by: UUID,
+        created_by: int,
     ) -> list[InvoiceItem]:
         """Convert a list of ``InvoiceItemCreate`` DTOs to ``InvoiceItem`` models.
 
         Args:
             request_items: The validated line items from the create request.
             invoice_id: UUID of the parent invoice (already persisted).
-            created_by: UUID of the user creating the invoice.
+            created_by: User ID of the invoice creator (auth.users.id = int).
 
         Returns:
             A list of ``InvoiceItem`` instances with assigned sequence numbers.
@@ -356,7 +356,7 @@ class InvoiceMapper:
         from_status: InvoiceStatus,
         to_status: InvoiceStatus,
         changed_at: datetime,
-        changed_by: UUID,
+        changed_by: int,
     ) -> InvoiceStatusTransitionResponse:
         """Build a status transition response from an invoice and transition data.
 
@@ -365,7 +365,7 @@ class InvoiceMapper:
             from_status: The previous status.
             to_status: The new status.
             changed_at: Timestamp when the transition occurred.
-            changed_by: UUID of the user who performed the transition.
+            changed_by: User ID who performed the transition (auth.users.id = int).
 
         Returns:
             An ``InvoiceStatusTransitionResponse``.

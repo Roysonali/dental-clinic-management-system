@@ -6,6 +6,11 @@ Responsibilities
   issuable, payable checks.
 * **Patient ownership**: invoice belongs to the specified patient.
 * **Line items**: presence, sequence uniqueness, amount validation.
+* **Foreign-key existence**: validates referenced entities (patient, doctor,
+  appointment, treatment plan) exist before persistence (Sprint 12A).
+* **Line-item FK hardening**: validates ``plan_item_id`` and ``diagnosis_id``
+  FK references on invoice line items, including business ownership rules
+  (Sprint 12A.1).
 * **Numbering**: invoice number uniqueness.
 * **Dates**: invoice date and due date validation.
 * **Status transitions**: delegating to the state machine with business-policy
@@ -18,6 +23,11 @@ Design
 ------
 * **Read-only repositories**: ``InvoiceRepositoryProtocol`` injected as a
   constructor dependency, used exclusively for lookups.
+* **Cross-module reference protocols**: ``PatientRepositoryProtocol``,
+  ``AppointmentRepositoryProtocol``, ``DoctorRepositoryProtocol``,
+  ``TreatmentPlanRepositoryProtocol``, ``TreatmentPlanItemRepositoryProtocol``,
+  and ``DiagnosisRepositoryProtocol`` are injected for FK existence checks
+  before the invoice aggregate is persisted.
 * **State machine delegation**: all transition legality checks are forwarded to
   ``validate_invoice_transition`` in ``state_machine.py`` — never duplicated
   here.
@@ -28,11 +38,37 @@ Design
   ``InvoiceValidationFailed``, ``DuplicateLineItemSequence``,
   ``InvoiceNumberAlreadyUsed``, ``GrandTotalMismatch``, ``CurrencyMismatch``,
   ``NegativeAmountNotAllowed``, and other billing exceptions.
+* **Cross-module exceptions**: ``PatientNotFound`` (from patients module),
+  ``DoctorNotFound`` (from doctors module),
+  ``AppointmentNotFoundException`` (from appointments module),
+  ``TreatmentPlanNotFound`` (from treatment module),
+  ``ItemNotFound`` (from treatment module),
+  ``DiagnosisNotFound`` (from patient_records module) — all mapped to HTTP 404
+  by the global exception handlers.
 * **Composable**: the service layer calls each validator in the order it needs.
 
 Integration example::
 
-    validator = InvoiceValidator(invoice_repo, financial_validator)
+    validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+        appointment_repo=appointment_repo,
+        doctor_repo=doctor_repo,
+        treatment_plan_repo=treatment_plan_repo,
+        treatment_plan_item_repo=treatment_plan_repo,  # same repo, item protocol
+        diagnosis_repo=diagnosis_repo,
+    )
+
+    # Before creating an invoice, verify all FK references exist
+    validator.validate_patient_exists(patient_id)
+    validator.validate_treatment_plan_exists(treatment_plan_id)  # optional
+    validator.validate_appointment_exists(appointment_id)  # optional
+    validator.validate_doctor_exists(doctor_id)  # optional
+
+    # Before creating line items, verify item-level FK references
+    validator.validate_line_item_plan_item(plan_item_id, invoice.treatment_plan_id)
+    validator.validate_line_item_diagnosis(diagnosis_id, invoice.patient_id)
 
     # Before issuing an invoice
     invoice = validator.validate_invoice_exists(invoice_id)
@@ -66,7 +102,15 @@ from app.modules.billing.exceptions import (
 )
 from app.modules.billing.models import Invoice, InvoiceItem
 from app.modules.billing.validators.financial_validator import FinancialValidator
-from app.modules.billing.validators.protocols import InvoiceRepositoryProtocol
+from app.modules.billing.validators.protocols import (
+    AppointmentRepositoryProtocol,
+    DiagnosisRepositoryProtocol,
+    DoctorRepositoryProtocol,
+    InvoiceRepositoryProtocol,
+    PatientRepositoryProtocol,
+    TreatmentPlanItemRepositoryProtocol,
+    TreatmentPlanRepositoryProtocol,
+)
 from app.modules.billing.validators.state_machine import (
     allowed_transitions,
     is_editable_state,
@@ -83,15 +127,40 @@ class InvoiceValidator:
             existence, uniqueness, and patient lookups.
         financial_validator: ``FinancialValidator`` instance for monetary
             validations.
+        patient_repo: Optional ``PatientRepositoryProtocol`` for patient
+            existence checks (Sprint 12A FK hardening).
+        appointment_repo: Optional ``AppointmentRepositoryProtocol`` for
+            appointment existence checks.
+        doctor_repo: Optional ``DoctorRepositoryProtocol`` for doctor
+            existence checks.
+        treatment_plan_repo: Optional ``TreatmentPlanRepositoryProtocol``
+            for treatment plan existence checks.
+        treatment_plan_item_repo: Optional
+            ``TreatmentPlanItemRepositoryProtocol`` for line-item
+            ``plan_item_id`` FK validation (Sprint 12A.1).
+        diagnosis_repo: Optional ``DiagnosisRepositoryProtocol`` for
+            line-item ``diagnosis_id`` FK validation (Sprint 12A.1).
     """
 
     def __init__(
         self,
         invoice_repo: InvoiceRepositoryProtocol,
         financial_validator: FinancialValidator,
+        patient_repo: PatientRepositoryProtocol | None = None,
+        appointment_repo: AppointmentRepositoryProtocol | None = None,
+        doctor_repo: DoctorRepositoryProtocol | None = None,
+        treatment_plan_repo: TreatmentPlanRepositoryProtocol | None = None,
+        treatment_plan_item_repo: TreatmentPlanItemRepositoryProtocol | None = None,
+        diagnosis_repo: DiagnosisRepositoryProtocol | None = None,
     ) -> None:
         self._invoice_repo = invoice_repo
         self._financial = financial_validator
+        self._patient_repo = patient_repo
+        self._appointment_repo = appointment_repo
+        self._doctor_repo = doctor_repo
+        self._treatment_plan_repo = treatment_plan_repo
+        self._treatment_plan_item_repo = treatment_plan_item_repo
+        self._diagnosis_repo = diagnosis_repo
 
     # ==================================================================
     # Invoice lifecycle
@@ -602,6 +671,211 @@ class InvoiceValidator:
         return self._financial.validate_currency_consistency(
             currencies, expected=expected
         )
+
+    # ==================================================================
+    # Foreign-key existence validation (Sprint 12A)
+    # ==================================================================
+
+    def validate_patient_exists(self, patient_id: UUID) -> None:
+        """Validate that a patient with the given id exists.
+
+        Raises ``PatientNotFound`` (404) if the patient does not exist.
+        Uses ``PatientRepositoryProtocol`` for the lookup — no persistence
+        or transaction management.
+
+        Raises:
+            PatientNotFound: If ``patient_id`` does not resolve to an existing
+                patient record.
+        """
+        if self._patient_repo is None:
+            raise RuntimeError(
+                "PatientRepositoryProtocol is required for patient existence "
+                "validation but was not provided to InvoiceValidator"
+            )
+        if not self._patient_repo.exists(patient_id):
+            from app.modules.patients.exceptions import PatientNotFound
+            raise PatientNotFound()
+
+    def validate_treatment_plan_exists(self, plan_id: UUID | None) -> None:
+        """Validate that a treatment plan with the given id exists.
+
+        ``None`` is silently accepted (optional FK).
+
+        Raises ``TreatmentPlanNotFound`` (404) if the plan does not exist.
+
+        Raises:
+            TreatmentPlanNotFound: If ``plan_id`` is not ``None`` and does
+                not resolve to an existing treatment plan.
+        """
+        if plan_id is None or self._treatment_plan_repo is None:
+            return
+        if not self._treatment_plan_repo.exists(plan_id):
+            from app.modules.treatment.exceptions import PlanNotFound as TreatmentPlanNotFound
+            raise TreatmentPlanNotFound(plan_id)
+
+    def validate_appointment_exists(self, appointment_id: UUID | None) -> None:
+        """Validate that an appointment with the given id exists.
+
+        ``None`` is silently accepted (optional FK).
+
+        Raises ``AppointmentNotFoundException`` (404) if the appointment
+        does not exist.
+
+        Raises:
+            AppointmentNotFoundException: If ``appointment_id`` is not
+                ``None`` and does not resolve to an existing appointment.
+        """
+        if appointment_id is None or self._appointment_repo is None:
+            return
+        if not self._appointment_repo.exists(appointment_id):
+            from app.modules.appointments.exceptions import (
+                AppointmentNotFoundException,
+            )
+            raise AppointmentNotFoundException(
+                message=f"Appointment not found: {appointment_id}"
+            )
+
+    def validate_doctor_exists(self, doctor_id: UUID | None) -> None:
+        """Validate that a doctor with the given id exists.
+
+        ``None`` is silently accepted (optional FK).
+
+        Raises ``DoctorNotFound`` (404) if the doctor does not exist.
+
+        Raises:
+            DoctorNotFound: If ``doctor_id`` is not ``None`` and does not
+                resolve to an existing doctor.
+        """
+        if doctor_id is None or self._doctor_repo is None:
+            return
+        if not self._doctor_repo.exists(doctor_id):
+            from app.modules.doctors.exceptions import DoctorNotFound
+            raise DoctorNotFound(
+                message=f"Doctor not found: {doctor_id}",
+                details={"doctor_id": str(doctor_id)},
+            )
+
+    # ==================================================================
+    # Line-item foreign-key validation (Sprint 12A.1)
+    # ==================================================================
+
+    def validate_line_item_plan_item(
+        self,
+        plan_item_id: UUID | None,
+        treatment_plan_id: UUID | None,
+        item_index: int = 0,
+    ) -> None:
+        """Validate a single line item's ``plan_item_id`` FK reference.
+
+        Performs a single query: fetches the owning ``plan_id`` from the
+        treatment plan item. If the item does not exist, ``None`` is returned
+        and ``ItemNotFound`` is raised. If ``treatment_plan_id`` is also
+        provided on the invoice, ownership is validated against the fetched
+        ``plan_id`` in the same query result — avoiding separate ``exists()``
+        + ``get()`` round trips.
+
+        ``None`` is silently accepted (optional FK).
+
+        Checks:
+        1. The referenced ``TreatmentPlanItem`` must exist.
+        2. If ``treatment_plan_id`` is on the invoice, the plan item must
+           belong to that same treatment plan.
+
+        Query count: 1 SQL SELECT per item when ``plan_item_id`` is set.
+
+        Raises:
+            ItemNotFound: If ``plan_item_id`` does not resolve to an
+                existing treatment plan item (HTTP 404).
+            InvoiceValidationFailed: If the plan item belongs to a
+                different treatment plan than the invoice.
+        """
+        if plan_item_id is None or self._treatment_plan_item_repo is None:
+            return
+
+        # Single query: fetch owning plan_id (None if item doesn't exist)
+        item_plan_id = self._treatment_plan_item_repo.get_item_plan_id(plan_item_id)
+
+        if item_plan_id is None:
+            from app.modules.treatment.exceptions import ItemNotFound
+            raise ItemNotFound(
+                plan_item_id,
+                details={
+                    "plan_item_id": str(plan_item_id),
+                    "item_index": item_index,
+                },
+            )
+
+        # Business ownership validation (no extra query — plan_id already fetched)
+        if treatment_plan_id is not None and item_plan_id != treatment_plan_id:
+            raise InvoiceValidationFailed(
+                f"Line item {item_index}: plan_item_id {plan_item_id} belongs "
+                f"to treatment plan {item_plan_id}, not invoice's "
+                f"treatment plan {treatment_plan_id}",
+                details={
+                    "plan_item_id": str(plan_item_id),
+                    "item_plan_id": str(item_plan_id),
+                    "invoice_treatment_plan_id": str(treatment_plan_id),
+                    "item_index": item_index,
+                },
+            )
+
+    def validate_line_item_diagnosis(
+        self,
+        diagnosis_id: UUID | None,
+        patient_id: UUID,
+        item_index: int = 0,
+    ) -> None:
+        """Validate a single line item's ``diagnosis_id`` FK reference.
+
+        Performs a single query: fetches the owning ``patient_id`` from the
+        diagnosis via its ``PatientRecord`` parent. If the diagnosis does not
+        exist, ``None`` is returned and ``DiagnosisNotFound`` is raised. If
+        the diagnosis belongs to a different patient, ownership validation
+        fails — all from the same single query result.
+
+        ``None`` is silently accepted (optional FK).
+
+        Checks:
+        1. The referenced ``PatientRecordDiagnosis`` must exist.
+        2. The diagnosis must belong to the same patient as the invoice.
+
+        Query count: 1 SQL SELECT per item when ``diagnosis_id`` is set.
+
+        Raises:
+            DiagnosisNotFound: If ``diagnosis_id`` does not resolve to an
+                existing diagnosis (HTTP 404).
+            InvoiceValidationFailed: If the diagnosis belongs to a
+                different patient than the invoice.
+        """
+        if diagnosis_id is None or self._diagnosis_repo is None:
+            return
+
+        # Single query: fetch owning patient_id (None if diagnosis doesn't exist)
+        diagnosis_patient_id = self._diagnosis_repo.get_patient_id(diagnosis_id)
+
+        if diagnosis_patient_id is None:
+            from app.modules.patient_records.exceptions import DiagnosisNotFound
+            raise DiagnosisNotFound(
+                diagnosis_id=diagnosis_id,
+                details={
+                    "diagnosis_id": str(diagnosis_id),
+                    "item_index": item_index,
+                },
+            )
+
+        # Business ownership validation (no extra query — patient_id already fetched)
+        if diagnosis_patient_id != patient_id:
+            raise InvoiceValidationFailed(
+                f"Line item {item_index}: diagnosis_id {diagnosis_id} belongs "
+                f"to patient {diagnosis_patient_id}, not invoice's "
+                f"patient {patient_id}",
+                details={
+                    "diagnosis_id": str(diagnosis_id),
+                    "diagnosis_patient_id": str(diagnosis_patient_id),
+                    "invoice_patient_id": str(patient_id),
+                    "item_index": item_index,
+                },
+            )
 
 
 __all__ = ["InvoiceValidator"]

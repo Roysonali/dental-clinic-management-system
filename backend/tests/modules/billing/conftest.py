@@ -75,10 +75,14 @@ from app.modules.billing.models import (  # noqa: E402
 # ---------------------------------------------------------------------------
 _STUB_PATIENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 _STUB_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
+_STUB_USER_INT_ID = 1
 _STUB_DOCTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 _STUB_APPOINTMENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000003")
 _STUB_TREATMENT_PLAN_ID = uuid.UUID("00000000-0000-0000-0000-000000000004")
 _STUB_TREATMENT_PLAN_ITEM_ID = uuid.UUID("00000000-0000-0000-0000-000000000005")
+_STUB_PATIENT_RECORD_ID = uuid.UUID("00000000-0000-0000-0000-000000000006")
+_STUB_DIAGNOSIS_ID = uuid.UUID("00000000-0000-0000-0000-000000000007")
+_STUB_DIAGNOSIS_WRONG_PATIENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000008")
 
 
 # ---------------------------------------------------------------------------
@@ -108,11 +112,25 @@ def db():
 
 def _seed_fk_stubs(db: Session) -> None:
     """Insert minimal FK target records required by Invoice."""
+    from app.modules.auth.models import User  # noqa: E402
     from app.modules.patients.models import Patient  # noqa: E402
     from app.modules.doctors.models import Doctor  # noqa: E402
     from app.modules.appointments.model import Appointment  # noqa: E402
     from app.modules.treatment.models import TreatmentPlan  # noqa: E402
     from app.modules.treatment.models import TreatmentPlanItem  # noqa: E402
+    from app.modules.patient_records.models import PatientRecord  # noqa: E402
+    from app.modules.patient_records.models import PatientRecordDiagnosis  # noqa: E402
+    from app.modules.patient_records.enums import DiagnosisType  # noqa: E402
+
+    stub_user = User(
+        id=_STUB_USER_INT_ID,
+        full_name="Stub User",
+        email="stub@example.com",
+        password_hash="$2b$12$stubhash",
+        status="active",
+        is_active=True,
+    )
+    db.add(stub_user)
 
     patient = Patient(
         id=_STUB_PATIENT_ID,
@@ -142,7 +160,7 @@ def _seed_fk_stubs(db: Session) -> None:
         start_time=datetime.strptime("09:00:00", "%H:%M:%S").time(),
         end_time=datetime.strptime("09:30:00", "%H:%M:%S").time(),
         duration_minutes=30,
-        appointment_type="checkup",
+        appointment_type="Consultation",
         reason_for_visit="Test visit",
     )
     db.add(appointment)
@@ -171,13 +189,59 @@ def _seed_fk_stubs(db: Session) -> None:
     )
     db.add(treatment_plan_item)
 
+    patient_record = PatientRecord(
+        id=_STUB_PATIENT_RECORD_ID,
+        patient_id=_STUB_PATIENT_ID,
+        appointment_id=_STUB_APPOINTMENT_ID,
+        status="draft",
+        chief_complaint="Test",
+    )
+    db.add(patient_record)
+
+    diagnosis = PatientRecordDiagnosis(
+        id=_STUB_DIAGNOSIS_ID,
+        patient_record_id=_STUB_PATIENT_RECORD_ID,
+        diagnosis_type=DiagnosisType.PROVISIONAL,
+        diagnosis_name="Test diagnosis",
+    )
+    db.add(diagnosis)
+
+    # Create a second patient with a diagnosis (for ownership mismatch tests)
+    second_patient = Patient(
+        id=_STUB_DIAGNOSIS_WRONG_PATIENT_ID,
+        patient_code="P-TEST-002",
+        first_name="Other",
+        last_name="Patient",
+        date_of_birth=date(1990, 1, 1),
+        gender="male",
+        primary_contact_number="+1234567890",
+    )
+    db.add(second_patient)
+
+    second_record = PatientRecord(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000009"),
+        patient_id=_STUB_DIAGNOSIS_WRONG_PATIENT_ID,
+        appointment_id=uuid.UUID("00000000-0000-0000-0000-00000000000a"),
+        status="draft",
+        chief_complaint="Other patient",
+    )
+    db.add(second_record)
+
+    second_diagnosis = PatientRecordDiagnosis(
+        id=_STUB_DIAGNOSIS_WRONG_PATIENT_ID,
+        patient_record_id=uuid.UUID("00000000-0000-0000-0000-000000000009"),
+        diagnosis_type=DiagnosisType.PROVISIONAL,
+        diagnosis_name="Wrong patient diagnosis",
+    )
+    db.add(second_diagnosis)
+
     document_sequence_invoice = DocumentSequence(
         document_type="invoice",
         prefix="INV-",
         current_value=0,
         min_digits=5,
         start_value=1,
-        updated_by=_STUB_USER_ID,
+        updated_by=1,
     )
     db.add(document_sequence_invoice)
 
@@ -187,7 +251,7 @@ def _seed_fk_stubs(db: Session) -> None:
         current_value=0,
         min_digits=5,
         start_value=1,
-        updated_by=_STUB_USER_ID,
+        updated_by=1,
     )
     db.add(document_sequence_payment)
 
@@ -197,7 +261,7 @@ def _seed_fk_stubs(db: Session) -> None:
         current_value=0,
         min_digits=5,
         start_value=1,
-        updated_by=_STUB_USER_ID,
+        updated_by=1,
     )
     db.add(document_sequence_receipt)
 
@@ -207,7 +271,7 @@ def _seed_fk_stubs(db: Session) -> None:
         current_value=0,
         min_digits=5,
         start_value=1,
-        updated_by=_STUB_USER_ID,
+        updated_by=1,
     )
     db.add(document_sequence_refund)
 
@@ -217,7 +281,7 @@ def _seed_fk_stubs(db: Session) -> None:
         current_value=0,
         min_digits=5,
         start_value=1,
-        updated_by=_STUB_USER_ID,
+        updated_by=1,
     )
     db.add(document_sequence_credit_note)
 
@@ -252,7 +316,7 @@ class InvoiceFactory:
             notes=None,
             cancellation_reason=None,
             void_reason=None,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
             updated_by=None,
             created_at=now,
             updated_at=now,
@@ -297,7 +361,7 @@ class InvoiceItemFactory:
             tax_amount=None,
             original_price=None,
             override_reason=None,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
             updated_by=None,
             version=1,
             doc_version=1,
@@ -337,7 +401,7 @@ class PaymentFactory:
             is_reversed=False,
             reversal_reason=None,
             notes=None,
-            created_by=_STUB_USER_ID,
+            created_by=_STUB_USER_INT_ID,
             updated_by=None,
             created_at=now,
             updated_at=now,
@@ -422,11 +486,35 @@ def invoice_service(db) -> InvoiceService:
         InvoiceService,
     )
 
+    from app.modules.patients.repository import PatientRepository
+    from app.modules.doctors.repositories.doctor_repository import DoctorRepository
+    from app.modules.appointments.repository import AppointmentRepository
+    from app.modules.treatment.repositories.treatment_plan_repository import (
+        TreatmentPlanRepository,
+    )
+    from app.modules.patient_records.repositories import (
+        DiagnosisRepository,
+    )
+
     invoice_repo = InvoiceRepository(db)
+    patient_repo = PatientRepository(db)
+    doctor_repo = DoctorRepository(db)
+    appointment_repo = AppointmentRepository(db)
+    treatment_plan_repo = TreatmentPlanRepository(db)
+    diagnosis_repo = DiagnosisRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
     financial_validator = FinancialValidator()
-    invoice_validator = InvoiceValidator(invoice_repo, financial_validator)
+    invoice_validator = InvoiceValidator(
+        invoice_repo=invoice_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+        appointment_repo=appointment_repo,
+        doctor_repo=doctor_repo,
+        treatment_plan_repo=treatment_plan_repo,
+        treatment_plan_item_repo=treatment_plan_repo,
+        diagnosis_repo=diagnosis_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     document_sequence_service = DocumentSequenceService(
         db, doc_seq_repo, doc_seq_validator
@@ -458,12 +546,18 @@ def payment_service(db) -> PaymentService:
         DocumentSequenceService,
         PaymentService,
     )
+    from app.modules.patients.repository import PatientRepository
 
     payment_repo = PaymentRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
-    payment_validator = PaymentValidator(payment_repo, financial_validator)
+    payment_validator = PaymentValidator(
+        payment_repo=payment_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     document_sequence_service = DocumentSequenceService(
         db, doc_seq_repo, doc_seq_validator
@@ -498,13 +592,19 @@ def payment_service_with_allocation(db) -> PaymentService:
         DocumentSequenceService,
         PaymentService,
     )
+    from app.modules.patients.repository import PatientRepository
 
     payment_repo = PaymentRepository(db)
     invoice_repo = InvoiceRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
-    payment_validator = PaymentValidator(payment_repo, financial_validator)
+    payment_validator = PaymentValidator(
+        payment_repo=payment_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
     invoice_validator = InvoiceValidator(invoice_repo, financial_validator)
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     document_sequence_service = DocumentSequenceService(
@@ -627,13 +727,19 @@ def credit_note_service(db) -> 'CreditNoteService':
     from app.modules.billing.services.credit_note_service import (
         CreditNoteService,
     )
+    from app.modules.patients.repository import PatientRepository
 
     credit_note_repo = CreditNoteRepository(db)
     invoice_repo = InvoiceRepository(db)
     audit_repo = AuditRepository(db)
     doc_seq_repo = DocumentSequenceRepository(db)
+    patient_repo = PatientRepository(db)
     financial_validator = FinancialValidator()
-    credit_note_validator = CreditNoteValidator(credit_note_repo, financial_validator)
+    credit_note_validator = CreditNoteValidator(
+        credit_note_repo=credit_note_repo,
+        financial_validator=financial_validator,
+        patient_repo=patient_repo,
+    )
     doc_seq_validator = DocumentSequenceValidator(doc_seq_repo)
     document_sequence_service = DocumentSequenceService(
         db, doc_seq_repo, doc_seq_validator

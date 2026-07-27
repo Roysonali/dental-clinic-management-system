@@ -73,14 +73,14 @@ class PaymentMapper:
     def to_model(
         request: PaymentCreateRequest,
         payment_number: str,
-        created_by: UUID,
+        created_by: int,
     ) -> Payment:
         """Convert a ``PaymentCreateRequest`` DTO to a ``Payment`` ORM model.
 
         Args:
             request: The validated create request DTO.
             payment_number: The assigned sequential payment number.
-            created_by: UUID of the user creating the payment.
+            created_by: User ID of the payment creator (auth.users.id = int).
 
         Returns:
             A ``Payment`` instance ready for persistence.
@@ -276,7 +276,7 @@ class PaymentMapper:
         from_status: PaymentStatus,
         to_status: PaymentStatus,
         changed_at: datetime,
-        changed_by: UUID,
+        changed_by: int,
     ) -> PaymentStatusTransitionResponse:
         """Build a status transition response from a payment and transition data.
 
@@ -285,7 +285,7 @@ class PaymentMapper:
             from_status: The previous status.
             to_status: The new status.
             changed_at: Timestamp when the transition occurred.
-            changed_by: UUID of the user who performed the transition.
+            changed_by: User ID who performed the transition (auth.users.id = int).
 
         Returns:
             A ``PaymentStatusTransitionResponse``.

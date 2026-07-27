@@ -488,10 +488,11 @@ class RefundStatusTransitionResponse(BillingResponseSchema):
         title="Changed At",
         description="Timestamp when the transition was applied.",
     )
-    changed_by: UUID = Field(
+    changed_by: int = Field(
         ...,
         title="Changed By",
-        description="User who performed the transition.",
+        description="User ID who performed the transition (auth.users.id).",
+        examples=[1],
     )
 
 
@@ -888,10 +889,11 @@ class RefundRead(BillingResponseSchema, TimestampMixin, AuditMixin):
         title="Rejection Reason",
         description="Reason for rejection, if applicable.",
     )
-    reviewed_by: UUID | None = Field(
+    reviewed_by: int | None = Field(
         default=None,
         title="Reviewed By",
-        description="User who approved or rejected the refund.",
+        description="User ID who approved or rejected the refund (auth.users.id).",
+        examples=[1],
     )
     reviewed_at: datetime | None = Field(
         default=None,

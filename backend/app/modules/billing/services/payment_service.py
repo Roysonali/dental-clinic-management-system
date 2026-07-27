@@ -145,14 +145,16 @@ class PaymentService(BaseService):
         """Create a new payment in Pending status.
 
         Workflow:
-        1. Validate payment amount is positive.
-        2. Validate payment method.
-        3. Validate payment date.
-        4. Reserve or validate the payment number.
-        5. Build the ``Payment`` aggregate root.
-        6. Create the initial ``BillingAuditLog`` entry.
-        7. Persist the aggregate via ``payment_repo.create()``.
-        8. Commit the transaction.
+        1. Validate that ``patient_id`` references an existing patient
+           (Sprint 12A FK hardening).
+        2. Validate payment amount is positive.
+        3. Validate payment method.
+        4. Validate payment date.
+        5. Reserve or validate the payment number.
+        6. Build the ``Payment`` aggregate root.
+        7. Create the initial ``BillingAuditLog`` entry.
+        8. Persist the aggregate via ``payment_repo.create()``.
+        9. Commit the transaction.
 
         Args:
             patient_id: UUID of the payment owner.
@@ -172,8 +174,7 @@ class PaymentService(BaseService):
             The newly created ``Payment`` aggregate in ``Pending`` status.
 
         Raises:
-            PaymentNotFound: If ``patient_id`` does not resolve (not expected
-                at creation time but kept for consistency).
+            PatientNotFound: If ``patient_id`` does not resolve.
             PaymentValidationFailed: If amount, method, or date validation
                 fails.
             DocumentSequenceNotFound: If no document sequence exists for
@@ -184,20 +185,23 @@ class PaymentService(BaseService):
                 persistence.
         """
         try:
-            # ── 1. Validate amount ──────────────────────────────────
+            # ── 1. Validate patient exists (Sprint 12A FK hardening) ─
+            self._payment_validator.validate_patient_exists(patient_id)
+
+            # ── 2. Validate amount ──────────────────────────────────
             validated_amount = self._financial.validate_positive_amount(
                 amount, field="total_amount"
             )
 
-            # ── 2. Validate payment method ──────────────────────────
+            # ── 3. Validate payment method ──────────────────────────
             validated_method = self._payment_validator.validate_payment_method(
                 payment_method
             )
 
-            # ── 3. Validate payment date ────────────────────────────
+            # ── 4. Validate payment date ────────────────────────────
             self._payment_validator.validate_payment_date(payment_date)
 
-            # ── 4. Reserve or validate payment number ───────────────
+            # ── 5. Reserve or validate payment number ───────────────
             if payment_number is None:
                 reserved_number = (
                     self._document_sequence_service.reserve_next_number(
@@ -213,7 +217,7 @@ class PaymentService(BaseService):
                     reserved_number
                 )
 
-            # ── 5. Build the aggregate ──────────────────────────────
+            # ── 6. Build the aggregate ──────────────────────────────
             payment = Payment(
                 patient_id=patient_id,
                 payment_number=reserved_number,
@@ -228,10 +232,10 @@ class PaymentService(BaseService):
                 created_by=created_by,
             )
 
-            # ── 6. Persist so payment.id is available ────────────────
+            # ── 7. Persist so payment.id is available ────────────────
             self._payment_repo.create(payment)
 
-            # ── 7. Create audit log ─────────────────────────────────
+            # ── 8. Create audit log ─────────────────────────────────
             audit_log = BillingAuditLog(
                 entity_type="payment",
                 entity_id=payment.id,
@@ -249,7 +253,7 @@ class PaymentService(BaseService):
             )
             self._audit_repo.create(audit_log)
 
-            # ── 8. Commit ───────────────────────────────────────────
+            # ── 9. Commit ───────────────────────────────────────────
             self._commit()
 
             logger.info(

@@ -166,15 +166,17 @@ class AuditInfo(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    created_by: UUID = Field(
+    created_by: int = Field(
         ...,
         title="Created By",
-        description="User who created the record.",
+        description="User ID who created the record (auth.users.id).",
+        examples=[1],
     )
-    updated_by: UUID | None = Field(
+    updated_by: int | None = Field(
         default=None,
         title="Updated By",
-        description="User who last modified the record.",
+        description="User ID who last modified the record (auth.users.id).",
+        examples=[1],
     )
     created_at: datetime = Field(
         ...,
