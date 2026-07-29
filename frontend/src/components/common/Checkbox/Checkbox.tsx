@@ -1,23 +1,24 @@
 import {
   forwardRef,
+  useId,
+  useEffect,
+  useRef,
   type InputHTMLAttributes,
   type ReactNode,
-  useId,
 } from 'react';
 
 /* ── Props ──────────────────────────────────────────────────────────── */
 
 interface CheckboxProps
-  extends Omit<
-    InputHTMLAttributes<HTMLInputElement>,
-    'type' | 'size'
-  > {
-  /** Label text displayed to the right of the checkbox */
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> {
+  /** Label displayed to the right */
   label?: ReactNode;
-  /** Whether the field is in an error state */
+  /** Error state */
   error?: boolean;
   /** Checkbox size */
   size?: 'sm' | 'md';
+  /** Indeterminate state (three-state checkbox) */
+  indeterminate?: boolean;
 }
 
 /* ── Component ──────────────────────────────────────────────────────── */
@@ -29,6 +30,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
       error = false,
       size = 'md',
       disabled = false,
+      indeterminate = false,
       className = '',
       id: externalId,
       ...rest
@@ -37,8 +39,23 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
   ) => {
     const generatedId = useId();
     const checkboxId = externalId ?? generatedId;
+    const innerRef = useRef<HTMLInputElement | null>(null);
+
+    const setRef = (element: HTMLInputElement | null) => {
+      innerRef.current = element;
+      if (typeof ref === 'function') ref(element);
+      else if (ref) ref.current = element;
+    };
+
+    // Sync indeterminate state (DOM property, not attribute)
+    useEffect(() => {
+      if (innerRef.current) {
+        innerRef.current.indeterminate = indeterminate;
+      }
+    }, [indeterminate]);
 
     const boxSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+    const iconSize = size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3';
 
     return (
       <label
@@ -51,11 +68,12 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
       >
         {/* Hidden native checkbox (for accessibility & form integration) */}
         <input
-          ref={ref}
+          ref={setRef}
           type="checkbox"
           id={checkboxId}
           disabled={disabled}
           aria-invalid={error}
+          aria-checked={indeterminate ? 'mixed' : undefined}
           className="peer sr-only"
           {...rest}
         />
@@ -76,24 +94,43 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           `}
           aria-hidden="true"
         >
-          {/* Checkmark icon */}
-          <svg
-            className="h-3 w-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-150"
-            viewBox="0 0 12 12"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M2.5 6L5 8.5L9.5 3.5"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {/* Indeterminate dash */}
+          {indeterminate ? (
+            <svg
+              className={`${iconSize} text-white`}
+              viewBox="0 0 12 4"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                x="1"
+                y="1.5"
+                width="10"
+                height="1"
+                rx="0.5"
+                fill="currentColor"
+              />
+            </svg>
+          ) : (
+            /* Checkmark icon */
+            <svg
+              className={`${iconSize} text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-150`}
+              viewBox="0 0 12 12"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2.5 6L5 8.5L9.5 3.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </span>
 
-        {/* Label */}
+        {/* Label text */}
         {label && (
           <span className="text-body text-neutral-700 leading-5">
             {label}
