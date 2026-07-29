@@ -1,21 +1,16 @@
-import { useEffect } from "react";
-import { api } from "./services/api";
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 
 function App() {
-  useEffect(() => {
-    api.get("/")
-      .then((response) => {
-        console.log(response.data);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  }, []);
-
   return (
-    <div>
-      <h1>DensCare Frontend Running</h1>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="*" element={<Navigate to="/auth/login" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
