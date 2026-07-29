@@ -1,10 +1,10 @@
 import type { FC } from 'react';
-import { Logo } from '../common/Logo';
+import { Logo } from '../../common/Logo';
 import { StatisticItem } from './StatisticItem';
 import { SecurityNotice } from './SecurityNotice';
 
 /**
- * Left panel of the login page.
+ * Left panel of the authentication pages.
  * Features the DensCare branding, hero tagline, platform statistics,
  * and a security compliance notice.
  */

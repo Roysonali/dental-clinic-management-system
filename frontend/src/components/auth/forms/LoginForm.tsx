@@ -3,11 +3,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-import { Input } from '../common/Input';
-import { Button } from '../common/Button';
+import { Input } from '../../common/Input';
+import { Button } from '../../common/Button';
 import { PasswordInput } from './PasswordInput';
-import { RememberMeCheckbox } from './RememberMeCheckbox';
-import type { LoginFormValues } from '../../types/auth';
+import { RememberMeCheckbox } from '../shared/RememberMeCheckbox';
+import type { LoginFormValues } from '../../../types/auth';
 
 /* ── Zod Validation Schema ─────────────────────────────────────────── */
 

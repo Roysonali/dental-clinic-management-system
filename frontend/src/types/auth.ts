@@ -5,6 +5,10 @@
  * Do NOT invent fields that don't exist in the backend.
  * ============================================================ */
 
+import type { RoleName } from '../constants/roles';
+export type { RoleName } from '../constants/roles';
+export { ROLES, DOCTOR_ROLES } from '../constants/roles';
+
 /** Login request (form-encoded via OAuth2PasswordRequestForm) */
 export interface LoginRequest {
   /** Maps to OAuth2 `username` field — the user's email */
@@ -71,26 +75,6 @@ export interface UserApprovalResponse {
 
 /** User lifecycle statuses matching backend constants */
 export type UserStatus = 'pending' | 'active' | 'inactive';
-
-/** RBAC roles matching backend app/core/constants.py */
-export const ROLES = {
-  ADMIN: 'ADMIN',
-  CHIEF_DOCTOR: 'CHIEF_DOCTOR',
-  GENERAL_DOCTOR: 'GENERAL_DOCTOR',
-  SPECIALIST_DOCTOR: 'SPECIALIST_DOCTOR',
-  CONSULTING_DOCTOR: 'CONSULTING_DOCTOR',
-  RECEPTIONIST: 'RECEPTIONIST',
-  DENTAL_ASSISTANT: 'DENTAL_ASSISTANT',
-} as const;
-
-export type RoleName = (typeof ROLES)[keyof typeof ROLES];
-
-export const DOCTOR_ROLES: readonly RoleName[] = [
-  ROLES.CHIEF_DOCTOR,
-  ROLES.GENERAL_DOCTOR,
-  ROLES.SPECIALIST_DOCTOR,
-  ROLES.CONSULTING_DOCTOR,
-] as const;
 
 /* ── Form Types (UI-specific, not sent to API) ──────────────────────── */
 

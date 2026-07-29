@@ -3,7 +3,7 @@ import {
   useState,
   type InputHTMLAttributes,
 } from 'react';
-import { Input } from '../common/Input';
+import { Input } from '../../common/Input';
 
 interface PasswordInputProps
   extends Omit<

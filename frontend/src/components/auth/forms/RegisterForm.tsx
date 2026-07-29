@@ -3,11 +3,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-import { Input } from '../common/Input';
-import { Button } from '../common/Button';
-import { Checkbox } from '../common/Checkbox';
+import { Input } from '../../common/Input';
+import { Button } from '../../common/Button';
+import { Checkbox } from '../../common/Checkbox';
 import { PasswordInput } from './PasswordInput';
-import type { RegisterFormValues } from '../../types/auth';
+import type { RegisterFormValues } from '../../../types/auth';
 
 /* ── Password Strength Calculation ─────────────────────────────────── */
 

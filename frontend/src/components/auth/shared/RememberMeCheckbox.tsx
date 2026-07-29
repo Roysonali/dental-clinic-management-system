@@ -1,5 +1,5 @@
 import { forwardRef, type InputHTMLAttributes } from 'react';
-import { Checkbox } from '../common/Checkbox';
+import { Checkbox } from '../../common/Checkbox';
 
 interface RememberMeCheckboxProps
   extends Omit<

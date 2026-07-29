@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
-import { Divider } from '../common/Divider';
+import { Divider } from '../../common/Divider';
 
 /**
  * Footer section of the login panel.
