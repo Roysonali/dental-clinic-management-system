@@ -1,22 +1,7 @@
-import { useEffect } from "react";
-import { api } from "./services/api";
+import AppRouter from './routes/AppRouter';
 
 function App() {
-  useEffect(() => {
-    api.get("/")
-      .then((response) => {
-        console.log(response.data);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  }, []);
-
-  return (
-    <div>
-      <h1>DensCare Frontend Running</h1>
-    </div>
-  );
+  return <AppRouter />;
 }
 
 export default App;
