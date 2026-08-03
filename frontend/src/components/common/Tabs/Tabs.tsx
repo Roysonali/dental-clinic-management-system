@@ -164,7 +164,7 @@ const TabsTrigger: FC<TabsTriggerProps> = ({
   disabled = false,
   className = '',
 }) => {
-  const { activeValue, onSelect, variant, values, onRegister, orientation } = useTabsContext();
+  const { activeValue, onSelect, variant, values, onRegister, onUnregister, orientation } = useTabsContext();
   const isActive = activeValue === value;
 
   // Register/unregister this tab value

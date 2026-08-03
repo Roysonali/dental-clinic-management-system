@@ -5,6 +5,7 @@
  * Use these constants instead of hardcoded strings throughout the app.
  */
 export const ROUTES = {
+  HOME: '/',
   AUTH: {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',

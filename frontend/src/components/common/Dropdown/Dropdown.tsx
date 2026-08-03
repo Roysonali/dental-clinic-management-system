@@ -74,6 +74,8 @@ export const Dropdown: FC<DropdownProps> & {
   Trigger: FC<DropdownTriggerProps>;
   Content: FC<DropdownContentProps>;
   Item: FC<DropdownItemProps>;
+  Label: FC<DropdownLabelProps>;
+  Divider: FC<DropdownDividerProps>;
 } = ({
   open: controlledOpen,
   defaultOpen = false,
@@ -95,10 +97,12 @@ export const Dropdown: FC<DropdownProps> & {
 
   const triggerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
 
   // Click outside handler
   useEffect(() => {
     if (!open) return;
+    previousActiveElement.current = document.activeElement as HTMLElement;
     const handleClick = (e: MouseEvent) => {
       if (
         triggerRef.current?.contains(e.target as Node) ||
@@ -114,6 +118,7 @@ export const Dropdown: FC<DropdownProps> & {
     return () => {
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleEscape);
+      previousActiveElement.current?.focus();
     };
   }, [open, setOpen]);
 
@@ -171,10 +176,32 @@ const DropdownContent: FC<DropdownContentProps> = ({
     right: 'left-full ml-1',
   };
 
+  // Arrow key navigation between menu items
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const menuEl = contentRef.current;
+    if (!menuEl) return;
+    const items = Array.from(
+      menuEl.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])'),
+    );
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    let nextIndex: number;
+    if (currentIndex === -1) {
+      nextIndex = e.key === 'ArrowDown' ? 0 : items.length - 1;
+    } else {
+      const delta = e.key === 'ArrowDown' ? 1 : -1;
+      nextIndex = (currentIndex + delta + items.length) % items.length;
+    }
+    items[nextIndex]?.focus();
+  };
+
   return (
     <div
       ref={contentRef}
       role="menu"
+      onKeyDown={handleKeyDown}
       className={`
         absolute z-dropdown min-w-[180px] rounded-lg border border-neutral-200 bg-white py-1 shadow-lg
         ${alignMap[align]}
@@ -226,8 +253,39 @@ const DropdownItem: FC<DropdownItemProps> = ({
   );
 };
 
+/* ── Dropdown Label (non-interactive section heading) ────────────────── */
+
+interface DropdownLabelProps {
+  children?: ReactNode;
+  className?: string;
+}
+
+const DropdownLabel: FC<DropdownLabelProps> = ({ children, className = '' }) => {
+  return (
+    <p
+      className={`px-3 py-1.5 text-caption font-semibold uppercase tracking-wider text-neutral-400 ${className}`}
+    >
+      {children}
+    </p>
+  );
+};
+
+/* ── Dropdown Divider (visual separator) ───────────────────────────── */
+
+interface DropdownDividerProps {
+  className?: string;
+}
+
+const DropdownDivider: FC<DropdownDividerProps> = ({ className = '' }) => {
+  return (
+    <hr className={`my-1 border-t border-neutral-200 ${className}`} role="separator" />
+  );
+};
+
 /* ── Attach sub-components ───────────────────────────────────────────── */
 
 Dropdown.Trigger = DropdownTrigger;
 Dropdown.Content = DropdownContent;
 Dropdown.Item = DropdownItem;
+Dropdown.Label = DropdownLabel;
+Dropdown.Divider = DropdownDivider;

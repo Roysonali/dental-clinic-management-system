@@ -164,15 +164,16 @@
 } /* end @theme */
 
 /* ══════════════════════════════════════════════════════════════════════
-   TRANSITION DURATIONS (CSS variables only — no utility classes)
+   LAYOUT SHELL DIMENSIONS
    ══════════════════════════════════════════════════════════════════════
-   These are NOT inside @theme because Tailwind v4 does not auto-generate
-   `duration-*` utilities from custom --duration-* tokens.
-   Use:  `duration-[var(--duration-fast)]`  or the JS constants.
-   Prefer Tailwind's built-in: `duration-150`, `duration-200` etc.
+   Single source of truth for shell component sizes.
+   Sprint 2 (Sidebar) and Sprint 3 (Header) will reuse these tokens.
    ══════════════════════════════════════════════════════════════════════ */
 
 :root {
+  --sidebar-width: 16rem;    /* matches w-64 */
+  --header-height: 4rem;     /* matches h-16 */
+
   --duration-instant: 100ms;
   --duration-fast: 150ms;
   --duration-normal: 200ms;
@@ -197,7 +198,7 @@ body {
   color: var(--color-neutral-800);
   font-size: var(--font-size-body);
   line-height: var(--font-size-body--line-height);
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ══════════════════════════════════════════════════════════════════════

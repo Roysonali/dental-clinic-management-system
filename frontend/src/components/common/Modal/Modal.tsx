@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, type FC, type ReactNode, type KeyboardE
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
-interface ModalProps {
+export interface ModalProps {
   /** Open state */
   open: boolean;
   /** Called when the modal should close (backdrop click, escape, X button) */
@@ -15,6 +15,10 @@ interface ModalProps {
   children?: ReactNode;
   /** Additional classes */
   className?: string;
+  /** Accessible name for the dialog (overrides ariaLabelledBy) */
+  ariaLabel?: string;
+  /** ID of element that labels this dialog (e.g. modal title) */
+  ariaLabelledBy?: string;
 }
 
 interface ModalHeaderProps {
@@ -58,11 +62,14 @@ export const Modal: FC<ModalProps> & {
   Header: FC<ModalHeaderProps>;
   Body: FC<ModalBodyProps>;
   Footer: FC<ModalFooterProps>;
-} = ({ open, onClose, size = 'md', children, className = '' }) => {
+} = ({ open, onClose, size = 'md', children, className = '', ariaLabel, ariaLabelledBy }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
-  // Focus trap + escape + overflow hidden
+  // Escape + overflow + focus save/restore + auto-focus dialog.
+  // Mirrors the Drawer primitive: Escape is handled at the document level
+  // (works regardless of focus) and the listener is removed on cleanup so
+  // an open instance never stacks duplicate handlers.
   useEffect(() => {
     if (!open) return;
 
@@ -72,12 +79,18 @@ export const Modal: FC<ModalProps> & {
     // Auto-focus dialog
     const frame = requestAnimationFrame(() => dialogRef.current?.focus());
 
+    const handleEscape = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+
     return () => {
       cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
       previousActiveElement.current?.focus();
     };
-  }, [open]);
+  }, [open, onClose]);
 
   // Tab focus trap
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
@@ -114,6 +127,8 @@ export const Modal: FC<ModalProps> & {
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-label={ariaLabelledBy ? undefined : ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         className={`
