@@ -1,5 +1,6 @@
 import { useState, type FC, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { Badge } from '../Badge/Badge';
 
 interface NavigationGroupProps {
   /** Group heading/title */
@@ -49,9 +50,9 @@ export const NavigationGroup: FC<NavigationGroupProps> = ({
       )}
       <div className="flex items-center gap-1">
         {badge != null && (
-          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-neutral-200 px-1.5 text-caption font-medium text-neutral-600">
+          <Badge variant="neutral" size="xs">
             {badge}
-          </span>
+          </Badge>
         )}
         {collapsible && (
           <button

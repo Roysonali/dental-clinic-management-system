@@ -1,0 +1,48 @@
+import type { FC } from 'react';
+import { User } from 'lucide-react';
+import { Card } from '../common/Card/Card';
+import { DescriptionList } from '../common/DescriptionList/DescriptionList';
+import { Icon } from '../common/Icon/Icon';
+import { PatientStatusBadge } from './PatientStatusBadge';
+import { PATIENT_GENDER_LABELS } from '../../constants/patient';
+import { formatISODate } from '../../utils/date';
+import type { PatientResponse } from '../../types/patient';
+
+interface PatientInfoCardProps {
+  patient: PatientResponse;
+}
+
+/**
+ * PatientInfoCard — demographic + contact information for the Overview tab.
+ */
+export const PatientInfoCard: FC<PatientInfoCardProps> = ({ patient }) => {
+  const genderLabel = patient.gender
+    ? PATIENT_GENDER_LABELS[patient.gender as keyof typeof PATIENT_GENDER_LABELS] ?? patient.gender
+    : null;
+
+  return (
+    <Card>
+      <Card.Header
+        title="Patient Information"
+        icon={<Icon icon={User} size="md" className="text-primary-500" />}
+      />
+      <Card.Body>
+        <DescriptionList
+          layout="horizontal"
+          columns={2}
+          items={[
+            { label: 'Patient Code', value: patient.patient_code },
+            { label: 'Status', value: <PatientStatusBadge active={patient.is_active} /> },
+            { label: 'Date of Birth', value: formatISODate(patient.date_of_birth) },
+            { label: 'Age', value: patient.age ?? '—' },
+            { label: 'Gender', value: genderLabel ?? '—' },
+            { label: 'Phone', value: patient.primary_contact_number },
+            { label: 'Emergency Contact', value: patient.emergency_contact_number ?? '—' },
+            { label: 'Email', value: patient.email ?? '—' },
+            { label: 'Address', value: patient.address ?? '—' },
+          ]}
+        />
+      </Card.Body>
+    </Card>
+  );
+};

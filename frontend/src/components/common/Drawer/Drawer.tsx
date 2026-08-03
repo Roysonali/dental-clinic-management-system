@@ -16,6 +16,8 @@ interface DrawerProps {
   size?: DrawerSize;
   /** Content */
   children?: ReactNode;
+  /** Accessible name for the dialog */
+  ariaLabel?: string;
   /** Additional classes */
   className?: string;
 }
@@ -71,14 +73,19 @@ export const Drawer: FC<DrawerProps> & {
   Header: FC<DrawerHeaderProps>;
   Body: FC<DrawerBodyProps>;
   Footer: FC<DrawerFooterProps>;
-} = ({ open, onClose, position = 'right', size = 'md', children, className = '' }) => {
+} = ({ open, onClose, position = 'right', size = 'md', children, ariaLabel, className = '' }) => {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
-  // Escape + overflow + focus save/restore
+  // Escape + overflow + focus save/restore + auto-focus panel
   useEffect(() => {
     if (!open) return;
     previousActiveElement.current = document.activeElement as HTMLElement;
+
+    // Move focus to the dialog panel
+    requestAnimationFrame(() => {
+      panelRef.current?.focus();
+    });
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -132,6 +139,7 @@ export const Drawer: FC<DrawerProps> & {
         `}
         role="dialog"
         aria-modal="true"
+        aria-label={ariaLabel}
         tabIndex={-1}
       >
         {children}

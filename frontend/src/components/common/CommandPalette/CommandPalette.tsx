@@ -42,9 +42,13 @@ interface CommandPaletteProps {
 /**
  * CommandPalette — foundation for a command palette / quick search overlay.
  *
- * This is infrastructure only. Global keyboard listeners (Ctrl+K / Cmd+K)
- * and the overlay trigger are NOT implemented here — they belong to the
- * future Application Shell integration.
+ * @deprecated This component is a legacy foundation piece superseded by
+ * `CommandPaletteOverlay` which provides the full production modal with
+ * keyboard navigation, focus management, and global shortcut integration.
+ *
+ * This component is retained for reference and for scenarios where an
+ * inline (non-modal) command list is needed, but new code should prefer
+ * `CommandPaletteOverlay`.
  *
  * @example
  * ```tsx

@@ -1,14 +1,17 @@
 import type { FC, ReactNode } from 'react';
-import { User, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { Dropdown } from '../Dropdown/Dropdown';
+import { Avatar } from '../Avatar/Avatar';
 
 interface UserMenuProps {
   /** User's full name */
   name?: string;
   /** User's role/title */
   role?: string;
-  /** Avatar element (if omitted, shows initials or default icon) */
+  /** Avatar element (if omitted, shows initials via Avatar component) */
   avatar?: ReactNode;
+  /** User's email (shown in the dropdown header) */
+  email?: string;
   /** Menu items displayed between user info and logout */
   children?: ReactNode;
   /** Logout handler placeholder */
@@ -26,6 +29,7 @@ interface UserMenuProps {
  * <UserMenu
  *   name="Dr. Maria Santos"
  *   role="General Dentist"
+ *   email="maria@denscare.clinic"
  *   onLogout={() => console.log('Logout')}
  * >
  *   <Dropdown.Item icon={Settings} label="Settings" />
@@ -36,6 +40,7 @@ interface UserMenuProps {
 export const UserMenu: FC<UserMenuProps> = ({
   name,
   role,
+  email,
   avatar,
   children,
   onLogout,
@@ -48,7 +53,7 @@ export const UserMenu: FC<UserMenuProps> = ({
         .join('')
         .toUpperCase()
         .slice(0, 2)
-    : '?';
+    : undefined;
 
   return (
     <Dropdown className={className}>
@@ -59,9 +64,7 @@ export const UserMenu: FC<UserMenuProps> = ({
           aria-label="User menu"
         >
           {avatar ?? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-primary-700 text-label font-semibold">
-              {initials}
-            </div>
+            <Avatar size="md" initials={initials} />
           )}
           <div className="hidden text-left sm:block min-w-0">
             {name && (
@@ -81,12 +84,20 @@ export const UserMenu: FC<UserMenuProps> = ({
       <Dropdown.Content align="end">
         {/* User info header */}
         <div className="border-b border-neutral-200 px-3 py-2.5">
-          {name && (
-            <p className="text-body-sm font-medium text-neutral-900">{name}</p>
-          )}
-          {role && (
-            <p className="text-caption text-neutral-500">{role}</p>
-          )}
+          <div className="flex items-center gap-3">
+            {avatar ?? <Avatar size="md" initials={initials} />}
+            <div className="min-w-0">
+              {name && (
+                <p className="text-body-sm font-medium text-neutral-900 truncate">{name}</p>
+              )}
+              {email && (
+                <p className="text-caption text-neutral-500 truncate">{email}</p>
+              )}
+              {!email && role && (
+                <p className="text-caption text-neutral-500 truncate">{role}</p>
+              )}
+            </div>
+          </div>
         </div>
 
         {children}
