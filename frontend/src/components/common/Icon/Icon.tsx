@@ -68,4 +68,5 @@ export const Icon: FC<IconProps> = ({
 };
 
 /* ── Convenience: icon size map (for external use) ─────────────────── */
+// eslint-disable-next-line react-refresh/only-export-components -- iconSizes is a constant consumed outside this component; moving it would break the public API.
 export { iconSizes };

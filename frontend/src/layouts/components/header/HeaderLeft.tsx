@@ -17,7 +17,7 @@ import { Breadcrumb } from '../../../components/common/Breadcrumb/Breadcrumb';
  * <HeaderLeft onToggleSidebar={fn} pageTitle="Dashboard" />
  * ```
  */
-interface HeaderLeftProps {
+export interface HeaderLeftProps {
   /** Sidebar toggle callback */
   onToggleSidebar?: () => void;
   /** Dynamic page title from the current route */

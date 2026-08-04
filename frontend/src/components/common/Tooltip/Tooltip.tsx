@@ -55,8 +55,8 @@ export const Tooltip: FC<TooltipProps> = ({
   className = '',
 }) => {
   const [visible, setVisible] = useState(false);
-  const showTimer = useRef<ReturnType<typeof setTimeout>>();
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const showTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Clean up timers on unmount
   useEffect(() => {

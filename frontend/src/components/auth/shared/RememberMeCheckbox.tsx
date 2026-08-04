@@ -4,7 +4,7 @@ import { Checkbox } from '../../common/Checkbox';
 interface RememberMeCheckboxProps
   extends Omit<
     InputHTMLAttributes<HTMLInputElement>,
-    'type' | 'label'
+    'type' | 'label' | 'size'
   > {
   /** Whether the field has an error */
   error?: boolean;

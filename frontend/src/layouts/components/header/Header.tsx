@@ -32,7 +32,7 @@ import { HeaderRight } from './HeaderRight';
  * <Header pageTitle="Dashboard" onToggleSidebar={fn} onOpenCommandPalette={fn} />
  * ```
  */
-interface HeaderProps {
+export interface HeaderProps {
   /** Sidebar toggle callback */
   onToggleSidebar?: () => void;
   /** Command palette open callback */

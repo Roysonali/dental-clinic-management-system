@@ -12,6 +12,9 @@ export const ROUTES = {
     FORGOT_PASSWORD: '/auth/forgot-password',
   },
   DASHBOARD: '/dashboard',
+  ADMIN: {
+    PENDING_USERS: '/admin/users/pending',
+  },
   PATIENTS: '/patients',
   DOCTORS: '/doctors',
   APPOINTMENTS: '/appointments',
