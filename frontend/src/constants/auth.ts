@@ -8,7 +8,6 @@
 export const AUTH_STORAGE_KEYS = {
   ACCESS_TOKEN: 'access_token',
   TOKEN_TYPE: 'token_type',
-  REMEMBER_ME: 'remember_me',
 } as const;
 
 /** Auth API error messages */

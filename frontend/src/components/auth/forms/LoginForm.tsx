@@ -1,12 +1,14 @@
 import { useState, type FC } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
-import { Input } from '../../common/Input';
+import { Input, PasswordInput } from '../../common/Input';
 import { Button } from '../../common/Button';
-import { PasswordInput } from './PasswordInput';
 import { RememberMeCheckbox } from '../shared/RememberMeCheckbox';
+import { parseApiError } from '../../../services/apiError';
+import { ROUTES } from '../../../routes/routes';
 import type { LoginFormValues } from '../../../types/auth';
 
 /* ── Zod Validation Schema ─────────────────────────────────────────── */
@@ -58,10 +60,10 @@ export const LoginForm: FC<LoginFormProps> = ({ onSubmit }) => {
       if (onSubmit) {
         await onSubmit(values);
       }
-    } catch {
-      setSubmitError(
-        'Unable to sign in. Please check your credentials and try again.',
-      );
+    } catch (error) {
+      // Surface the backend's message (e.g. "Invalid email or password",
+      // "Account is inactive or deactivated") instead of a generic copy.
+      setSubmitError(parseApiError(error).message);
     } finally {
       setIsLoading(false);
     }
@@ -135,13 +137,12 @@ export const LoginForm: FC<LoginFormProps> = ({ onSubmit }) => {
         />
 
         {/* Forgot Password Link */}
-        <a
-          href="/auth/forgot-password"
-          className="absolute right-0 top-0 text-label font-medium text-primary-600 hover:text-primary-700 transition-colors duration-150"
-          tabIndex={-1}
+        <Link
+          to={ROUTES.AUTH.FORGOT_PASSWORD}
+          className="absolute right-0 top-0 text-label font-medium text-primary-600 hover:text-primary-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 rounded"
         >
           Forgot password?
-        </a>
+        </Link>
       </div>
 
       {/* ── Remember Me Checkbox ─────────────────────────── */}
@@ -154,7 +155,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onSubmit }) => {
         fullWidth
         loading={isLoading}
         disabled={!canSubmit || isLoading}
-        trailingIcon={
+        rightIcon={
           !isLoading && (
             <svg
               width="16"

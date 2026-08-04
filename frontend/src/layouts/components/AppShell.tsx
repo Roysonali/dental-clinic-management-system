@@ -75,6 +75,7 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
   // Close mobile drawer when switching from mobile to desktop
   useEffect(() => {
     if (!isMobile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset drawer state when the viewport leaves mobile
       setMobileDrawerOpen(false);
     }
   }, [isMobile]);

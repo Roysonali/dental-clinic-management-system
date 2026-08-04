@@ -23,6 +23,7 @@ export interface RouteMeta {
  */
 const ROUTE_META: Record<string, RouteMeta> = {
   [ROUTES.DASHBOARD]: { title: 'Dashboard' },
+  [ROUTES.ADMIN.PENDING_USERS]: { title: 'Pending Approvals' },
   [ROUTES.PATIENTS]: { title: 'Patients' },
   [ROUTES.DOCTORS]: { title: 'Doctors' },
   [ROUTES.APPOINTMENTS]: { title: 'Appointments' },

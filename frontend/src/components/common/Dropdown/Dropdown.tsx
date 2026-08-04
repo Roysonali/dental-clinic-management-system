@@ -56,7 +56,7 @@ import { createContext, useContext } from 'react';
 interface DropdownContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
-  triggerRef: React.RefObject<HTMLDivElement | null>;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
   contentRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -95,7 +95,7 @@ export const Dropdown: FC<DropdownProps> & {
     [isControlled, onOpenChange],
   );
 
-  const triggerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 

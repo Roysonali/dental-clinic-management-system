@@ -6,7 +6,7 @@ type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 type AvatarStatus = 'online' | 'offline' | 'busy';
 
-interface AvatarProps {
+export interface AvatarProps {
   /** Image URL (if omitted, initials or fallback icon is shown) */
   src?: string;
   /** Alt text for the image */

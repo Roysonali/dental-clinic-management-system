@@ -15,7 +15,7 @@ import { IconButton } from '../../../components/common/Button/IconButton';
  * <HeaderCenter onOpenCommandPalette={openPalette} />
  * ```
  */
-interface HeaderCenterProps {
+export interface HeaderCenterProps {
   /** Command palette open callback */
   onOpenCommandPalette?: () => void;
 }

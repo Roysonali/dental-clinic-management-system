@@ -10,6 +10,13 @@ import { AxiosError } from 'axios';
  */
 
 /**
+ * Message shown when a 401 invalidates the current session. Exported so
+ * consumers can swap the raw backend detail (e.g. "Not authenticated")
+ * for this friendly copy without duplicating the string.
+ */
+export const AUTH_SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';
+
+/**
  * Classification of a failed request. Callers can use `kind` to pick
  * behaviour (e.g. redirect on `auth`) in addition to the human message.
  */
@@ -80,7 +87,7 @@ function kindFromStatus(status: number): ApiErrorKind {
 function fallbackMessage(kind: ApiErrorKind, status: number | null): string {
   switch (kind) {
     case 'auth':
-      return 'Your session has expired. Please sign in again.';
+      return AUTH_SESSION_EXPIRED_MESSAGE;
     case 'forbidden':
       return 'You do not have permission to perform this action.';
     case 'not-found':
@@ -120,6 +127,37 @@ function fallbackMessage(kind: ApiErrorKind, status: number | null): string {
  * - Standard FastAPI HTTP errors (message = `detail`)
  * - Network / transport failures (no response)
  */
+/**
+ * Parse an error and return the message to show the user, swapping the raw
+ * backend detail for the friendly session-expired copy on 401s.
+ *
+ * A single DRY entry point for list/detail containers that render an error
+ * panel — avoids re-implementing the `kind === 'auth'` check per module.
+ */
+export function apiErrorMessage(error: unknown): string {
+  const info = parseApiError(error);
+  return info.kind === 'auth' ? AUTH_SESSION_EXPIRED_MESSAGE : info.message;
+}
+
+/**
+ * React Query `retry` callback for queries that must not hammer the server
+ * on *expected* authorization failures.
+ *
+ * - **401/403** → never retry (the outcome will not change; a retry only
+ *   adds latency and noise for users without permission).
+ * - **Any other failure** (network, 5xx, timeout, …) → retain the global
+ *   default behaviour (the app's QueryClient configures `retry: 1`).
+ *
+ * Usage: `useQuery({ ..., retry: shouldRetryQuery })`.
+ */
+export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  const info = parseApiError(error);
+  if (info.kind === 'auth' || info.kind === 'forbidden') return false;
+  // Retain the default single retry for transient failures. Keep this in
+  // sync with the QueryClient default (`retry: 1` in main.tsx).
+  return failureCount < 1;
+}
+
 export function parseApiError(error: unknown): ApiErrorInfo {
   const axiosError = error as AxiosError<ErrorEnvelope>;
 

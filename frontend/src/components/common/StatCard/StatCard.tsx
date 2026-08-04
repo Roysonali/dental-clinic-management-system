@@ -58,7 +58,6 @@ export const StatCard: FC<StatCardProps> = ({
   value,
   subtitle,
   trend,
-  color = 'text-primary-500',
   loading = false,
   size = 'md',
   className = '',

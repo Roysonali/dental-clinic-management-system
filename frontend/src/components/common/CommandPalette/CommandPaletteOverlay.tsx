@@ -3,6 +3,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   type FC,
 } from 'react';
 import { Search, X, Clock, ArrowRight } from 'lucide-react';
@@ -75,6 +76,7 @@ export const CommandPaletteOverlay: FC<CommandPaletteOverlayProps> = ({
   useEffect(() => {
     if (!open) return;
     previousActiveElement.current = document.activeElement as HTMLElement;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset the palette state every time it opens
     setQuery('');
     setActiveIndex(0);
 
@@ -100,12 +102,15 @@ export const CommandPaletteOverlay: FC<CommandPaletteOverlayProps> = ({
   const groupEntries = Array.from(grouped.entries());
 
   // Build flat list of item IDs for keyboard navigation
-  const flatIds: ItemId[] = [];
-  groupEntries.forEach(([, items], gi) => {
-    items.forEach((_, ii) => {
-      flatIds.push(getItemId(gi, ii));
+  const flatIds: ItemId[] = useMemo(() => {
+    const ids: ItemId[] = [];
+    groupEntries.forEach(([, items], gi) => {
+      items.forEach((_, ii) => {
+        ids.push(getItemId(gi, ii));
+      });
     });
-  });
+    return ids;
+  }, [groupEntries]);
 
   // Compute active option ID for aria-activedescendant
   const activeOptionId =

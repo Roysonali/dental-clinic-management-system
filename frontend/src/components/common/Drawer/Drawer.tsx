@@ -87,7 +87,7 @@ export const Drawer: FC<DrawerProps> & {
       panelRef.current?.focus();
     });
 
-    const handleEscape = (e: KeyboardEvent) => {
+    const handleEscape = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleEscape);

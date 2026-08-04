@@ -1,9 +1,12 @@
 import type { FC } from 'react';
 import { Settings, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Dropdown } from '../../../components/common/Dropdown/Dropdown';
 import { NotificationMenu } from '../../../components/common/NotificationMenu/NotificationMenu';
 import { UserMenu } from '../../../components/common/UserMenu/UserMenu';
 import { Divider } from '../../../components/common/Divider/Divider';
+import { useAuth } from '../../../hooks/auth/useAuth';
+import { ROUTES } from '../../../routes/routes';
 
 /**
  * HeaderRight — right section of the application header.
@@ -11,18 +14,23 @@ import { Divider } from '../../../components/common/Divider/Divider';
  * Contains:
  * - Notification bell dropdown (NotificationMenu)
  * - Vertical divider
- * - User avatar with dropdown menu (UserMenu)
+ * - User avatar with dropdown menu (UserMenu), driven by the authenticated
+ *   session — name/email come from GET /auth/me and "Sign out" clears the
+ *   session and returns to the login page.
  *
- * Props are reserved for future extensibility (e.g., user data injection).
- *
- * @example
- * ```tsx
- * <HeaderRight />
- * ```
+ * The backend does not expose the current user's role via /auth/me, so no
+ * role chip is rendered (see types/auth.ts).
  */
-export interface HeaderRightProps {}
+export const HeaderRight: FC = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-export const HeaderRight: FC<HeaderRightProps> = () => {
+  const handleLogout = () => {
+    logout();
+    // Guards will redirect anyway; navigate explicitly for immediacy.
+    navigate(ROUTES.AUTH.LOGIN, { replace: true });
+  };
+
   return (
     <div className="flex items-center gap-1 sm:gap-2">
       {/* Notifications */}
@@ -33,12 +41,9 @@ export const HeaderRight: FC<HeaderRightProps> = () => {
 
       {/* User menu */}
       <UserMenu
-        name="Dr. Maria Santos"
-        role="General Dentist"
-        email="maria@denscare.clinic"
-        onLogout={() => {
-          // Reserved for Sprint 7 authentication integration
-        }}
+        name={user?.full_name}
+        email={user?.email}
+        onLogout={handleLogout}
       >
         <Dropdown.Item icon={Settings} label="Settings" />
         <Dropdown.Item icon={HelpCircle} label="Help" />

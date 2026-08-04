@@ -5,7 +5,6 @@
  * Do NOT invent fields that don't exist in the backend.
  * ============================================================ */
 
-import type { RoleName } from '../constants/roles';
 export type { RoleName } from '../constants/roles';
 export { ROLES, DOCTOR_ROLES } from '../constants/roles';
 
@@ -37,14 +36,19 @@ export interface RegisterResponse {
   message: string;
 }
 
-/** Current user profile from GET /auth/me */
+/**
+ * Current user profile from GET /auth/me.
+ *
+ * The backend `CurrentUserResponse` schema returns EXACTLY these four
+ * fields — it deliberately does NOT expose the user's role. Client-side
+ * RBAC gating is therefore not possible from this endpoint; admin-only
+ * screens rely on the backend's 403 responses instead.
+ */
 export interface CurrentUserResponse {
   id: number;
   full_name: string;
   email: string;
   status: UserStatus;
-  role_id?: number | null;
-  role?: Role | null;
 }
 
 /** Pending user summary (admin view) */
@@ -53,12 +57,6 @@ export interface PendingUserResponse {
   full_name: string;
   email: string;
   status: UserStatus;
-}
-
-/** Role entity */
-export interface Role {
-  id: number;
-  name: string;
 }
 
 /** User approval request */
@@ -82,7 +80,7 @@ export type UserStatus = 'pending' | 'active' | 'inactive';
 export interface LoginFormValues {
   email: string;
   password: string;
-  remember_me: boolean;
+  remember_me?: boolean;
 }
 
 /** Registration form values (before transforming to API format) */

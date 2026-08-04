@@ -3,10 +3,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-import { Input } from '../../common/Input';
+import { Input, PasswordInput } from '../../common/Input';
 import { Button } from '../../common/Button';
 import { Checkbox } from '../../common/Checkbox';
-import { PasswordInput } from './PasswordInput';
+import { parseApiError } from '../../../services/apiError';
 import type { RegisterFormValues } from '../../../types/auth';
 
 /* ── Password Strength Calculation ─────────────────────────────────── */
@@ -65,11 +65,11 @@ const registerSchema = z
         'Must contain at least one special character',
       ),
     confirm_password: z.string().min(1, 'Please confirm your password'),
-    terms_accepted: z.literal(true, {
-      errorMap: () => ({
+    terms_accepted: z
+      .boolean()
+      .refine((v) => v === true, {
         message: 'You must accept the terms to proceed',
       }),
-    }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: 'Passwords do not match',
@@ -102,10 +102,11 @@ export const RegisterForm: FC<RegisterFormProps> = ({ onSubmit }) => {
       email: '',
       password: '',
       confirm_password: '',
-      terms_accepted: false as unknown as true,
+      terms_accepted: false,
     },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form's watch() is safe for the password-strength meter; the rule is intentionally conservative.
   const watchedPassword = watch('password');
   const { strength, score, label } = getPasswordStrength(
     watchedPassword || '',
@@ -119,10 +120,9 @@ export const RegisterForm: FC<RegisterFormProps> = ({ onSubmit }) => {
       if (onSubmit) {
         await onSubmit(values);
       }
-    } catch {
-      setSubmitError(
-        'Registration failed. Please try again later.',
-      );
+    } catch (error) {
+      // Surface the backend's message (e.g. "Email already registered").
+      setSubmitError(parseApiError(error).message);
     } finally {
       setIsLoading(false);
     }
@@ -351,7 +351,7 @@ export const RegisterForm: FC<RegisterFormProps> = ({ onSubmit }) => {
         fullWidth
         loading={isLoading}
         disabled={!isValid || isLoading}
-        trailingIcon={
+        rightIcon={
           !isLoading && (
             <svg
               width="16"

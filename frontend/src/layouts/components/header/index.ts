@@ -13,4 +13,3 @@ export type { HeaderLeftProps } from './HeaderLeft';
 export { HeaderCenter } from './HeaderCenter';
 export type { HeaderCenterProps } from './HeaderCenter';
 export { HeaderRight } from './HeaderRight';
-export type { HeaderRightProps } from './HeaderRight';

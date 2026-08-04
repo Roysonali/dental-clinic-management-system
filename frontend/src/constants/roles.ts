@@ -40,3 +40,41 @@ export const ROLE_LABELS: Record<RoleName, string> = {
 /** Check if a role is a doctor-level role */
 export const isDoctorRole = (role: RoleName): boolean =>
   DOCTOR_ROLES.includes(role);
+
+/**
+ * Admin-level roles.
+ *
+ * Mirrors the backend admin set exactly — `_ADMIN_ROLES` in
+ * `backend/app/modules/rbac/permissions.py` = { ADMIN, CHIEF_DOCTOR }.
+ * Do not add roles here that the backend does not treat as admin.
+ */
+export const ADMIN_ROLES: readonly RoleName[] = [
+  ROLES.ADMIN,
+  ROLES.CHIEF_DOCTOR,
+] as const;
+
+/** Check if a role is admin-level (ADMIN or CHIEF_DOCTOR). */
+export const isAdminRole = (role: RoleName): boolean =>
+  ADMIN_ROLES.includes(role);
+
+/**
+ * Role → numeric `role_id` mapping for the admin approval flow.
+ *
+ * The backend exposes no `GET /roles` endpoint, yet `PATCH
+ * /auth/users/{id}/approve` requires a numeric `role_id`. This mapping
+ * mirrors the deterministic insert order of
+ * `backend/app/database/seed_roles.py` (roles are seeded in this exact
+ * order and only if absent, so a fresh database yields ids 1–7).
+ *
+ * TODO: replace with a server-provided roles list once the backend adds
+ * a roles endpoint — hardcoding ids is fragile against reseeded DBs.
+ */
+export const ROLE_IDS: Record<RoleName, number> = {
+  [ROLES.ADMIN]: 1,
+  [ROLES.CHIEF_DOCTOR]: 2,
+  [ROLES.GENERAL_DOCTOR]: 3,
+  [ROLES.SPECIALIST_DOCTOR]: 4,
+  [ROLES.CONSULTING_DOCTOR]: 5,
+  [ROLES.RECEPTIONIST]: 6,
+  [ROLES.DENTAL_ASSISTANT]: 7,
+};

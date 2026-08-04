@@ -86,11 +86,11 @@ export const colorByRole = {
  * Complete color palette — flat object for easy consumption.
  */
 export const colors = {
+  ...colorByRole,
   primary,
   neutral,
   semantic,
   status,
-  ...colorByRole,
   /** RGB channels for opacity calculations (e.g. `rgba(${colors.channels.primary[500]}, 0.5)`) */
   channels: {
     primary: {

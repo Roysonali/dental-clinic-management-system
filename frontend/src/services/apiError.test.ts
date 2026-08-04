@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
-import { parseApiError } from './apiError';
+import { apiErrorMessage, parseApiError, shouldRetryQuery } from './apiError';
 
 const config: InternalAxiosRequestConfig = {} as InternalAxiosRequestConfig;
 
@@ -120,6 +120,45 @@ describe('parseApiError', () => {
       const info = parseApiError(httpError(409));
       expect(info.kind).toBe('client');
       expect(info.message).toContain('409');
+    });
+  });
+
+  describe('apiErrorMessage', () => {
+    it('swaps the raw backend detail for the friendly copy on 401', () => {
+      const msg = apiErrorMessage(httpError(401, envelope('Not authenticated')));
+      expect(msg).toBe('Your session has expired. Please sign in again.');
+    });
+
+    it('passes through other error messages unchanged', () => {
+      const msg = apiErrorMessage(httpError(500, envelope('Internal error')));
+      expect(msg).toBe('Internal error');
+    });
+  });
+
+  describe('shouldRetryQuery', () => {
+    it('never retries 401 authentication failures', () => {
+      expect(shouldRetryQuery(0, httpError(401))).toBe(false);
+      expect(shouldRetryQuery(1, httpError(401))).toBe(false);
+    });
+
+    it('never retries 403 forbidden failures', () => {
+      expect(shouldRetryQuery(0, httpError(403))).toBe(false);
+      expect(shouldRetryQuery(1, httpError(403))).toBe(false);
+    });
+
+    it('retains the default single retry for transient failures', () => {
+      expect(shouldRetryQuery(0, httpError(500))).toBe(true);
+      expect(shouldRetryQuery(1, httpError(500))).toBe(false);
+    });
+
+    it('retains the default single retry for network-level failures', () => {
+      expect(shouldRetryQuery(0, networkError('ERR_NETWORK'))).toBe(true);
+      expect(shouldRetryQuery(1, networkError('ERR_NETWORK'))).toBe(false);
+    });
+
+    it('retains the default single retry for non-Axios errors', () => {
+      expect(shouldRetryQuery(0, new Error('boom'))).toBe(true);
+      expect(shouldRetryQuery(1, new Error('boom'))).toBe(false);
     });
   });
 });
