@@ -13,13 +13,12 @@ import { Icon } from '../../components/common/Icon/Icon';
 import { PageWrapper } from '../../layouts/components/PageWrapper';
 import { ContentContainer } from '../../layouts/components/ContentContainer';
 import { PageHeader } from '../../components/common/PageHeader/PageHeader';
-import { Stack } from '../../components/common/Stack/Stack';
 import { Badge } from '../../components/common/Badge/Badge';
 import { DashboardStatCard } from './DashboardStatCard';
 import { SectionHeader } from './SectionHeader';
 import { QuickActionCard } from './QuickActionCard';
 import { ActivityItem } from './ActivityItem';
-import { AppointmentItem } from './AppointmentItem';
+import { UpcomingAppointments } from '../../components/appointments/UpcomingAppointments';
 
 /**
  * DashboardPage — authenticated landing page with placeholder metrics
@@ -153,38 +152,7 @@ export const DashboardPage: FC = () => {
                   <Badge variant="primary" size="sm">Today</Badge>
                 }
               />
-              <Stack spacing={3} className="mt-2">
-                <AppointmentItem
-                  patientName="Juan Dela Cruz"
-                  time="10:00 AM"
-                  type="Consultation"
-                  status="Confirmed"
-                />
-                <AppointmentItem
-                  patientName="Maria Santos"
-                  time="11:30 AM"
-                  type="Follow-Up"
-                  status="Scheduled"
-                />
-                <AppointmentItem
-                  patientName="Pedro Reyes"
-                  time="2:00 PM"
-                  type="Procedure"
-                  status="Confirmed"
-                />
-                <AppointmentItem
-                  patientName="Ana Gonzales"
-                  time="3:30 PM"
-                  type="Review"
-                  status="Scheduled"
-                />
-                <AppointmentItem
-                  patientName="Dr. Jose Rizal"
-                  time="4:00 PM"
-                  type="Emergency"
-                  status="Pending"
-                />
-              </Stack>
+              <UpcomingAppointments />
             </div>
           </section>
         </div>

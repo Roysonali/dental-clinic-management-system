@@ -5,6 +5,8 @@ import { DashboardLayout } from '../layouts/DashboardLayout';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { PatientListPage } from '../pages/patients/PatientListPage';
 import { PatientDetailsPage } from '../pages/patients/PatientDetailsPage';
+import { AppointmentListPage } from '../pages/appointments/AppointmentListPage';
+import { AppointmentDetailsPage } from '../pages/appointments/AppointmentDetailsPage';
 import { ROUTES } from './routes';
 
 /**
@@ -48,6 +50,16 @@ const AppRouter = () => {
           <Route
             path={`${ROUTES.PATIENTS}/:patientId`}
             element={<PatientDetailsPage />}
+          />
+
+          {/* ── Appointments Module ─────────────────────── */}
+          <Route
+            path={ROUTES.APPOINTMENTS}
+            element={<AppointmentListPage />}
+          />
+          <Route
+            path={`${ROUTES.APPOINTMENTS}/:appointmentId`}
+            element={<AppointmentDetailsPage />}
           />
         </Route>
 
