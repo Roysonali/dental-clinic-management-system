@@ -42,7 +42,7 @@ export const NavigationGroup: FC<NavigationGroupProps> = ({
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const heading = (
-    <div className="flex items-center justify-between px-3 py-2">
+    <div className="flex items-center justify-between px-4 py-2">
       {title && (
         <span className="text-caption font-semibold uppercase tracking-wider text-neutral-400">
           {title}

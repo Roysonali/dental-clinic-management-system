@@ -5,7 +5,7 @@ import type { ButtonProps, ButtonVariant, ButtonSize } from './button.types';
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 focus-visible:ring-primary-500/30 disabled:bg-primary-200',
+    'bg-primary-500 text-white shadow-sm hover:bg-primary-600 hover:shadow active:bg-primary-700 focus-visible:ring-primary-500/30 disabled:bg-primary-200 disabled:shadow-none',
   secondary:
     'bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 active:bg-neutral-100 focus-visible:ring-primary-500/20 disabled:text-neutral-300 disabled:border-neutral-200',
   outline:

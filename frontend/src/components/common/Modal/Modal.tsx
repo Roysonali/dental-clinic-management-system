@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, type FC, type ReactNode, type KeyboardEvent } from 'react';
+import { OverlayLayerContext } from '../Overlay/OverlayLayerContext';
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -64,6 +65,7 @@ export const Modal: FC<ModalProps> & {
   Footer: FC<ModalFooterProps>;
 } = ({ open, onClose, size = 'md', children, className = '', ariaLabel, ariaLabelledBy }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
   // Escape + overflow + focus save/restore + auto-focus dialog.
@@ -111,36 +113,39 @@ export const Modal: FC<ModalProps> & {
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-modal flex items-center justify-center p-4"
-      role="presentation"
-    >
-      {/* Backdrop */}
+    <OverlayLayerContext.Provider value={{ containerRef: wrapperRef }}>
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Dialog */}
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabelledBy ? undefined : ariaLabel}
-        aria-labelledby={ariaLabelledBy}
-        tabIndex={-1}
-        onKeyDown={handleKeyDown}
-        className={`
-          relative w-full ${sizeMap[size]} max-h-[85vh] overflow-y-auto
-          rounded-xl bg-white shadow-xl
-          focus-visible:outline-none
-          ${className}
-        `}
+        ref={wrapperRef}
+        className="fixed inset-0 z-modal flex items-center justify-center p-4"
+        role="presentation"
       >
-        {children}
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+
+        {/* Dialog */}
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabelledBy ? undefined : ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+          tabIndex={-1}
+          onKeyDown={handleKeyDown}
+          className={`
+            relative w-full ${sizeMap[size]} max-h-[85vh] overflow-y-auto
+            rounded-xl bg-white shadow-xl
+            focus-visible:outline-none
+            ${className}
+          `}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </OverlayLayerContext.Provider>
   );
 };
 

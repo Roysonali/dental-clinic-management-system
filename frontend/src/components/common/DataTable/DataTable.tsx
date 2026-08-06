@@ -60,6 +60,8 @@ interface DataTableProps<T> {
   defaultSort?: SortState | null;
   /** Enable row selection checkboxes */
   selectable?: boolean;
+  /** Alternate row background colors for readability */
+  zebra?: boolean;
   /** Controlled selected row keys */
   selectedKeys?: RowKey[];
   /** Called when selection changes */
@@ -106,6 +108,8 @@ interface DataTableProps<T> {
   ariaLabel?: string;
   /** Additional classes for the outer wrapper */
   className?: string;
+  /** Additional classes applied to the <table> element itself */
+  tableClassName?: string;
 }
 
 /* ── Alignment map ─────────────────────────────────────────────────── */
@@ -163,6 +167,7 @@ export function DataTable<T>({
   onSortChange,
   defaultSort = null,
   selectable = false,
+  zebra = false,
   selectedKeys: controlledSelected,
   onSelectionChange,
   columnVisibility: controlledVisibility,
@@ -178,6 +183,7 @@ export function DataTable<T>({
   loadingRows = 5,
   ariaLabel = 'Data table',
   className = '',
+  tableClassName = '',
 }: DataTableProps<T>) {
   /* ── Sorting state (uncontrolled fallback) ────────────────────── */
   const [internalSort, setInternalSort] = useState<SortState | null>(defaultSort);
@@ -306,12 +312,12 @@ export function DataTable<T>({
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
-        <table className="w-full border-collapse text-left" aria-label={ariaLabel}>
+        <table className={`w-full border-collapse text-left ${tableClassName}`.trim()} aria-label={ariaLabel}>
           {/* Header */}
           <thead>
             <tr className="border-b border-neutral-200 bg-neutral-50">
               {selectable && (
-                <th scope="col" className="w-12 px-4 py-3 align-middle">
+                <th scope="col" className="w-12 px-5 py-3.5 align-middle">
                   <Checkbox
                     checked={allSelected}
                     indeterminate={someSelected}
@@ -332,7 +338,7 @@ export function DataTable<T>({
                     scope="col"
                     aria-sort={ariaSort}
                     className={`
-                      whitespace-nowrap px-4 py-3 text-label font-semibold text-neutral-600
+                      whitespace-nowrap px-5 py-3.5 text-label font-semibold text-neutral-600
                       ${alignMap[column.align ?? 'left']}
                       ${column.width ?? ''}
                       ${column.headerClassName ?? ''}
@@ -371,7 +377,7 @@ export function DataTable<T>({
                 );
               })}
               {rowActions && (
-                <th scope="col" className="w-20 px-4 py-3 text-right text-label font-semibold text-neutral-600">
+                <th scope="col" className="w-24 px-5 py-3.5 text-right text-label font-semibold text-neutral-600">
                   {rowActionsHeader}
                 </th>
               )}
@@ -384,17 +390,17 @@ export function DataTable<T>({
               Array.from({ length: loadingRows }).map((_, rowIdx) => (
                 <tr key={`skeleton-${rowIdx}`} className="border-b border-neutral-100 last:border-0">
                   {selectable && (
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <Skeleton variant="table-row" width="16px" />
                     </td>
                   )}
                   {visibleColumns.map((column) => (
-                    <td key={column.key} className={`px-4 py-3 ${alignMap[column.align ?? 'left']}`}>
+                    <td key={column.key} className={`px-5 py-4 ${alignMap[column.align ?? 'left']}`}>
                       <Skeleton variant="table-row" />
                     </td>
                   ))}
                   {rowActions && (
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <Skeleton variant="table-row" width="40px" />
                     </td>
                   )}
@@ -410,12 +416,14 @@ export function DataTable<T>({
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                     className={`
                       border-b border-neutral-100 transition-colors duration-100 last:border-0
-                      ${onRowClick ? 'cursor-pointer hover:bg-neutral-50' : ''}
-                      ${isSelected ? 'bg-primary-50/60' : 'hover:bg-neutral-50'}
+                      ${zebra ? 'odd:bg-white even:bg-neutral-50/60' : ''}
+                      ${onRowClick ? 'cursor-pointer' : ''}
+                      hover:bg-neutral-50
+                      ${isSelected ? 'bg-primary-50/60' : ''}
                     `}
                   >
                     {selectable && (
-                      <td className="px-4 py-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-5 py-4 align-middle" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={isSelected}
                           onChange={() => toggleRow(key)}
@@ -427,7 +435,7 @@ export function DataTable<T>({
                     {visibleColumns.map((column) => (
                       <td
                         key={column.key}
-                        className={`px-4 py-3 text-body text-neutral-800 ${alignMap[column.align ?? 'left']} ${column.cellClassName ?? ''}`}
+                        className={`px-5 py-4 text-body text-neutral-800 ${alignMap[column.align ?? 'left']} ${column.cellClassName ?? ''}`}
                       >
                         {column.render
                           ? column.render(row)
@@ -435,7 +443,7 @@ export function DataTable<T>({
                       </td>
                     ))}
                     {rowActions && (
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                         {rowActions(row)}
                       </td>
                     )}

@@ -17,6 +17,7 @@ export const ROUTES = {
   },
   PATIENTS: '/patients',
   DOCTORS: '/doctors',
+  USERS: '/users',
   APPOINTMENTS: '/appointments',
   TREATMENT_PLANS: '/treatment-plans',
   BILLING: '/billing',

@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, useCallback, type FC, type ReactNode } from 'react';
+import {
+  useState, useRef, useEffect, useCallback,
+  cloneElement, isValidElement,
+  type FC, type ReactNode,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Icon } from '../Icon/Icon';
 
@@ -20,6 +26,14 @@ interface DropdownProps {
 interface DropdownTriggerProps {
   children?: ReactNode;
   className?: string;
+  /**
+   * Render the child element as the trigger instead of wrapping it in a
+   * `<button>`. Use this when the trigger is already an interactive element
+   * (e.g. an IconButton) so the DOM never contains a `<button>` inside a
+   * `<button>`. The child must accept a ref and button-related props
+   * (`onClick`, `onKeyDown`, `type`, `aria-haspopup`, `aria-expanded`).
+   */
+  asChild?: boolean;
 }
 
 interface DropdownContentProps {
@@ -56,7 +70,6 @@ import { createContext, useContext } from 'react';
 interface DropdownContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
   contentRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -95,7 +108,11 @@ export const Dropdown: FC<DropdownProps> & {
     [isControlled, onOpenChange],
   );
 
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // Both the trigger and the content are rendered inside the container
+  // wrapper div, so a single container ref is enough for click-outside
+  // detection. The trigger never needs its own ref, which keeps the
+  // asChild slot free of ref plumbing.
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
@@ -104,10 +121,7 @@ export const Dropdown: FC<DropdownProps> & {
     if (!open) return;
     previousActiveElement.current = document.activeElement as HTMLElement;
     const handleClick = (e: MouseEvent) => {
-      if (
-        triggerRef.current?.contains(e.target as Node) ||
-        contentRef.current?.contains(e.target as Node)
-      ) return;
+      if (containerRef.current?.contains(e.target as Node)) return;
       setOpen(false);
     };
     const handleEscape = (e: KeyboardEvent) => {
@@ -123,8 +137,8 @@ export const Dropdown: FC<DropdownProps> & {
   }, [open, setOpen]);
 
   return (
-    <DropdownContext.Provider value={{ open, setOpen, triggerRef, contentRef }}>
-      <div className={`relative inline-block ${className}`}>
+    <DropdownContext.Provider value={{ open, setOpen, contentRef }}>
+      <div ref={containerRef} className={`relative inline-block ${className}`}>
         {children}
       </div>
     </DropdownContext.Provider>
@@ -133,12 +147,47 @@ export const Dropdown: FC<DropdownProps> & {
 
 /* ── Dropdown Trigger ───────────────────────────────────────────────── */
 
-const DropdownTrigger: FC<DropdownTriggerProps> = ({ children, className = '' }) => {
-  const { open, setOpen, triggerRef } = useDropdownContext();
+const DropdownTrigger: FC<DropdownTriggerProps> = ({
+  children,
+  className = '',
+  asChild = false,
+}) => {
+  const { open, setOpen } = useDropdownContext();
+
+  // `asChild` (Radix-style slot): clone the child element and lift the
+  // trigger behaviour onto it, rather than rendering a wrapping <button>.
+  // Consumers use this when the trigger is already interactive (e.g.
+  // IconButton / a plain <button>), which is what eliminates the invalid
+  // "<button> cannot be a descendant of <button>" hierarchy.
+  if (asChild && isValidElement(children)) {
+    const child = children as React.ReactElement<{
+      type?: 'button';
+      'aria-haspopup'?: 'menu';
+      'aria-expanded'?: boolean;
+      onClick?: (e: ReactMouseEvent<HTMLElement>) => void;
+      onKeyDown?: (e: ReactKeyboardEvent<HTMLElement>) => void;
+    }>;
+    return cloneElement(child, {
+      type: 'button',
+      'aria-haspopup': 'menu',
+      'aria-expanded': open,
+      onClick: (e: ReactMouseEvent<HTMLElement>) => {
+        child.props.onClick?.(e);
+        if (!e.defaultPrevented) setOpen(!open);
+      },
+      onKeyDown: (e: ReactKeyboardEvent<HTMLElement>) => {
+        child.props.onKeyDown?.(e);
+        if (!e.defaultPrevented && (e.key === 'Enter' || e.key === ' ')) {
+          // Suppress the native button click so the menu does not toggle twice.
+          e.preventDefault();
+          setOpen(!open);
+        }
+      },
+    });
+  }
 
   return (
     <button
-      ref={triggerRef}
       type="button"
       onClick={() => setOpen(!open)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(!open); } }}

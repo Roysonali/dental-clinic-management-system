@@ -146,3 +146,59 @@ class TestDoctorCreateWithPhotoUrl:
         )
         assert updated.profile_photo_url is None
 
+
+
+# ======================================================================
+# F1 regression: GET /doctors/{id}/profile must not crash when schedules
+# exist, and schedules must be ordered by day_of_week.
+# ======================================================================
+
+
+class TestDoctorProfileScheduleSorting:
+    """Regression for the F1 production finding.
+
+    Previously ``get_doctor_profile`` sorted schedules with
+    ``key=lambda s: s.day_of_week.value``. ``day_of_week`` is a plain
+    Integer column (0=Monday..5=Saturday), NOT an Enum — calling
+    ``.value`` raised AttributeError and produced HTTP 500 whenever a
+    doctor had at least one schedule.
+    """
+
+    def test_profile_with_zero_schedules(self, db, doctor_user, admin_user):
+        """A doctor with no schedules loads without error."""
+        from tests.modules.doctors.conftest import DoctorFactory
+        from app.modules.doctors.services.doctor_service import DoctorService
+
+        doctor = DoctorFactory.create(db, user_id=doctor_user.id)
+        service = DoctorService(db)
+        profile = service.get_doctor_profile(doctor.id)
+        assert profile.schedules == []
+
+    def test_profile_with_one_schedule(self, db, doctor_user, admin_user):
+        """A doctor with a single schedule loads without error."""
+        from tests.modules.doctors.conftest import DoctorFactory, ScheduleFactory
+        from app.modules.doctors.services.doctor_service import DoctorService
+
+        doctor = DoctorFactory.create(db, user_id=doctor_user.id)
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=2)
+        # Expire the identity map so the (eagerly-cached empty) schedules
+        # collection is reloaded — mirrors a fresh request-scoped session.
+        db.expire_all()
+        service = DoctorService(db)
+        profile = service.get_doctor_profile(doctor.id)
+        assert [s.day_of_week for s in profile.schedules] == [2]
+
+    def test_profile_with_multiple_schedules_ordered(self, db, doctor_user, admin_user):
+        """Multiple schedules are returned ordered by day_of_week."""
+        from tests.modules.doctors.conftest import DoctorFactory, ScheduleFactory
+        from app.modules.doctors.services.doctor_service import DoctorService
+
+        doctor = DoctorFactory.create(db, user_id=doctor_user.id)
+        # Insert out of order on purpose.
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=4)
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=0)
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=2)
+        db.expire_all()
+        service = DoctorService(db)
+        profile = service.get_doctor_profile(doctor.id)
+        assert [s.day_of_week for s in profile.schedules] == [0, 2, 4]

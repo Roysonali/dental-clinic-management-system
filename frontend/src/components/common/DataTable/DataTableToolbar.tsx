@@ -116,9 +116,9 @@ export const DataTableToolbar: FC<DataTableToolbarProps> = ({
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
                 className="
-                  w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-9 text-body text-neutral-800
+                  h-10 w-full rounded-lg border border-neutral-300 bg-white py-0 pl-9 pr-9 text-body text-neutral-800 shadow-sm
                   placeholder:text-neutral-400
-                  transition-colors duration-150
+                  transition-all duration-150
                   focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20
                   hover:border-neutral-400
                 "
@@ -146,9 +146,9 @@ export const DataTableToolbar: FC<DataTableToolbarProps> = ({
             <Dropdown>
               <Dropdown.Trigger
                 className="
-                  inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2
-                  text-button-sm font-medium text-neutral-700
-                  transition-colors duration-150 hover:bg-neutral-50
+                  inline-flex h-10 items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3
+                  text-button-sm font-medium text-neutral-700 shadow-sm
+                  transition-all duration-150 hover:bg-neutral-50 hover:border-neutral-400
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
                 "
               >

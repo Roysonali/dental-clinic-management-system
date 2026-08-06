@@ -148,18 +148,31 @@
   /* ──────────────────────────────────────────────────────────────────────
      Z-INDEX LAYERS
      ──────────────────────────────────────────────────────────────────────
-     Enables utility classes like `z-dropdown`, `z-modal`, `z-tooltip`.
+     Single source of truth for overlay stacking order. Enables utility
+     classes like `z-tooltip`, `z-dropdown`, `z-datepicker`, `z-modal`.
+
+     Ordered lowest → highest:
+       base(0) < elevated(10) < sticky(20)
+       < tooltip(30) < dropdown(40) < datepicker(50)
+       < drawer(60) < modal(70) < notification/toast(80) < overlay(90)
+
+     Floating layers (tooltip/dropdown/datepicker) are rendered into the
+     stacking context of their nearest overlay layer (Drawer/Modal) via the
+     shared OverlayLayerContext, so their token only needs to be correct
+     relative to siblings inside that layer — never relative to the whole
+     page.
      ────────────────────────────────────────────────────────────────────── */
 
   --z-base: 0;
   --z-elevated: 10;
   --z-sticky: 20;
-  --z-dropdown: 30;
-  --z-drawer: 40;
-  --z-modal: 50;
-  --z-notification: 60;
-  --z-tooltip: 70;
-  --z-overlay: 80;
+  --z-tooltip: 30;
+  --z-dropdown: 40;
+  --z-datepicker: 50;
+  --z-drawer: 60;
+  --z-modal: 70;
+  --z-notification: 80;
+  --z-overlay: 90;
 
 } /* end @theme */
 
@@ -231,6 +244,37 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   UTILITY: SKELETON SHIMMER
+   ══════════════════════════════════════════════════════════════════════
+   Soft shimmer sweep used by the shared <Skeleton /> primitive.    */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    rgb(226 232 240 / 0.55) 25%,
+    rgb(241 245 249 / 1) 50%,
+    rgb(226 232 240 / 0.55) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton {
+    animation: none;
   }
 }
 

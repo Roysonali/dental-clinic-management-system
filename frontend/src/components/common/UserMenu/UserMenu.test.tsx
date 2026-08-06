@@ -46,6 +46,16 @@ describe('UserMenu', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('renders a single trigger button with no nested buttons', () => {
+    renderUserMenu();
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].querySelector('button')).toBeNull();
+    expect(buttons[0]).toHaveAttribute('aria-haspopup', 'menu');
+    expect(buttons[0]).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('opens the menu on click and renders menu items with menuitem roles', async () => {
     const user = userEvent.setup();
     renderUserMenu();

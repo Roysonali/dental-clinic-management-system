@@ -201,6 +201,90 @@ class TestListDoctorsEndpoint:
         assert resp.status_code == 200
         assert resp.json()["total"] >= 1
 
+
+    def test_list_search_by_full_name(self, client, admin_token, db):
+        """F2: search matches the doctor's full name (documented contract)."""
+        from tests.modules.doctors.conftest import UserFactory, DoctorFactory
+        u = UserFactory.create(db, full_name="Alice Reyes", email="alice.reyes@t.com")
+        DoctorFactory.create(db, user_id=u.id)
+        resp = client.get(f"{self.URL}?search=Reyes", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] >= 1
+        names = [i["user_full_name"] for i in data["items"]]
+        assert any(n and "Reyes" in n for n in names)
+
+    def test_list_search_partial_full_name(self, client, admin_token, db):
+        """F2: partial full-name search works (case-insensitive substring)."""
+        from tests.modules.doctors.conftest import UserFactory, DoctorFactory
+        u = UserFactory.create(db, full_name="Maria Clara Santos", email="mcs@t.com")
+        DoctorFactory.create(db, user_id=u.id)
+        resp = client.get(f"{self.URL}?search=clara", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        assert resp.json()["total"] >= 1
+
+    def test_list_search_no_matches(self, client, admin_token, db):
+        """F2: a search with no matches returns an empty result set."""
+        resp = client.get(f"{self.URL}?search=zzzz-no-such-doctor", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0
+
+    def test_list_search_combined_with_pagination(self, client, admin_token, db):
+        """F2: search + pagination work together."""
+        from tests.modules.doctors.conftest import UserFactory, DoctorFactory
+        for i in range(3):
+            u = UserFactory.create(db, full_name=f"Juan Dela Cruz {i}", email=f"jdc{i}@t.com")
+            DoctorFactory.create(db, user_id=u.id)
+        resp = client.get(
+            f"{self.URL}?search=Dela&page=1&page_size=2",
+            headers=auth_header(admin_token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 3
+        assert len(data["items"]) == 2
+        assert data["page"] == 1
+        assert data["page_size"] == 2
+
+    def test_list_search_with_active_filter(self, client, admin_token, db):
+        """F2: search + status filter combine correctly."""
+        from tests.modules.doctors.conftest import UserFactory, DoctorFactory
+        active_u = UserFactory.create(db, full_name="Rosa Parks", email="rosa@t.com")
+        DoctorFactory.create(db, user_id=active_u.id, is_active=True)
+        inactive_u = UserFactory.create(db, full_name="Rosa Parks", email="rosa2@t.com")
+        DoctorFactory.create(db, user_id=inactive_u.id, is_active=False)
+        resp = client.get(
+            f"{self.URL}?search=Rosa&is_active=true",
+            headers=auth_header(admin_token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert all(i["is_active"] is True for i in data["items"])
+
+    def test_list_search_with_specialization_filter(self, client, admin_token, db):
+        """F2: search + specialization filter combine correctly."""
+        from tests.modules.doctors.conftest import (
+            UserFactory, DoctorFactory, SpecializationFactory,
+            DoctorSpecializationFactory,
+        )
+        spec = SpecializationFactory.create(db)
+        other_spec = SpecializationFactory.create(db)
+        u1 = UserFactory.create(db, full_name="Pedro Penduko", email="pedro@t.com")
+        d1 = DoctorFactory.create(db, user_id=u1.id)
+        DoctorSpecializationFactory.create(db, doctor_id=d1.id, specialization_id=spec.id)
+        u2 = UserFactory.create(db, full_name="Pedro Penduko", email="pedro2@t.com")
+        d2 = DoctorFactory.create(db, user_id=u2.id)
+        DoctorSpecializationFactory.create(db, doctor_id=d2.id, specialization_id=other_spec.id)
+        resp = client.get(
+            f"{self.URL}?search=Penduko&specialization_id={spec.id}",
+            headers=auth_header(admin_token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["user_full_name"] == "Pedro Penduko"
+
     def test_receptionist_can_list(self, client, receptionist_user, db):
         from app.core.security import create_access_token
         token = create_access_token({"sub": receptionist_user.email})
@@ -466,6 +550,34 @@ class TestGetDoctorProfileEndpoint:
     def test_profile_doctor_self(self, client, doctor_token, doctor):
         resp = client.get(f"/doctors/{doctor.id}/profile", headers=auth_header(doctor_token))
         assert resp.status_code == 200
+
+    def test_profile_with_schedules_returns_200(self, client, admin_token, db, doctor):
+        """F1 regression: profile must return 200 (not 500) when schedules exist."""
+        from tests.modules.doctors.conftest import ScheduleFactory
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=0)
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=3)
+        db.expire_all()  # reload schedules fresh, as a new request would
+        resp = client.get(f"/doctors/{doctor.id}/profile", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        assert len(resp.json()["schedules"]) == 2
+
+    def test_profile_schedules_ordered_by_day(self, client, admin_token, db, doctor):
+        """F1 regression: schedules in the profile are ordered by day_of_week."""
+        from tests.modules.doctors.conftest import ScheduleFactory
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=4)
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=0)
+        ScheduleFactory.create(db, doctor_id=doctor.id, day_of_week=2)
+        db.expire_all()  # reload schedules fresh, as a new request would
+        resp = client.get(f"/doctors/{doctor.id}/profile", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        days = [s["day_of_week"] for s in resp.json()["schedules"]]
+        assert days == [0, 2, 4]
+
+    def test_profile_zero_schedules(self, client, admin_token, doctor):
+        """F1 regression: profile with no schedules returns 200 and empty list."""
+        resp = client.get(f"/doctors/{doctor.id}/profile", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        assert resp.json()["schedules"] == []
 
 # ======================================================================
 # Specialization Endpoints

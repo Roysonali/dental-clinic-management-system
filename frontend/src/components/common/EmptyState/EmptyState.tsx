@@ -46,29 +46,32 @@ export const EmptyState: FC<EmptyStateProps> = ({
       role="status"
     >
       {/* Icon */}
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
-        <Icon
-          icon={IconComponent}
-          size="xl"
-          className="text-neutral-400"
-        />
+      <div className="relative mb-5">
+        <div className="absolute -inset-3 rounded-full bg-primary-50/60" aria-hidden="true" />
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-neutral-100 bg-white shadow-sm">
+          <Icon
+            icon={IconComponent}
+            size="xl"
+            className="text-primary-400"
+          />
+        </div>
       </div>
 
       {/* Title */}
       {title && (
-        <h3 className="text-h4 font-semibold text-neutral-800">{title}</h3>
+        <h3 className="text-h3 font-semibold tracking-tight text-neutral-900">{title}</h3>
       )}
 
       {/* Description */}
       {description && (
-        <p className="mt-1 max-w-sm text-body text-neutral-500">
+        <p className="mt-1.5 max-w-sm text-body text-neutral-500">
           {description}
         </p>
       )}
 
       {/* Actions */}
       {(primaryAction || secondaryAction) && (
-        <div className="mt-6 flex items-center gap-3">
+        <div className="mt-6 flex flex-col items-center gap-2 sm:flex-row">
           {primaryAction}
           {secondaryAction}
         </div>

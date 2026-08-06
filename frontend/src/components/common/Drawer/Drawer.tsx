@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, type FC, type ReactNode, type KeyboardEvent } from 'react';
+import { OverlayLayerContext } from '../Overlay/OverlayLayerContext';
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -75,6 +76,7 @@ export const Drawer: FC<DrawerProps> & {
   Footer: FC<DrawerFooterProps>;
 } = ({ open, onClose, position = 'right', size = 'md', children, ariaLabel, className = '' }) => {
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
   // Escape + overflow + focus save/restore + auto-focus panel
@@ -117,41 +119,43 @@ export const Drawer: FC<DrawerProps> & {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-drawer" role="presentation">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <OverlayLayerContext.Provider value={{ containerRef: wrapperRef }}>
+      <div ref={wrapperRef} className="fixed inset-0 z-drawer" role="presentation">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/40"
+          onClick={onClose}
+          aria-hidden="true"
+        />
 
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        onKeyDown={handleKeyDown}
-        className={`
-          absolute flex flex-col bg-white shadow-xl
-          w-full ${sizeMap[size]} h-full
-          ${positionMap[position]}
-          animate-in ${slideMap[position]} duration-300
-          focus-visible:outline-none
-          ${className}
-        `}
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        tabIndex={-1}
-      >
-        {children}
+        {/* Panel */}
+        <div
+          ref={panelRef}
+          onKeyDown={handleKeyDown}
+          className={`
+            absolute flex flex-col bg-white shadow-xl
+            w-full ${sizeMap[size]} h-full
+            ${positionMap[position]}
+            animate-in ${slideMap[position]} duration-300
+            focus-visible:outline-none
+            ${className}
+          `}
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabel}
+          tabIndex={-1}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </OverlayLayerContext.Provider>
   );
 };
 
 /* ── Drawer Header ────────────────────────────────────────────────── */
 
 const DrawerHeader: FC<DrawerHeaderProps> = ({ children, className = '' }) => (
-  <div className={`flex items-start justify-between gap-4 border-b border-neutral-200 px-5 py-4 ${className}`}>
+  <div className={`flex items-start justify-between gap-4 border-b border-neutral-200 px-6 py-5 ${className}`}>
     <div className="min-w-0 flex-1">{children}</div>
   </div>
 );
@@ -159,13 +163,13 @@ const DrawerHeader: FC<DrawerHeaderProps> = ({ children, className = '' }) => (
 /* ── Drawer Body ──────────────────────────────────────────────────── */
 
 const DrawerBody: FC<DrawerBodyProps> = ({ children, className = '' }) => (
-  <div className={`flex-1 overflow-y-auto px-5 py-4 ${className}`}>{children}</div>
+  <div className={`flex-1 overflow-y-auto px-6 py-6 ${className}`}>{children}</div>
 );
 
 /* ── Drawer Footer ────────────────────────────────────────────────── */
 
 const DrawerFooter: FC<DrawerFooterProps> = ({ children, className = '' }) => (
-  <div className={`flex items-center justify-end gap-3 border-t border-neutral-200 px-5 py-4 ${className}`}>
+  <div className={`flex items-center justify-end gap-3 border-t border-neutral-200 bg-neutral-50/60 px-6 py-4 ${className}`}>
     {children}
   </div>
 );

@@ -6,6 +6,10 @@ import { DashboardLayout } from '../layouts/DashboardLayout';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { PatientListPage } from '../pages/patients/PatientListPage';
 import { PatientDetailsPage } from '../pages/patients/PatientDetailsPage';
+import { DoctorListPage } from '../pages/doctors/DoctorListPage';
+import { DoctorDetailsPage } from '../pages/doctors/DoctorDetailsPage';
+import { UserListPage } from '../pages/users/UserListPage';
+import { UserDetailsPage } from '../pages/users/UserDetailsPage';
 import { AppointmentListPage } from '../pages/appointments/AppointmentListPage';
 import { AppointmentDetailsPage } from '../pages/appointments/AppointmentDetailsPage';
 import { PendingUsersPage } from '../pages/admin/PendingUsersPage';
@@ -80,6 +84,27 @@ const AppRouter = () => {
             <Route
               path={`${ROUTES.PATIENTS}/:patientId`}
               element={<PatientDetailsPage />}
+            />
+
+            {/* ── Doctors Module ──────────────────────────── */}
+            <Route
+              path={ROUTES.DOCTORS}
+              element={<DoctorListPage />}
+            />
+            <Route
+              path={`${ROUTES.DOCTORS}/:doctorId`}
+              element={<DoctorDetailsPage />}
+            />
+
+            {/* ── Users Module ──────────────────────────────── */}
+            <Route
+              path={ROUTES.USERS}
+              element={<UserListPage />}
+            />
+            {/* Placeholder until Phase 1C replaces it with the real details page. */}
+            <Route
+              path={`${ROUTES.USERS}/:userId`}
+              element={<UserDetailsPage />}
             />
 
             {/* ── Appointments Module ─────────────────────── */}

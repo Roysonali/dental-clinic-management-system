@@ -42,7 +42,7 @@ export const PageHeader: FC<PageHeaderProps> = ({
     <div className={`mb-6 lg:mb-8 ${className}`}>
       {/* Breadcrumbs */}
       {breadcrumbs && (
-        <div className="mb-2">{breadcrumbs}</div>
+        <div className="mb-3">{breadcrumbs}</div>
       )}
 
       {/* Title Row */}
@@ -50,7 +50,7 @@ export const PageHeader: FC<PageHeaderProps> = ({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             {title && (
-              <h1 className="text-h2 font-semibold text-neutral-900 truncate">
+              <h1 className="text-h1 font-semibold tracking-tight text-neutral-900 truncate">
                 {title}
               </h1>
             )}
@@ -67,7 +67,7 @@ export const PageHeader: FC<PageHeaderProps> = ({
 
         {/* Actions */}
         {actions && (
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:items-center sm:gap-3">
             {actions}
           </div>
         )}
