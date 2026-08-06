@@ -86,8 +86,16 @@ describe('UserToolbar', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toHaveAttribute('aria-busy', 'true');
   });
 
-  it('does not render a Create User action (no backend create endpoint)', () => {
+  it('renders an Add User action when onAddUser is provided', () => {
+    const onAddUser = vi.fn();
+    renderWithProviders(<UserToolbar {...baseProps} onAddUser={onAddUser} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add User' }));
+    expect(onAddUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render an Add User action when onAddUser is omitted', () => {
     renderWithProviders(<UserToolbar {...baseProps} />);
-    expect(screen.queryByRole('button', { name: /Create User/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add User' })).not.toBeInTheDocument();
   });
 });

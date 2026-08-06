@@ -103,3 +103,24 @@ export interface RoleFormValues {
   /** Role id held as a string (select value); '' = not selected */
   role_id: string;
 }
+
+/**
+ * Add-User form model (Sprint 11B Phase 1D — re-scoped to the verified
+ * backend register → approve workflow).
+ *
+ * Mirrors `UserRegister` + `UserApprovalRequest` exactly — NO invented
+ * fields (no username, phone, address, avatar, dob, status…). The form
+ * submits `{full_name, email, password}` to POST /auth/register and then
+ * `{role_id}` to PATCH /auth/users/{id}/approve.
+ *
+ * `role_id` is held as a numeric string (select value, matching the
+ * `RoleFormValues` convention); the container converts it with
+ * `roleIdFromUserCreateForm`.
+ */
+export interface UserCreateFormValues {
+  full_name: string;
+  email: string;
+  password: string;
+  /** Numeric role id as a string; '' = not selected */
+  role_id: string;
+}

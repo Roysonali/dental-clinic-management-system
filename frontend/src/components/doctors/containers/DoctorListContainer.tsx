@@ -15,6 +15,8 @@ import {
   useDeactivateDoctor,
 } from '../../../hooks/doctors/useDoctorMutations';
 import { useSpecializations } from '../../../hooks/doctors/useSpecializations';
+import { usePermission } from '../../../hooks/rbac/usePermission';
+import { ADMIN_ROLES } from '../../../constants/roles';
 import { parseApiError } from '../../../services/apiError';
 import { DOCTOR_MAX_PAGE_SIZE } from '../../../constants/doctor';
 import type { DoctorResponse } from '../../../types/doctor';
@@ -64,6 +66,13 @@ export const DoctorListContainer: FC = () => {
   const activateMutation = useActivateDoctor();
   const deactivateMutation = useDeactivateDoctor();
   const statusSubmitting = activateMutation.isPending || deactivateMutation.isPending;
+
+  // Activate/deactivate are ADMIN-only on the backend (require_roles([ADMIN]))
+  // — hide the row actions for everyone else (Sprint 11C). Edit/create stay
+  // visible: they allow ADMIN + RECEPTIONIST, which the client cannot
+  // distinguish, so the backend enforces those.
+  const { can } = usePermission();
+  const canManageStatus = can(ADMIN_ROLES);
 
   const queryError = doctorsQuery.error ? parseApiError(doctorsQuery.error).message : null;
 
@@ -120,8 +129,8 @@ export const DoctorListContainer: FC = () => {
         columnVisibility={columnVisibility}
         onColumnVisibilityChange={setColumnVisibility}
         onEdit={openEdit}
-        onDeactivate={(doctor) => setStatusState({ doctor, intent: 'deactivate' })}
-        onReactivate={(doctor) => setStatusState({ doctor, intent: 'activate' })}
+        onDeactivate={canManageStatus ? (doctor) => setStatusState({ doctor, intent: 'deactivate' }) : undefined}
+        onReactivate={canManageStatus ? (doctor) => setStatusState({ doctor, intent: 'activate' }) : undefined}
       />
 
       <Pagination

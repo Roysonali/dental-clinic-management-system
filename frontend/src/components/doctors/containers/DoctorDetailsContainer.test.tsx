@@ -23,6 +23,19 @@ vi.mock('../../../services/doctorService', () => ({
   },
 }));
 
+// Sprint 11C: admin identity so ADMIN-only status actions render in tests.
+const permissionMock = {
+  state: { status: 'admin' as const, role: { role_id: 1, role_name: 'ADMIN' } },
+  isAdmin: true,
+  isResolved: true,
+  role: 'ADMIN' as const,
+  can: vi.fn(() => true),
+};
+
+vi.mock('../../../hooks/rbac/usePermission', () => ({
+  usePermission: () => permissionMock,
+}));
+
 const profile: DoctorProfileResponse = {
   id: 'd1',
   doctor_code: 'DOC-000001',

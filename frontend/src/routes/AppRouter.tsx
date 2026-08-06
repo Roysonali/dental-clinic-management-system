@@ -15,7 +15,9 @@ import { AppointmentDetailsPage } from '../pages/appointments/AppointmentDetails
 import { PendingUsersPage } from '../pages/admin/PendingUsersPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicOnlyRoute } from './PublicOnlyRoute';
+import { RequireRole } from '../components/rbac/RequireRole';
 import { ROUTES } from './routes';
+import { ROUTE_ROLE_REQUIREMENTS } from './routeRequirements';
 
 /**
  * AppRouter — central routing component for the application.
@@ -96,16 +98,39 @@ const AppRouter = () => {
               element={<DoctorDetailsPage />}
             />
 
-            {/* ── Users Module ──────────────────────────────── */}
+            {/* ── Admin-only module group (Sprint 11C RBAC) ── */}
+            {/*
+              Every /users and /auth/users/pending endpoint is
+              require_admin (ADMIN + CHIEF_DOCTOR) on the backend, so the
+              Users module and the pending-approvals screen are guarded
+              client-side by RequireRole. Non-admins are redirected to the
+              dashboard; a transient role-resolution failure fails open
+              (the backend still enforces with 403).
+            */}
+            {/* All three routes share the /users entry in the policy map
+                (ADMIN + CHIEF_DOCTOR) — single source of truth. */}
             <Route
-              path={ROUTES.USERS}
-              element={<UserListPage />}
-            />
-            {/* Placeholder until Phase 1C replaces it with the real details page. */}
-            <Route
-              path={`${ROUTES.USERS}/:userId`}
-              element={<UserDetailsPage />}
-            />
+              element={
+                <RequireRole requiredRoles={ROUTE_ROLE_REQUIREMENTS[ROUTES.USERS]} />
+              }
+            >
+              {/* ── Users Module ──────────────────────────── */}
+              <Route
+                path={ROUTES.USERS}
+                element={<UserListPage />}
+              />
+              {/* Placeholder until Phase 1C replaces it with the real details page. */}
+              <Route
+                path={`${ROUTES.USERS}/:userId`}
+                element={<UserDetailsPage />}
+              />
+
+              {/* ── Admin: pending registration approvals ── */}
+              <Route
+                path={ROUTES.ADMIN.PENDING_USERS}
+                element={<PendingUsersPage />}
+              />
+            </Route>
 
             {/* ── Appointments Module ─────────────────────── */}
             <Route
@@ -115,12 +140,6 @@ const AppRouter = () => {
             <Route
               path={`${ROUTES.APPOINTMENTS}/:appointmentId`}
               element={<AppointmentDetailsPage />}
-            />
-
-            {/* ── Admin: pending registration approvals ─────── */}
-            <Route
-              path={ROUTES.ADMIN.PENDING_USERS}
-              element={<PendingUsersPage />}
             />
           </Route>
         </Route>

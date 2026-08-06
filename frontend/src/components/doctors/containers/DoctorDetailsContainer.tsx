@@ -18,6 +18,8 @@ import { DoctorScheduleSection } from '../DoctorScheduleSection';
 import { DoctorFormContainer } from './DoctorFormContainer';
 import { DoctorStatusDialog, type DoctorStatusIntent } from '../DoctorStatusDialog';
 import { DoctorToggleDialog, type DoctorToggleIntent } from '../DoctorToggleDialog';
+import { PermissionGate } from '../../rbac/PermissionGate';
+import { ADMIN_ROLES } from '../../../constants/roles';
 import { Tabs } from '../../common/Tabs/Tabs';
 import { Button } from '../../common/Button/Button';
 import { Icon } from '../../common/Icon/Icon';
@@ -150,14 +152,20 @@ export const DoctorDetailsContainer: FC = () => {
               >
                 Edit
               </Button>
-              <Button
-                variant={doctor.is_active ? 'danger' : 'success'}
-                size="sm"
-                onClick={() => setStatusState({ intent: doctor.is_active ? 'deactivate' : 'activate' })}
-                leftIcon={<Icon icon={doctor.is_active ? UserX : UserCheck} size="sm" />}
-              >
-                {doctor.is_active ? 'Deactivate' : 'Activate'}
-              </Button>
+              {/* Activate/deactivate are ADMIN-only on the backend
+                  (require_roles([ADMIN])) — gate them client-side (Sprint
+                  11C). Edit + availability/leave toggles stay visible to
+                  the role sets the backend permits. */}
+              <PermissionGate requiredRoles={ADMIN_ROLES}>
+                <Button
+                  variant={doctor.is_active ? 'danger' : 'success'}
+                  size="sm"
+                  onClick={() => setStatusState({ intent: doctor.is_active ? 'deactivate' : 'activate' })}
+                  leftIcon={<Icon icon={doctor.is_active ? UserX : UserCheck} size="sm" />}
+                >
+                  {doctor.is_active ? 'Deactivate' : 'Activate'}
+                </Button>
+              </PermissionGate>
               <Button
                 variant="outline"
                 size="sm"

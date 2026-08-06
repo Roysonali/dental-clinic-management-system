@@ -22,6 +22,20 @@ vi.mock('../../../services/doctorService', () => ({
   },
 }));
 
+// Sprint 11C: admin identity so the ADMIN-only deactivate/reactivate row
+// actions render in the status-flow tests below.
+const permissionMock = {
+  state: { status: 'admin' as const, role: { role_id: 1, role_name: 'ADMIN' } },
+  isAdmin: true,
+  isResolved: true,
+  role: 'ADMIN' as const,
+  can: vi.fn(() => true),
+};
+
+vi.mock('../../../hooks/rbac/usePermission', () => ({
+  usePermission: () => permissionMock,
+}));
+
 const listMock = vi.mocked(doctorService.list);
 const activateMock = vi.mocked(doctorService.activate);
 const deactivateMock = vi.mocked(doctorService.deactivate);
@@ -82,6 +96,7 @@ describe('DoctorListContainer', () => {
     activateMock.mockReset();
     deactivateMock.mockReset();
     getMock.mockReset();
+    permissionMock.can.mockReturnValue(true);
     vi.mocked(doctorService.listSpecializations).mockReset();
     vi.mocked(doctorService.listSpecializations).mockResolvedValue({
       items: [{ id: 1, name: 'Orthodontics', code: 'ORTHO', description: null, is_active: true }],
@@ -191,6 +206,19 @@ describe('DoctorListContainer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Register Doctor' }));
 
     expect(screen.getByRole('dialog', { name: 'Register Doctor' })).toBeInTheDocument();
+  });
+
+  it('hides the ADMIN-only deactivate/reactivate row actions for non-admins', async () => {
+    permissionMock.can.mockReturnValue(false);
+    renderWithProviders(<DoctorListContainer />);
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+    expect(
+      screen.queryByRole('button', { name: 'Deactivate Dr. Jose Rizal' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reactivate Dr. Maria Santos' }),
+    ).not.toBeInTheDocument();
   });
 
   it('opens the edit drawer and fetches the doctor record', async () => {

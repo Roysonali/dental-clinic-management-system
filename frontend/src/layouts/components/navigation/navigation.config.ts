@@ -8,18 +8,32 @@ import {
   Package,
   FlaskConical,
   Shield,
+  UserCheck,
   BarChart3,
   Settings,
 } from 'lucide-react';
 import { ROUTES } from '../../../routes/routes';
+import { ADMIN_ROLES } from '../../../constants/roles';
+import { roleMeetsRequirement } from '../../../constants/rbac';
+import type { RoleName } from '../../../constants/roles';
 import type { NavGroupConfig } from './navigation.types';
 
 /**
  * Navigation groups and items.
  *
  * Single source of truth for the sidebar navigation structure.
- * Items with `disabled: true` appear visually disabled and are non-interactive.
- * The `roles` array is a placeholder for future RBAC filtering (not yet enforced).
+ *
+ * RBAC (Sprint 11C):
+ * - Items with a `roles` list are permission-aware: `getNavGroups(role)`
+ *   keeps them only when the current user's resolved role satisfies the
+ *   requirement. Admin-only items (Users, Pending Approvals) carry
+ *   `roles: ADMIN_ROLES` — non-admins never see them.
+ * - Items with `disabled: true` appear visually disabled and are
+ *   non-interactive (placeholders for not-yet-built modules).
+ * - Items restricted to non-admin roles cannot be modelled here because
+ *   the client cannot resolve non-admin roles (backend limitation — see
+ *   `docs/Sprint-11C-RBAC-UI-Integration.md`); those modules stay visible
+ *   to everyone and the backend enforces with 403.
  */
 export const NAV_GROUPS: NavGroupConfig[] = [
   {
@@ -110,8 +124,20 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         id: 'users',
         label: 'Users',
         icon: Shield,
+        route: ROUTES.USERS,
         group: 'administration',
-        disabled: true,
+        // Every /users endpoint is require_admin on the backend; the item
+        // is enabled and visible for admins only (Sprint 11C).
+        roles: ADMIN_ROLES,
+      },
+      {
+        id: 'pending-approvals',
+        label: 'Pending Approvals',
+        icon: UserCheck,
+        route: ROUTES.ADMIN.PENDING_USERS,
+        group: 'administration',
+        // /auth/users/pending + approve/deactivate are require_admin too.
+        roles: ADMIN_ROLES,
       },
       {
         id: 'reports',
@@ -132,9 +158,22 @@ export const NAV_GROUPS: NavGroupConfig[] = [
 ];
 
 /**
- * Get all navigation groups.
- * Future: Accept roles to filter by permissions.
+ * Get the navigation groups filtered for a resolved role.
+ *
+ * Items carrying a `roles` requirement are kept only when
+ * `roleMeetsRequirement` passes. Groups left with no items are dropped so
+ * an empty section heading is never rendered.
+ *
+ * @param role — the current user's resolved role (null while unresolved or
+ *   for non-admins; admin-only items are hidden in that case).
  */
-export function getNavGroups(): NavGroupConfig[] {
-  return NAV_GROUPS;
+export function getNavGroups(role: RoleName | null = null): NavGroupConfig[] {
+  return NAV_GROUPS
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !item.roles || roleMeetsRequirement(role, item.roles),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 }

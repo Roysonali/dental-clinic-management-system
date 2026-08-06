@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/testUtils';
 import { UserListContainer } from './UserListContainer';
 import { userService } from '../../../services/userService';
+import { authService } from '../../../services/authService';
 import type { UserListResponse, UserListItem } from '../../../types/user';
+import type { PendingUserResponse } from '../../../types/auth';
 
 const navigateMock = vi.fn();
 
@@ -22,10 +24,25 @@ vi.mock('../../../services/userService', () => ({
   },
 }));
 
+// The Add-User drawer orchestrates the register → approve workflow.
+vi.mock('../../../services/authService', () => ({
+  authService: {
+    register: vi.fn(),
+    fetchPendingUsers: vi.fn(),
+    approveUser: vi.fn(),
+    deactivateUser: vi.fn(),
+    login: vi.fn(),
+    getMe: vi.fn(),
+  },
+}));
+
 const listMock = vi.mocked(userService.list);
 const changeRoleMock = vi.mocked(userService.changeRole);
 const activateMock = vi.mocked(userService.activate);
 const deactivateMock = vi.mocked(userService.deactivate);
+const registerMock = vi.mocked(authService.register);
+const fetchPendingMock = vi.mocked(authService.fetchPendingUsers);
+const approveMock = vi.mocked(authService.approveUser);
 
 const makeUser = (overrides: Partial<UserListItem> = {}): UserListItem => ({
   id: 3,
@@ -75,6 +92,9 @@ describe('UserListContainer', () => {
     changeRoleMock.mockReset();
     activateMock.mockReset();
     deactivateMock.mockReset();
+    registerMock.mockReset();
+    fetchPendingMock.mockReset();
+    approveMock.mockReset();
   });
 
   it('renders users fetched from the service', async () => {
@@ -298,5 +318,129 @@ describe('UserListContainer', () => {
     renderWithProviders(<UserListContainer />);
 
     expect(await screen.findByText('No users found')).toBeInTheDocument();
+  });
+
+  it('opens the Add User drawer from the toolbar', async () => {
+    renderWithProviders(<UserListContainer />);
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Add User' }));
+
+    expect(screen.getByRole('dialog', { name: 'Add User' })).toBeInTheDocument();
+  });
+
+  it('adds a user through the register → approve workflow and shows a success toast', async () => {
+    registerMock.mockResolvedValue({
+      message: 'Registration submitted. Waiting for admin approval.',
+    });
+    const pendingUser: PendingUserResponse = {
+      id: 9,
+      full_name: 'Jane Doe',
+      email: 'jane@example.com',
+      status: 'pending',
+    };
+    fetchPendingMock.mockResolvedValue([pendingUser]);
+    approveMock.mockResolvedValue({ message: 'User approved successfully.' });
+
+    renderWithProviders(<UserListContainer />);
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+    // Capture the count BEFORE the workflow — the invalidation-triggered
+    // refetch is fast, so a post-approve capture would already include it.
+    const listCallsBeforeSubmit = listMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add User' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add User' });
+    fireEvent.change(within(dialog).getByLabelText(/full name/i), {
+      target: { value: 'Jane Doe' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/email address/i), {
+      target: { value: 'jane@example.com' },
+    });
+    fireEvent.change(within(dialog).getByPlaceholderText('Create a strong password'), {
+      target: { value: 'Secure@Pass1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/role/i), { target: { value: '3' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add User' }));
+
+    await waitFor(() => expect(registerMock).toHaveBeenCalled());
+    await waitFor(() => expect(approveMock).toHaveBeenCalledWith(9, 3));
+
+    // Approve invalidates the user directory — the list refetches.
+    await waitFor(() =>
+      expect(listMock.mock.calls.length).toBeGreaterThan(listCallsBeforeSubmit),
+    );
+
+    // Success closes the drawer and reports a success toast.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByText('User added')).toBeInTheDocument();
+  });
+
+  it('keeps the drawer open and shows the backend message on duplicate email', async () => {
+    registerMock.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 409, data: { message: 'Email already registered' } },
+    });
+
+    renderWithProviders(<UserListContainer />);
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Add User' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add User' });
+    fireEvent.change(within(dialog).getByLabelText(/full name/i), {
+      target: { value: 'Jane Doe' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/email address/i), {
+      target: { value: 'jane@example.com' },
+    });
+    fireEvent.change(within(dialog).getByPlaceholderText('Create a strong password'), {
+      target: { value: 'Secure@Pass1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/role/i), { target: { value: '3' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add User' }));
+
+    expect(await screen.findByText('Email already registered')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Add User' })).toBeInTheDocument();
+    expect(approveMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a warning toast when automatic approval fails after registration', async () => {
+    registerMock.mockResolvedValue({
+      message: 'Registration submitted. Waiting for admin approval.',
+    });
+    fetchPendingMock.mockResolvedValue([
+      { id: 9, full_name: 'Jane Doe', email: 'jane@example.com', status: 'pending' },
+    ]);
+    approveMock.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 400, data: { message: 'User is already active' } },
+    });
+
+    renderWithProviders(<UserListContainer />);
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Add User' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add User' });
+    fireEvent.change(within(dialog).getByLabelText(/full name/i), {
+      target: { value: 'Jane Doe' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/email address/i), {
+      target: { value: 'jane@example.com' },
+    });
+    fireEvent.change(within(dialog).getByPlaceholderText('Create a strong password'), {
+      target: { value: 'Secure@Pass1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/role/i), { target: { value: '3' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add User' }));
+
+    // The account was registered; only automatic approval failed — the
+    // drawer closes and a warning toast explains the user is pending.
+    expect(
+      await screen.findByText('User registered — approval pending'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });

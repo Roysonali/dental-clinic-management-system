@@ -1,9 +1,11 @@
-import { useState, type FC } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserTable } from '../UserTable';
 import { Pagination } from '../../common/Pagination/Pagination';
 import { UserStatusDialog, type UserStatusIntent } from '../UserStatusDialog';
 import { UserRoleDialog } from '../UserRoleDialog';
+import { ToastContainer, type Toast } from '../../common/Toast';
+import { UserCreateContainer, type UserCreationResult } from './UserCreateContainer';
 import { useUsers } from '../../../hooks/users/useUsers';
 import { useUserFilters } from '../../../hooks/users/useUserFilters';
 import {
@@ -15,6 +17,9 @@ import { parseApiError } from '../../../services/apiError';
 import { isRoleUnchanged } from '../../../utils/userFormUtils';
 import { ROUTES } from '../../../routes/routes';
 import type { UserListItem } from '../../../types/user';
+
+/** Toast lifetime before auto-dismiss (ms). */
+const TOAST_DURATION_MS = 5000;
 
 type StatusState = { user: UserListItem; intent: UserStatusIntent } | null;
 
@@ -37,6 +42,9 @@ export const UserListContainer: FC = () => {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [roleUser, setRoleUser] = useState<UserListItem | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const toastSeq = useRef(0);
 
   const activateMutation = useActivateUser();
   const deactivateMutation = useDeactivateUser();
@@ -66,6 +74,29 @@ export const UserListContainer: FC = () => {
       onError: (error) => setStatusError(parseApiError(error).message),
     });
   };
+
+  /** Map an Add-User workflow outcome onto a transient success/warning toast. */
+  const handleCreated = (result: UserCreationResult) => {
+    const variant =
+      result.outcome === 'approved'
+        ? 'success'
+        : result.outcome === 'pending'
+          ? 'info'
+          : 'warning';
+    setToast({
+      id: `add-user-${++toastSeq.current}`,
+      variant,
+      title: result.title,
+      description: result.description,
+    });
+  };
+
+  // Auto-dismiss the success toast after a short delay.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), TOAST_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const handleRoleConfirm = (roleId: number) => {
     if (!roleUser) return;
@@ -108,6 +139,7 @@ export const UserListContainer: FC = () => {
         onChangeRole={(user) => setRoleUser(user)}
         onActivate={(user) => setStatusState({ user, intent: 'activate' })}
         onDeactivate={(user) => setStatusState({ user, intent: 'deactivate' })}
+        onAddUser={() => setCreateOpen(true)}
       />
 
       <Pagination
@@ -143,6 +175,20 @@ export const UserListContainer: FC = () => {
           setRoleError(null);
         }}
       />
+
+      <UserCreateContainer
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={handleCreated}
+      />
+
+      {toast && (
+        <ToastContainer
+          toasts={[toast]}
+          position="top-right"
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

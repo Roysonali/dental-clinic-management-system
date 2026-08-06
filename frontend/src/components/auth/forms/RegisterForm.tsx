@@ -7,6 +7,7 @@ import { Input, PasswordInput } from '../../common/Input';
 import { Button } from '../../common/Button';
 import { Checkbox } from '../../common/Checkbox';
 import { parseApiError } from '../../../services/apiError';
+import { passwordSchema } from '../../../utils/passwordSchema';
 import type { RegisterFormValues } from '../../../types/auth';
 
 /* ── Password Strength Calculation ─────────────────────────────────── */
@@ -53,17 +54,7 @@ const registerSchema = z
       .min(1, 'Email address is required')
       .email('Please enter a valid email address')
       .transform((val) => val.trim().toLowerCase()),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .max(128, 'Password must not exceed 128 characters')
-      .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
-      .regex(/[a-z]/, 'Must contain at least one lowercase letter')
-      .regex(/\d/, 'Must contain at least one digit')
-      .regex(
-        /[^a-zA-Z0-9]/,
-        'Must contain at least one special character',
-      ),
+    password: passwordSchema,
     confirm_password: z.string().min(1, 'Please confirm your password'),
     terms_accepted: z
       .boolean()

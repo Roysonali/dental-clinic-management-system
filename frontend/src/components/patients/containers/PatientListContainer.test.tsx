@@ -16,6 +16,21 @@ vi.mock('../../../services/patientService', () => ({
   },
 }));
 
+// Sprint 11C: mutable permission identity. Defaults to non-admin (matches
+// the context-safe behaviour outside an AuthProvider) so the ADMIN-only
+// status row actions stay hidden unless a test opts into admin.
+const permissionMock = {
+  state: { status: 'non-admin' as const, role: null },
+  isAdmin: false,
+  isResolved: true,
+  role: null,
+  can: vi.fn(() => false),
+};
+
+vi.mock('../../../hooks/rbac/usePermission', () => ({
+  usePermission: () => permissionMock,
+}));
+
 const listMock = vi.mocked(patientService.list);
 
 const makeResponse = (total: number, page = 1): PatientListResponse => ({
@@ -48,6 +63,7 @@ describe('PatientListContainer', () => {
   beforeEach(() => {
     listMock.mockReset();
     listMock.mockResolvedValue(makeResponse(2));
+    permissionMock.can.mockReturnValue(false);
   });
 
   it('renders patients fetched from the service', async () => {
@@ -112,5 +128,30 @@ describe('PatientListContainer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Register Patient' }));
 
     expect(screen.getByRole('dialog', { name: 'Register Patient' })).toBeInTheDocument();
+  });
+
+  it('hides the ADMIN-only status row actions for non-admin users', async () => {
+    renderWithProviders(<PatientListContainer />);
+
+    await waitFor(() => expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument());
+    expect(
+      screen.queryByRole('button', { name: 'Deactivate Juan Dela Cruz' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reactivate Maria Santos' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the ADMIN-only status row actions for admins', async () => {
+    permissionMock.can.mockReturnValue(true);
+    renderWithProviders(<PatientListContainer />);
+
+    await waitFor(() => expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument());
+    expect(
+      screen.getByRole('button', { name: 'Deactivate Juan Dela Cruz' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reactivate Maria Santos' }),
+    ).toBeInTheDocument();
   });
 });

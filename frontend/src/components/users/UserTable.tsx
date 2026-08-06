@@ -58,6 +58,8 @@ interface UserTableProps {
   onClearFilters: () => void;
   onRefresh: () => void;
   refreshing?: boolean;
+  /** Opens the Add-User drawer (forwarded to the toolbar) */
+  onAddUser?: () => void;
   /* ── Row actions ── */
   onViewDetails?: (user: UserListItem) => void;
   onChangeRole?: (user: UserListItem) => void;
@@ -95,6 +97,7 @@ export const UserTable: FC<UserTableProps> = ({
   onClearFilters,
   onRefresh,
   refreshing = false,
+  onAddUser,
   onViewDetails,
   onChangeRole,
   onActivate,
@@ -115,8 +118,9 @@ export const UserTable: FC<UserTableProps> = ({
       rowActionsHeader={rowActionsHeader}
       emptyTitle="No users found"
       emptyDescription="Try adjusting your search or filters."
-      // NOTE: no `emptyAction` — the backend exposes no create endpoint, so
-      // there is no CTA to offer here.
+      // NOTE: no `emptyAction` here — the backend exposes no create
+      // endpoint. Adding users runs the register + approve workflow from
+      // the toolbar's "Add User" action instead.
       toolbar={({ columnVisibility, setColumnVisibility }) => (
         <UserToolbar
           searchValue={searchValue}
@@ -132,6 +136,7 @@ export const UserTable: FC<UserTableProps> = ({
           refreshing={refreshing}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={setColumnVisibility}
+          onAddUser={onAddUser}
         />
       )}
       columns={[

@@ -8,6 +8,8 @@ import type { PatientStatusIntent } from '../PatientStatusDialog';
 import { usePatients } from '../../../hooks/patients/usePatients';
 import { usePatientFilters } from '../../../hooks/patients/usePatientFilters';
 import { useActivatePatient, useDeactivatePatient } from '../../../hooks/patients/usePatientMutations';
+import { usePermission } from '../../../hooks/rbac/usePermission';
+import { ADMIN_ROLES } from '../../../constants/roles';
 import { parseApiError } from '../../../services/apiError';
 import type { PatientListItem } from '../../../types/patient';
 import type { RowKey } from '../../common/DataTable';
@@ -36,6 +38,13 @@ export const PatientListContainer: FC = () => {
   const activateMutation = useActivatePatient();
   const deactivateMutation = useDeactivatePatient();
   const statusSubmitting = activateMutation.isPending || deactivateMutation.isPending;
+
+  // Activate/deactivate are ADMIN-only on the backend (require_roles([ADMIN]))
+  // — hide the row actions for everyone else (Sprint 11C). Edit/create stay
+  // visible: they allow ADMIN + RECEPTIONIST, which the client cannot
+  // distinguish, so the backend enforces those.
+  const { can } = usePermission();
+  const canManageStatus = can(ADMIN_ROLES);
 
   const queryError = patientsQuery.error ? parseApiError(patientsQuery.error).message : null;
 
@@ -74,8 +83,8 @@ export const PatientListContainer: FC = () => {
         onSelectionChange={setSelectedKeys}
         onView={(patient) => navigate(`/patients/${patient.id}`)}
         onEdit={openEdit}
-        onDeactivate={(patient) => setStatusState({ patient, intent: 'deactivate' })}
-        onReactivate={(patient) => setStatusState({ patient, intent: 'reactivate' })}
+        onDeactivate={canManageStatus ? (patient) => setStatusState({ patient, intent: 'deactivate' }) : undefined}
+        onReactivate={canManageStatus ? (patient) => setStatusState({ patient, intent: 'reactivate' }) : undefined}
         onRowClick={(patient) => navigate(`/patients/${patient.id}`)}
       />
 

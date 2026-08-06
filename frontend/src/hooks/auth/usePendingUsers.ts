@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authService } from '../../services/authService';
 import { shouldRetryQuery } from '../../services/apiError';
+import { userQueryKeys } from '../users/useUsers';
 import type {
   PendingUserResponse,
   UserApprovalResponse,
@@ -25,13 +26,22 @@ export function usePendingUsers() {
   });
 }
 
-/** Approve a pending user — PATCH /auth/users/{id}/approve (admin only). */
+/**
+ * Approve a pending user — PATCH /auth/users/{id}/approve (admin only).
+ *
+ * Invalidates BOTH the pending-approval queue (the approved user leaves
+ * it) and the user directory (the approved user now appears in the
+ * `/users` list with an assigned role). The second invalidation also
+ * serves the Phase 1D Add-User flow, which approves a freshly registered
+ * account from the Add-User drawer.
+ */
 export function useApproveUser() {
   const queryClient = useQueryClient();
   return useMutation<UserApprovalResponse, Error, { userId: number; roleId: number }>({
     mutationFn: ({ userId, roleId }) => authService.approveUser(userId, roleId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: pendingUsersQueryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
     },
   });
 }

@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import type { RoleName } from '../../../constants/roles';
 
 /**
  * Navigation group identifiers.
@@ -30,8 +31,15 @@ export interface NavItemConfig {
   badge?: string | number;
   /** Visually disabled (non-interactive) */
   disabled?: boolean;
-  /** Placeholder for future RBAC filtering */
-  roles?: string[];
+  /**
+   * Roles that may see this item (Sprint 11C). When set, the item is
+   * rendered only for users whose resolved role satisfies the list (via
+   * `getNavGroups(role)`); when omitted the item is visible to everyone.
+   * Admin-only items use `ADMIN_ROLES` (ADMIN + CHIEF_DOCTOR) — the only
+   * roles the client can resolve. Items restricted to non-admin roles
+   * cannot be represented (backend limitation — see the sprint doc).
+   */
+  roles?: readonly RoleName[];
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { FilterX, RefreshCw } from 'lucide-react';
+import { FilterX, RefreshCw, UserPlus } from 'lucide-react';
 import { DataTableToolbar } from '../common/DataTable/DataTableToolbar';
 import { Button } from '../common/Button/Button';
 import { Icon } from '../common/Icon/Icon';
@@ -42,6 +42,8 @@ interface UserToolbarProps {
   /* ── Column visibility ── */
   columnVisibility?: ColumnVisibility;
   onColumnVisibilityChange?: (visibility: ColumnVisibility) => void;
+  /** Opens the Add-User drawer (Sprint 11B Phase 1D — register + approve flow) */
+  onAddUser?: () => void;
   /** Extra actions rendered before the clear/refresh actions */
   children?: ReactNode;
   /** Additional classes */
@@ -54,9 +56,10 @@ interface UserToolbarProps {
  * The search placeholder is intentionally explicit about the backend
  * contract: `GET /users` matches `full_name` OR `email` only.
  *
- * There is deliberately NO "Create User" button — the backend exposes no
- * create endpoint (accounts are self-registered and admin-approved via the
- * auth module).
+ * The "Add User" action (Sprint 11B Phase 1D) is NOT a create endpoint —
+ * the backend exposes none. It opens the Add-User drawer, which runs the
+ * verified POST /auth/register → PATCH /auth/users/{id}/approve workflow
+ * (`onAddUser`). Rendered only when the handler is provided.
  */
 export const UserToolbar: FC<UserToolbarProps> = ({
   searchValue,
@@ -72,6 +75,7 @@ export const UserToolbar: FC<UserToolbarProps> = ({
   refreshing = false,
   columnVisibility,
   onColumnVisibilityChange,
+  onAddUser,
   children,
   className = '',
 }) => {
@@ -89,6 +93,17 @@ export const UserToolbar: FC<UserToolbarProps> = ({
       className={className}
       primaryActions={
         <div className="flex items-center gap-2">
+          {onAddUser && (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={onAddUser}
+              leftIcon={<Icon icon={UserPlus} size="sm" />}
+              className="shrink-0 whitespace-nowrap"
+            >
+              Add User
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="md"

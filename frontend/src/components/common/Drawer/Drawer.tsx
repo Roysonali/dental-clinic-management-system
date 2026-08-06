@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, type FC, type ReactNode, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useCallback, type FC, type ReactNode, type KeyboardEvent, type RefObject } from 'react';
 import { OverlayLayerContext } from '../Overlay/OverlayLayerContext';
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -19,6 +19,12 @@ interface DrawerProps {
   children?: ReactNode;
   /** Accessible name for the dialog */
   ariaLabel?: string;
+  /**
+   * Optional element to receive focus when the drawer opens (e.g. the
+   * first form field). Defaults to the dialog panel itself. Kept optional
+   * and backward-compatible — existing usages are unaffected.
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
   /** Additional classes */
   className?: string;
 }
@@ -74,19 +80,19 @@ export const Drawer: FC<DrawerProps> & {
   Header: FC<DrawerHeaderProps>;
   Body: FC<DrawerBodyProps>;
   Footer: FC<DrawerFooterProps>;
-} = ({ open, onClose, position = 'right', size = 'md', children, ariaLabel, className = '' }) => {
+} = ({ open, onClose, position = 'right', size = 'md', children, ariaLabel, initialFocusRef, className = '' }) => {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
-  // Escape + overflow + focus save/restore + auto-focus panel
+  // Escape + overflow + focus save/restore + focus target
   useEffect(() => {
     if (!open) return;
     previousActiveElement.current = document.activeElement as HTMLElement;
 
-    // Move focus to the dialog panel
+    // Move focus to the requested element (default: the dialog panel).
     requestAnimationFrame(() => {
-      panelRef.current?.focus();
+      (initialFocusRef?.current ?? panelRef.current)?.focus();
     });
 
     const handleEscape = (e: globalThis.KeyboardEvent) => {
@@ -100,7 +106,7 @@ export const Drawer: FC<DrawerProps> & {
       document.body.style.overflow = '';
       previousActiveElement.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open, onClose, initialFocusRef]);
 
   // Tab focus trap
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
