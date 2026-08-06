@@ -57,11 +57,14 @@ export const UserMenu: FC<UserMenuProps> = ({
 
   return (
     <Dropdown className={className}>
-      <Dropdown.Trigger>
+      {/* asChild: the inner button IS the trigger — no nested <button>.
+          Its accessible name comes from its content (user name + role),
+          so screen readers announce the actual user rather than a generic
+          "User menu" label. */}
+      <Dropdown.Trigger asChild>
         <button
           type="button"
           className="flex items-center gap-3 rounded-lg p-1.5 hover:bg-neutral-100 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          aria-label="User menu"
         >
           {avatar ?? (
             <Avatar size="md" initials={initials} />

@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.modules.auth.models import User
 from app.modules.doctors.constants import (
     ALLOWED_SORT_FIELDS,
     DEFAULT_PAGE_SIZE,
@@ -40,10 +41,20 @@ class DoctorRepository:
 
     @staticmethod
     def _build_search_filter(search: str) -> or_:
+        """Build the search predicate for the documented search contract.
+
+        Contract (UI placeholder / architecture blueprint / frontend):
+        search matches **doctor code** or **doctor full name** only.
+
+        NOTE: registration_number was previously searched here, which
+        violated the documented contract — searching by registration
+        number is intentionally NOT supported. The User table must be
+        joined by callers when this filter is applied.
+        """
         pattern = f"%{search}%"
         return or_(
             Doctor.doctor_code.ilike(pattern),
-            Doctor.registration_number.ilike(pattern),
+            User.full_name.ilike(pattern),
         )
 
     def add(self, doctor: Doctor) -> None:
@@ -151,7 +162,16 @@ class DoctorRepository:
                 )
             )
 
+        # The User join is required when searching by full name OR sorting by
+        # full name. Apply it to both the count and the select statements so
+        # the total reflects the same filtered population (no N+1 queries —
+        # a single LEFT JOIN against the users table). The count only needs
+        # the join when the search filter actually references User.full_name.
+        needs_user_join = bool(search) or sort_field == "full_name"
+
         count_stmt = select(func.count()).select_from(Doctor)
+        if search:
+            count_stmt = count_stmt.join(Doctor.user, isouter=True)
         if filters:
             count_stmt = count_stmt.where(*filters)
         total: int = self.db.execute(count_stmt).scalar() or 0
@@ -166,7 +186,7 @@ class DoctorRepository:
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
-        if sort_field == "full_name":
+        if needs_user_join:
             stmt = stmt.join(Doctor.user, isouter=True)
         if filters:
             stmt = stmt.where(*filters)

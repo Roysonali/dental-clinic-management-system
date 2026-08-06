@@ -28,13 +28,13 @@ export const HeaderCenter: FC<HeaderCenterProps> = ({ onOpenCommandPalette }) =>
         variant="ghost"
         size="sm"
         leftIcon={<Icon icon={Search} size="sm" />}
-        className="hidden sm:inline-flex w-56 justify-start text-neutral-400 hover:text-neutral-500"
+        className="hidden h-9 w-64 justify-start rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-400 shadow-sm transition-colors duration-150 hover:border-neutral-300 hover:bg-neutral-100 hover:text-neutral-500 sm:inline-flex"
         aria-label="Open search"
         onClick={onOpenCommandPalette}
       >
         <span className="flex w-full items-center justify-between">
           <span>Search</span>
-          <kbd className="ml-auto flex items-center gap-0.5 rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-caption font-medium text-neutral-400 shadow-xs">
+          <kbd className="ml-auto flex items-center gap-0.5 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-caption font-medium text-neutral-500">
             <span className="text-caption">⌘</span>
             <span>K</span>
           </kbd>

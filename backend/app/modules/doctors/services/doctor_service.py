@@ -240,7 +240,7 @@ class DoctorService:
         Args:
             page: One-based page index (default: 1).
             page_size: Number of items per page (default: 20).
-            search: Optional full-name or email search string.
+            search: Optional doctor-code or full-name search string.
             specialization_id: Filter by specialization ID.
             is_active: Filter by active status.
             is_available: Filter by availability flag.
@@ -571,7 +571,11 @@ class DoctorService:
         """
         doctor = self._get_doctor_or_raise(doctor_id)
         if doctor.schedules:
-            doctor.schedules.sort(key=lambda s: s.day_of_week.value)
+            # day_of_week is a plain Integer column (0=Monday..5=Saturday),
+            # NOT an Enum — sorting must use the raw integer value. Using
+            # `.value` here previously raised AttributeError → HTTP 500.
+            # Mirrors ScheduleService.replace_week_schedule ordering.
+            doctor.schedules.sort(key=lambda s: s.day_of_week)
         return doctor
 
 

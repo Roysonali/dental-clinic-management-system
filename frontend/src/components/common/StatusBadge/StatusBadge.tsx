@@ -2,6 +2,17 @@ import type { FC } from 'react';
 import { Badge } from '../Badge';
 import type { BadgeVariant, BadgeSize } from '../Badge';
 
+const dotColors: Record<BadgeVariant, string> = {
+  primary: 'bg-primary-500',
+  secondary: 'bg-neutral-500',
+  success: 'bg-success',
+  warning: 'bg-warning',
+  danger: 'bg-danger',
+  info: 'bg-info',
+  neutral: 'bg-neutral-400',
+  outline: 'bg-neutral-400',
+};
+
 /**
  * Default status-to-variant mapping for common DensCare domain statuses.
  * Consumers can override via the `statusMap` prop for custom enums.
@@ -42,6 +53,8 @@ interface StatusBadgeProps {
   size?: BadgeSize;
   /** Optional custom status-to-variant map */
   statusMap?: Record<string, BadgeVariant>;
+  /** Render a small status dot before the label */
+  showDot?: boolean;
   /** Additional classes */
   className?: string;
 }
@@ -62,6 +75,7 @@ export const StatusBadge: FC<StatusBadgeProps> = ({
   label,
   size = 'sm',
   statusMap,
+  showDot = false,
   className = '',
 }) => {
   const mergedMap = { ...defaultStatusMap, ...statusMap };
@@ -75,6 +89,12 @@ export const StatusBadge: FC<StatusBadgeProps> = ({
 
   return (
     <Badge variant={variant} size={size} className={className}>
+      {showDot && (
+        <span
+          aria-hidden="true"
+          className={`h-1.5 w-1.5 rounded-full ${dotColors[variant]}`}
+        />
+      )}
       {displayLabel}
     </Badge>
   );

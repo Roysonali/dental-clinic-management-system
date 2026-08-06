@@ -5,11 +5,11 @@ import { Skeleton } from '../Skeleton/Skeleton';
 /* ── Style Maps ──────────────────────────────────────────────────────── */
 
 const variantStyles: Record<CardVariant, string> = {
-  default: 'bg-white border border-neutral-200',
+  default: 'bg-white border border-neutral-200 shadow-sm',
   outlined: 'bg-white border-2 border-neutral-200',
-  elevated: 'bg-white border border-neutral-100 shadow-md',
+  elevated: 'bg-white border border-neutral-200 shadow-md',
   filled: 'bg-neutral-50 border border-neutral-200',
-  interactive: 'bg-white border border-neutral-200 cursor-pointer hover:border-primary-300 hover:shadow-sm active:border-primary-400 transition-all duration-150',
+  interactive: 'bg-white border border-neutral-200 shadow-sm cursor-pointer hover:border-primary-300 hover:shadow-md active:border-primary-400 transition-all duration-150',
 };
 
 const sizeStyles: Record<CardSize, string> = {

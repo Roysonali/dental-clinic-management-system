@@ -77,9 +77,21 @@ app.include_router(billing_router)
 register_exception_handlers(app)
 
 # CORS configuration
+#
+# The frontend dev server (Vite) can be opened via either `localhost` or
+# `127.0.0.1`; the Origin header the browser sends depends on which hostname
+# was typed into the address bar. The frontend API client
+# (frontend/src/services/api.ts) targets `http://127.0.0.1:8000`, so BOTH
+# dev-server origins must be allow-listed. Without `http://127.0.0.1:5173`,
+# opening the app at http://127.0.0.1:5173 makes every browser request a
+# cross-origin request whose Origin is not allow-listed → the browser blocks
+# the response with "Access to XMLHttpRequest ... blocked by CORS".
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

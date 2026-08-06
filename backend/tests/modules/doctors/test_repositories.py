@@ -47,3 +47,59 @@ class TestDoctorSpecializationRepository:
         ds = DoctorSpecialization(doctor_id=doctor.id, specialization_id=specialization.id, is_primary=True)
         repo.assign_specialization(ds)
         assert repo.get_primary_specialization(doctor.id) is not None
+
+
+# ======================================================================
+# F2 regression: list search contract (doctor code + full name only)
+# ======================================================================
+
+
+class TestDoctorRepositorySearchContract:
+    """Regression for the F2 production finding.
+
+    The documented search contract is: doctor code OR doctor full name.
+    Previously the repository searched doctor_code + registration_number
+    and did not join the users table, so full-name search silently
+    returned nothing.
+    """
+
+    def test_search_by_doctor_code(self, db, doctor):
+        repo = DoctorRepository(db)
+        items, total = repo.list(search=doctor.doctor_code[:8], page=1, page_size=10)
+        assert total >= 1
+        assert any(d.id == doctor.id for d in items)
+
+    def test_search_by_full_name(self, db):
+        from tests.modules.doctors.conftest import UserFactory, DoctorFactory
+        u = UserFactory.create(db, full_name="Alice Reyes", email="alice@t.com")
+        DoctorFactory.create(db, user_id=u.id)
+        repo = DoctorRepository(db)
+        items, total = repo.list(search="Reyes", page=1, page_size=10)
+        assert total == 1
+        assert items[0].user.full_name == "Alice Reyes"
+
+    def test_search_partial_full_name_case_insensitive(self, db):
+        from tests.modules.doctors.conftest import UserFactory, DoctorFactory
+        u = UserFactory.create(db, full_name="Maria Clara Santos", email="mcs@t.com")
+        DoctorFactory.create(db, user_id=u.id)
+        repo = DoctorRepository(db)
+        items, total = repo.list(search="clara", page=1, page_size=10)
+        assert total == 1
+        assert items[0].user.full_name == "Maria Clara Santos"
+
+    def test_search_no_matches(self, db, doctor):
+        repo = DoctorRepository(db)
+        items, total = repo.list(search="zzzz-no-such-doctor", page=1, page_size=10)
+        assert total == 0
+        assert items == []
+
+    def test_search_count_matches_filtered_population(self, db):
+        """total must reflect the full-name filter (count query joins users too)."""
+        from tests.modules.doctors.conftest import UserFactory, DoctorFactory
+        for i in range(3):
+            u = UserFactory.create(db, full_name=f"Juan Dela Cruz {i}", email=f"jdc{i}@t.com")
+            DoctorFactory.create(db, user_id=u.id)
+        repo = DoctorRepository(db)
+        items, total = repo.list(search="Dela", page=1, page_size=2)
+        assert total == 3
+        assert len(items) == 2

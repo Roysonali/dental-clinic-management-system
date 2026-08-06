@@ -26,7 +26,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({ item, collapsed, isActive })
   // Disabled items render as a span instead of a link
   if (item.disabled) {
     return (
-      <div className="group relative px-3 py-1">
+      <div className="group relative mx-2">
         <div
           className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 opacity-40"
           aria-disabled="true"
@@ -45,10 +45,10 @@ export const SidebarItem: FC<SidebarItemProps> = ({ item, collapsed, isActive })
   const linkContent = (
     <div
       className={`
-        flex items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-150
+        flex items-center gap-3 rounded-lg px-3 py-2 text-body-sm font-medium transition-all duration-150
         ${
           isActive
-            ? 'bg-primary-50 text-primary-700'
+            ? 'bg-primary-50 font-semibold text-primary-700'
             : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-800'
         }
       `}
@@ -59,7 +59,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({ item, collapsed, isActive })
         className={`shrink-0 ${isActive ? 'text-primary-600' : 'text-neutral-400'}`}
       />
       {!collapsed && (
-        <span className="text-body-sm font-medium">{item.label}</span>
+        <span className="truncate">{item.label}</span>
       )}
     </div>
   );
@@ -67,13 +67,13 @@ export const SidebarItem: FC<SidebarItemProps> = ({ item, collapsed, isActive })
   const link = item.route ? (
     <NavLink
       to={item.route}
-      className="block px-3 py-1"
+      className="block mx-2"
       aria-current={isActive ? 'page' : undefined}
     >
       {linkContent}
     </NavLink>
   ) : (
-    <div className="px-3 py-1">{linkContent}</div>
+    <div className="mx-2">{linkContent}</div>
   );
 
   // In collapsed mode, wrap with a tooltip

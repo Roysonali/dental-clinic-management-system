@@ -30,8 +30,9 @@ export const NotificationMenu: FC<NotificationMenuProps> = ({ className = '' }) 
 
   return (
     <Dropdown className={className}>
-      <Dropdown.Trigger>
-        <Tooltip content="Notifications" position="bottom">
+      <Tooltip content="Notifications" position="bottom">
+        {/* asChild: the IconButton is the trigger itself — no nested <button>. */}
+        <Dropdown.Trigger asChild>
           <IconButton
             icon={
               <span className="relative">
@@ -47,8 +48,8 @@ export const NotificationMenu: FC<NotificationMenuProps> = ({ className = '' }) 
             size="sm"
             aria-label={`Notifications (${unreadCount} unread)`}
           />
-        </Tooltip>
-      </Dropdown.Trigger>
+        </Dropdown.Trigger>
+      </Tooltip>
 
       <Dropdown.Content align="end" className="w-[360px]">
         {/* Header */}

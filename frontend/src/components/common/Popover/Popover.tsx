@@ -2,6 +2,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useLayoutEffect,
   useCallback,
   createContext,
   useContext,
@@ -9,9 +10,19 @@ import {
   type ReactNode,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
+import { useOverlayLayer } from '../Overlay/OverlayLayerContext';
 
 export type PopoverSide = 'bottom' | 'top' | 'left' | 'right';
 export type PopoverAlign = 'start' | 'center' | 'end';
+export type PopoverZIndex =
+  | 'z-tooltip'
+  | 'z-dropdown'
+  | 'z-datepicker'
+  | 'z-drawer'
+  | 'z-modal'
+  | 'z-notification'
+  | 'z-overlay';
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -32,7 +43,16 @@ interface PopoverProps {
   restoreFocusOnClose?: boolean;
   /** Move focus into the content panel when the popover opens */
   focusOnOpen?: boolean;
-  /** Additional classes for wrapper */
+  /** Gap (px) between the trigger and the content */
+  offset?: number;
+  /** Z-index layer token applied to the floating content */
+  zIndex?: PopoverZIndex;
+  /**
+   * Override the portal target. Defaults to the nearest overlay layer
+   * (Drawer/Modal) root, falling back to `document.body`.
+   */
+  portalContainer?: HTMLElement | null;
+  /** Additional classes for the trigger wrapper */
   className?: string;
 }
 
@@ -77,6 +97,9 @@ interface PopoverContextValue {
   contentRef: React.RefObject<HTMLDivElement | null>;
   side: PopoverSide;
   align: PopoverAlign;
+  offset: number;
+  zIndex: PopoverZIndex;
+  portalContainer: HTMLElement | null;
   focusOnOpen: boolean;
 }
 
@@ -88,20 +111,99 @@ function usePopoverContext(): PopoverContextValue {
   return ctx;
 }
 
-/* ── Position maps ──────────────────────────────────────────────────── */
+/* ── Positioning ────────────────────────────────────────────────────── */
 
-const sideMap: Record<PopoverSide, string> = {
-  bottom: 'top-full mt-2',
-  top: 'bottom-full mb-2',
-  left: 'right-full mr-2',
-  right: 'left-full ml-2',
-};
+interface PopoverPosition {
+  top: number;
+  left: number;
+  width?: number;
+  ready: boolean;
+}
 
-const alignMap: Record<PopoverAlign, string> = {
-  start: 'left-0',
-  center: 'left-1/2 -translate-x-1/2',
-  end: 'right-0',
-};
+const EDGE_MARGIN = 8;
+
+/**
+ * Compute fixed-viewport coordinates for the content relative to the
+ * trigger. Flips to the opposite side when there is not enough space and
+ * clamps the popover inside the viewport, so it never renders off-screen
+ * or under another control when the space available is insufficient.
+ */
+function computePosition(opts: {
+  trigger: HTMLElement;
+  content: HTMLElement;
+  side: PopoverSide;
+  align: PopoverAlign;
+  offset: number;
+  contentClassName: string;
+}): PopoverPosition {
+  const { trigger, content, side, align, offset, contentClassName } = opts;
+  const triggerRect = trigger.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  const matchTriggerWidth = contentClassName.split(/\s+/).includes('w-full');
+  const contentWidth = matchTriggerWidth
+    ? Math.min(triggerRect.width, vw - EDGE_MARGIN * 2)
+    : undefined;
+  if (matchTriggerWidth && contentWidth !== undefined) {
+    content.style.width = `${contentWidth}px`;
+  }
+
+  const contentRect = content.getBoundingClientRect();
+  const cw = contentWidth ?? contentRect.width;
+  const ch = contentRect.height;
+
+  let top: number;
+  let left: number;
+
+  if (side === 'bottom' || side === 'top') {
+    if (align === 'start') left = triggerRect.left;
+    else if (align === 'center') left = triggerRect.left + (triggerRect.width - cw) / 2;
+    else left = triggerRect.right - cw;
+
+    const topForBottom = triggerRect.bottom + offset;
+    const topForTop = triggerRect.top - ch - offset;
+    const bottomFits = topForBottom + ch <= vh - EDGE_MARGIN;
+    const topFits = topForTop >= EDGE_MARGIN;
+
+    if (side === 'bottom') {
+      top = bottomFits ? topForBottom : topFits ? topForTop : topForBottom;
+    } else {
+      top = topFits ? topForTop : bottomFits ? topForBottom : topForTop;
+    }
+
+    if (cw > vw - EDGE_MARGIN * 2) {
+      left = EDGE_MARGIN;
+    } else if (left < EDGE_MARGIN) {
+      left = EDGE_MARGIN;
+    } else if (left + cw > vw - EDGE_MARGIN) {
+      left = Math.max(EDGE_MARGIN, vw - EDGE_MARGIN - cw);
+    }
+  } else {
+    if (align === 'start') top = triggerRect.top;
+    else if (align === 'center') top = triggerRect.top + (triggerRect.height - ch) / 2;
+    else top = triggerRect.bottom - ch;
+
+    const leftForRight = triggerRect.right + offset;
+    const leftForLeft = triggerRect.left - cw - offset;
+    const rightFits = leftForRight + cw <= vw - EDGE_MARGIN;
+    const leftFits = leftForLeft >= EDGE_MARGIN;
+
+    if (side === 'right') {
+      left = rightFits ? leftForRight : leftFits ? leftForLeft : leftForRight;
+    } else {
+      left = leftFits ? leftForLeft : rightFits ? leftForRight : leftForLeft;
+    }
+
+    if (top < EDGE_MARGIN) {
+      top = EDGE_MARGIN;
+    } else if (top + ch > vh - EDGE_MARGIN) {
+      top = Math.max(EDGE_MARGIN, vh - EDGE_MARGIN - ch);
+    }
+  }
+
+  return { top, left, width: contentWidth, ready: true };
+}
 
 /* ── Popover Container ─────────────────────────────────────────────── */
 
@@ -117,6 +219,9 @@ export const Popover: FC<PopoverProps> & {
   onOpenChange,
   restoreFocusOnClose = true,
   focusOnOpen = false,
+  offset = 8,
+  zIndex = 'z-dropdown',
+  portalContainer,
   className = '',
 }) => {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
@@ -199,7 +304,18 @@ export const Popover: FC<PopoverProps> & {
 
   return (
     <PopoverContext.Provider
-      value={{ open, setOpen, triggerRef, contentRef, side, align, focusOnOpen }}
+      value={{
+        open,
+        setOpen,
+        triggerRef,
+        contentRef,
+        side,
+        align,
+        offset,
+        zIndex,
+        portalContainer: portalContainer ?? null,
+        focusOnOpen,
+      }}
     >
       <div className={`relative inline-block ${className}`}>
         {children}
@@ -291,27 +407,85 @@ const PopoverContent: FC<PopoverContentProps> = ({
   id,
   ariaLabel,
 }) => {
-  const { open, contentRef, side, align, focusOnOpen } = usePopoverContext();
+  const { open, contentRef, triggerRef, side, align, offset, zIndex, portalContainer, focusOnOpen } =
+    usePopoverContext();
+  const overlayLayer = useOverlayLayer();
+
+  const [pos, setPos] = useState<PopoverPosition>({ top: 0, left: 0, ready: false });
+
+  const portalTarget = portalContainer ?? overlayLayer?.containerRef.current ?? document.body;
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const content = contentRef.current;
+    if (!trigger || !content) return;
+    setPos(computePosition({ trigger, content, side, align, offset, contentClassName: className }));
+  }, [triggerRef, contentRef, side, align, offset, className]);
+
+  // Position synchronously before paint so there is never a visible jump.
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePosition();
+  }, [open, updatePosition]);
+
+  // Reposition on any scroll (capture catches nested scroll containers such
+  // as a Drawer Body) and on window resize / device orientation change.
+  useEffect(() => {
+    if (!open) return;
+    let raf: number | null = null;
+    const reposition = () => {
+      if (raf !== null) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = null;
+        updatePosition();
+      });
+    };
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+      if (raf !== null) window.cancelAnimationFrame(raf);
+    };
+  }, [open, updatePosition]);
+
+  // Reposition when the content itself resizes (e.g. DatePicker switching
+  // between the day grid and the month/year grids).
+  useEffect(() => {
+    if (!open || typeof ResizeObserver === 'undefined') return;
+    const content = contentRef.current;
+    if (!content) return;
+    const observer = new ResizeObserver(() => updatePosition());
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [open, updatePosition, contentRef]);
 
   if (!open) return null;
 
-  return (
+  const contentElement = (
     <div
       ref={contentRef}
       id={id}
       role={role}
       aria-label={ariaLabel}
       tabIndex={focusOnOpen ? -1 : undefined}
+      style={{
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
+        width: pos.width,
+        visibility: pos.ready ? 'visible' : 'hidden',
+      }}
       className={`
-        absolute z-dropdown rounded-lg border border-neutral-200 bg-white shadow-lg
-        ${sideMap[side]}
-        ${alignMap[align]}
+        ${zIndex} rounded-lg border border-neutral-200 bg-white shadow-lg
         ${className}
       `}
     >
       {children}
     </div>
   );
+
+  return createPortal(contentElement, portalTarget);
 };
 
 /* ── Attach sub-components ─────────────────────────────────────────── */

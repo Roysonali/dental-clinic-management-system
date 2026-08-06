@@ -19,12 +19,12 @@ describe('AppointmentStatusBadge', () => {
 
   it('maps multi-word statuses to the configured variant colours', () => {
     // The variant classes live on the outer Badge span; the inner span holds
-    // the text. info → bg-blue-100, danger → bg-red-100.
+    // the text. info → bg-blue-50, danger → bg-red-50.
     renderWithProviders(<AppointmentStatusBadge status="Checked In" />);
-    expect(screen.getByText('Checked In').parentElement?.className).toContain('bg-blue-100');
+    expect(screen.getByText('Checked In').parentElement?.className).toContain('bg-blue-50');
 
     renderWithProviders(<AppointmentStatusBadge status="No Show" />);
-    expect(screen.getByText('No Show').parentElement?.className).toContain('bg-red-100');
+    expect(screen.getByText('No Show').parentElement?.className).toContain('bg-red-50');
   });
 
   it('supports a custom size', () => {

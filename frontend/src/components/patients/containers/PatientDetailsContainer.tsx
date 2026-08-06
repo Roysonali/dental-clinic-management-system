@@ -17,6 +17,9 @@ import { TreatmentSummaryCard } from '../TreatmentSummaryCard';
 import { PatientFormContainer } from './PatientFormContainer';
 import { PatientStatusDialog } from '../PatientStatusDialog';
 import type { PatientStatusIntent } from '../PatientStatusDialog';
+import { PermissionGate } from '../../rbac/PermissionGate';
+import { usePermission } from '../../../hooks/rbac/usePermission';
+import { ADMIN_ROLES } from '../../../constants/roles';
 import { Tabs } from '../../common/Tabs/Tabs';
 import { Button } from '../../common/Button/Button';
 import { Icon } from '../../common/Icon/Icon';
@@ -95,6 +98,12 @@ export const PatientDetailsContainer: FC = () => {
   const deactivateMutation = useDeactivatePatient();
   const statusSubmitting = activateMutation.isPending || deactivateMutation.isPending;
 
+  // Activate/deactivate are ADMIN-only on the backend (require_roles([ADMIN]))
+  // — gate them client-side (Sprint 11C). Edit stays visible (ADMIN +
+  // RECEPTIONIST — indistinguishable client-side; backend enforces).
+  const { can } = usePermission();
+  const canManageStatus = can(ADMIN_ROLES);
+
   const errorMessage = patientQuery.error ? parseApiError(patientQuery.error).message : null;
 
   const handleStatusConfirm = () => {
@@ -150,14 +159,16 @@ export const PatientDetailsContainer: FC = () => {
               >
                 Edit
               </Button>
-              <Button
-                variant={patient.is_active ? 'danger' : 'success'}
-                size="sm"
-                onClick={() => setStatusState({ intent: patient.is_active ? 'deactivate' : 'reactivate' })}
-                leftIcon={<Icon icon={patient.is_active ? UserX : UserCheck} size="sm" />}
-              >
-                {patient.is_active ? 'Deactivate' : 'Reactivate'}
-              </Button>
+              <PermissionGate requiredRoles={ADMIN_ROLES}>
+                <Button
+                  variant={patient.is_active ? 'danger' : 'success'}
+                  size="sm"
+                  onClick={() => setStatusState({ intent: patient.is_active ? 'deactivate' : 'reactivate' })}
+                  leftIcon={<Icon icon={patient.is_active ? UserX : UserCheck} size="sm" />}
+                >
+                  {patient.is_active ? 'Deactivate' : 'Reactivate'}
+                </Button>
+              </PermissionGate>
             </>
           }
         />
@@ -188,8 +199,13 @@ export const PatientDetailsContainer: FC = () => {
                 <QuickActionsCard
                   patient={patient}
                   onEdit={() => setEditOpen(true)}
-                  onToggleStatus={() =>
-                    setStatusState({ intent: patient.is_active ? 'deactivate' : 'reactivate' })
+                  onToggleStatus={
+                    canManageStatus
+                      ? () =>
+                          setStatusState({
+                            intent: patient.is_active ? 'deactivate' : 'reactivate',
+                          })
+                      : undefined
                   }
                 />
                 <TreatmentSummaryCard />

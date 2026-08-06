@@ -25,7 +25,7 @@ interface WorkspaceProps {
 export const Workspace: FC<WorkspaceProps> = ({ children, className = '' }) => {
   return (
     <main
-      className={`min-h-0 flex-1 overflow-y-auto bg-neutral-50 px-4 sm:px-6 lg:px-8 ${className}`}
+      className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-neutral-50 px-4 sm:px-6 lg:px-8 ${className}`}
       aria-label="Main content"
     >
       {children}

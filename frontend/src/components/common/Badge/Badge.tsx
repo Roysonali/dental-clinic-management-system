@@ -6,13 +6,13 @@ import { Icon } from '../Icon/Icon';
 /* ── Style Maps ───────────────────────────────────────────────────────── */
 
 const variantStyles: Record<BadgeVariant, string> = {
-  primary: 'bg-primary-100 text-primary-700',
-  secondary: 'bg-neutral-100 text-neutral-700',
-  success: 'bg-emerald-100 text-emerald-700',
-  warning: 'bg-amber-100 text-amber-700',
-  danger: 'bg-red-100 text-red-700',
-  info: 'bg-blue-100 text-blue-700',
-  neutral: 'bg-neutral-100 text-neutral-600',
+  primary: 'bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-200/60',
+  secondary: 'bg-neutral-100 text-neutral-700 ring-1 ring-inset ring-neutral-200/60',
+  success: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/60',
+  warning: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/60',
+  danger: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200/60',
+  info: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/60',
+  neutral: 'bg-neutral-100 text-neutral-600 ring-1 ring-inset ring-neutral-200/60',
   outline: 'bg-transparent text-neutral-600 border border-neutral-300',
 };
 

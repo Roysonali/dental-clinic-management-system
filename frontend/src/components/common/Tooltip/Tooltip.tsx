@@ -104,7 +104,7 @@ export const Tooltip: FC<TooltipProps> = ({
           className={`absolute z-tooltip ${positionMap[position]}`}
           role="tooltip"
         >
-          <div className="whitespace-nowrap rounded-md bg-neutral-800 px-2.5 py-1.5 text-caption text-white shadow-sm">
+          <div className="whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1.5 text-caption font-medium text-white shadow-lg ring-1 ring-white/10">
             {content}
           </div>
           <div className={`absolute ${arrowMap[position]}`} aria-hidden="true" />

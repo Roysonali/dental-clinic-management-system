@@ -1,5 +1,6 @@
 import type { FC, ReactNode } from 'react';
 import { Button } from '../Button/Button';
+import type { ButtonSize } from '../Button/button.types';
 
 /* ── Props ─────────────────────────────────────────────────────────── */
 
@@ -20,6 +21,8 @@ interface FormActionsProps {
   align?: 'left' | 'right' | 'between' | 'end';
   /** Stretch submit button to full width (mobile-friendly) */
   fullWidth?: boolean;
+  /** Size of the action buttons */
+  size?: ButtonSize;
   /** Extra actions rendered before the buttons */
   children?: ReactNode;
   /** Additional classes */
@@ -54,6 +57,7 @@ export const FormActions: FC<FormActionsProps> = ({
   cancelDisabled = false,
   align = 'right',
   fullWidth = false,
+  size = 'md',
   children,
   className = '',
 }) => {
@@ -71,6 +75,7 @@ export const FormActions: FC<FormActionsProps> = ({
         <Button
           type="button"
           variant="secondary"
+          size={size}
           onClick={onCancel}
           disabled={cancelDisabled}
           className={fullWidth ? 'w-full sm:w-auto' : ''}
@@ -81,6 +86,7 @@ export const FormActions: FC<FormActionsProps> = ({
       <Button
         type="submit"
         variant="primary"
+        size={size}
         loading={submitting}
         disabled={submitDisabled}
         className={fullWidth ? 'w-full sm:w-auto' : ''}

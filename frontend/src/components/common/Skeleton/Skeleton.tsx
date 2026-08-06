@@ -1,6 +1,15 @@
 import type { FC } from 'react';
 
-export type SkeletonVariant = 'text' | 'avatar' | 'card' | 'table-row' | 'button' | 'custom';
+export type SkeletonVariant =
+  | 'text'
+  | 'avatar'
+  | 'card'
+  | 'table-row'
+  | 'button'
+  | 'title'
+  | 'stat'
+  | 'badge'
+  | 'custom';
 
 interface SkeletonProps {
   /** Shape preset */
@@ -23,11 +32,14 @@ const presets: Record<
   SkeletonVariant,
   { className: string; defaultLines?: number }
 > = {
-  text: { className: 'h-4 w-full rounded', defaultLines: 1 },
+  text: { className: 'h-4 w-full rounded-md', defaultLines: 1 },
   avatar: { className: 'h-10 w-10 rounded-full', defaultLines: undefined },
-  card: { className: 'h-32 w-full rounded-lg', defaultLines: undefined },
-  'table-row': { className: 'h-12 w-full rounded', defaultLines: undefined },
+  card: { className: 'h-32 w-full rounded-xl', defaultLines: undefined },
+  'table-row': { className: 'h-14 w-full rounded-lg', defaultLines: undefined },
   button: { className: 'h-10 w-24 rounded-lg', defaultLines: undefined },
+  title: { className: 'h-6 w-48 rounded-md', defaultLines: 1 },
+  stat: { className: 'h-8 w-20 rounded-md', defaultLines: 1 },
+  badge: { className: 'h-5 w-16 rounded-full', defaultLines: 1 },
   custom: { className: '', defaultLines: undefined },
 };
 
@@ -43,15 +55,12 @@ export const Skeleton: FC<SkeletonProps> = ({
 }) => {
   const preset = presets[variant];
   const numLines = lines ?? preset.defaultLines ?? 1;
-  const animClass = animate
-    ? 'animate-pulse motion-reduce:animate-none'
-    : '';
+  const animClass = animate ? 'animate-skeleton motion-reduce:animate-none' : '';
 
   const skeletonClass = `
-    bg-neutral-200
+    bg-neutral-200/70
     ${animClass}
     ${preset.className}
-    ${width ? '' : ''}
     ${className}
   `;
 
@@ -61,7 +70,12 @@ export const Skeleton: FC<SkeletonProps> = ({
 
   if (variant === 'text' && numLines > 1) {
     return (
-      <div className="flex flex-col gap-2" role="status" aria-label="Loading content">
+      <div
+        className="flex flex-col gap-2"
+        role="status"
+        aria-label="Loading content"
+        data-skeleton="true"
+      >
         {Array.from({ length: numLines }).map((_, i) => (
           <div
             key={i}
@@ -83,6 +97,7 @@ export const Skeleton: FC<SkeletonProps> = ({
       style={style}
       role="status"
       aria-label="Loading"
+      data-skeleton="true"
     >
       <span className="sr-only">Loading...</span>
     </div>
