@@ -113,7 +113,29 @@ describe('parseApiError', () => {
       );
       expect(info.kind).toBe('validation');
       expect(info.fieldErrors).toEqual({ first_name: 'Field required', phone: 'Invalid phone' });
+      expect(info.nestedFieldErrors).toEqual({ first_name: 'Field required', phone: 'Invalid phone' });
       expect(info.message).toBe('Validation error');
+    });
+
+    it('maps nested array-of-object loc paths to dotted keys per row', () => {
+      const info = parseApiError(
+        httpError(422, envelope('Validation error', [
+          { loc: ['body', 'items', 0, 'medicine_name'], msg: 'Field required', type: 'missing' },
+          { loc: ['body', 'items', 2, 'medicine_name'], msg: 'Too short', type: 'string_too_short' },
+          { loc: ['body', 'notes'], msg: 'Too long', type: 'string_too_long' },
+        ])),
+      );
+      expect(info.nestedFieldErrors).toEqual({
+        'items.0.medicine_name': 'Field required',
+        'items.2.medicine_name': 'Too short',
+        notes: 'Too long',
+      });
+      // Flat map keeps the bare last-segment key (first row wins) — array
+      // forms must consume nestedFieldErrors to avoid collisions.
+      expect(info.fieldErrors).toEqual({
+        medicine_name: 'Field required',
+        notes: 'Too long',
+      });
     });
 
     it('classifies other 4xx as client errors with the status in the fallback', () => {

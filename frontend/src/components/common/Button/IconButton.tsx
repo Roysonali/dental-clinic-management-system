@@ -21,10 +21,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         variant={variant}
         size={size}
         iconOnly
+        leftIcon={icon}
         {...rest}
-      >
-        {icon}
-      </Button>
+      />
     );
   },
 );
