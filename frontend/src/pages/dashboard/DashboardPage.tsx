@@ -19,18 +19,22 @@ import { SectionHeader } from './SectionHeader';
 import { QuickActionCard } from './QuickActionCard';
 import { ActivityItem } from './ActivityItem';
 import { UpcomingAppointments } from '../../components/appointments/UpcomingAppointments';
+import { ActiveTreatmentPlansCard } from '../../components/treatmentPlans/ActiveTreatmentPlansCard';
 
 /**
- * DashboardPage — authenticated landing page with placeholder metrics
- * and UI sections.
+ * DashboardPage — authenticated landing page.
  *
- * All data is placeholder — no API calls, no business logic.
+ * The Overview metrics, Quick Actions and Recent Activity sections remain
+ * placeholder content (no backing API); the "My Treatment Plans" section
+ * is REAL — ActiveTreatmentPlansCard fetches `by-doctor` plans via the
+ * treatment plan service. Upcoming appointments are also live.
  *
  * Composes:
- * - Statistics grid (4 metric cards)
- * - Quick actions (4 action buttons)
+ * - Statistics grid (4 metric cards, placeholder)
+ * - Quick actions (4 action buttons, placeholder)
+ * - My Treatment Plans (live S-13 widget)
  * - Recent activity (placeholder timeline)
- * - Upcoming appointments (placeholder list)
+ * - Upcoming appointments (live list)
  */
 export const DashboardPage: FC = () => {
   return (
@@ -93,6 +97,14 @@ export const DashboardPage: FC = () => {
               icon={<Icon icon={Calendar} size="xl" className="text-info" />}
               label="View Calendar"
             />
+          </div>
+        </section>
+
+        {/* ── My Active Treatment Plans (S-13) ──────────── */}
+        <section aria-labelledby="my-treatment-plans-heading" className="mb-6">
+          <SectionHeader id="my-treatment-plans-heading" title="My Treatment Plans" />
+          <div className="mt-4">
+            <ActiveTreatmentPlansCard />
           </div>
         </section>
 
