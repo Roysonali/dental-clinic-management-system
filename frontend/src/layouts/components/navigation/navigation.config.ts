@@ -9,6 +9,7 @@ import {
   FlaskConical,
   Shield,
   UserCheck,
+  BookOpen,
   BarChart3,
   Settings,
 } from 'lucide-react';
@@ -138,6 +139,16 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         group: 'administration',
         // /auth/users/pending + approve/deactivate are require_admin too.
         roles: ADMIN_ROLES,
+      },
+      {
+        id: 'procedures',
+        label: 'Procedure Catalog',
+        icon: BookOpen,
+        route: ROUTES.PROCEDURES,
+        group: 'administration',
+        // Reads are 🅰 (no role gate); admin writes are gated inline via
+        // PermissionGate (⭐). Kept visible like the other 🅰 modules — the
+        // backend excludes DENTAL_ASSISTANT with 403 (R16, [MAP §9]).
       },
       {
         id: 'reports',

@@ -1,3 +1,4 @@
+import { Suspense, lazy, type FC } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
@@ -16,8 +17,30 @@ import { PendingUsersPage } from '../pages/admin/PendingUsersPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicOnlyRoute } from './PublicOnlyRoute';
 import { RequireRole } from '../components/rbac/RequireRole';
+import { Spinner } from '../components/common/Spinner';
 import { ROUTES } from './routes';
 import { ROUTE_ROLE_REQUIREMENTS } from './routeRequirements';
+
+// Route-level code splitting (F-05): the Treatment Plan + Procedure Catalog
+// pages are lazy-loaded into their own chunks so the initial dashboard bundle
+// stays lean. Named exports are mapped to default for React.lazy. The shared
+// Spinner fallback mirrors the app's loading language.
+const TreatmentPlanListPage = lazy(() =>
+  import('../pages/treatmentPlans/TreatmentPlanListPage').then((m) => ({ default: m.TreatmentPlanListPage })),
+);
+const TreatmentPlanDetailsPage = lazy(() =>
+  import('../pages/treatmentPlans/TreatmentPlanDetailsPage').then((m) => ({ default: m.TreatmentPlanDetailsPage })),
+);
+const ProcedureListPage = lazy(() =>
+  import('../pages/procedures/ProcedureListPage').then((m) => ({ default: m.ProcedureListPage })),
+);
+
+/** Suspense fallback for lazy routes — centred spinner with an accessible label. */
+const RouteFallback: FC = () => (
+  <div className="flex min-h-[50vh] w-full items-center justify-center" role="status" aria-live="polite">
+    <Spinner size="lg" centered label="Loading" />
+  </div>
+);
 
 /**
  * AppRouter — central routing component for the application.
@@ -38,7 +61,14 @@ import { ROUTE_ROLE_REQUIREMENTS } from './routeRequirements';
 const AppRouter = () => {
   return (
     <BrowserRouter>
-      <Routes>
+      {/*
+        Suspense wraps <Routes> (NOT the other way around — react-router
+        requires Routes children to be Route/Fragment only). The fallback
+        renders only while a lazy route chunk loads; statically imported
+        routes never suspend.
+      */}
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
         {/* ── Auth Routes (public-only) ─────────────────────── */}
         <Route
           path={ROUTES.AUTH.LOGIN}
@@ -141,12 +171,35 @@ const AppRouter = () => {
               path={`${ROUTES.APPOINTMENTS}/:appointmentId`}
               element={<AppointmentDetailsPage />}
             />
+
+            {/* ── Treatment Plan Module ─────────────────────── */}
+            {/*
+              Plan + procedure READ endpoints allow the full plan role set
+              🅰 (6 roles) and DENTAL_ASSISTANT is excluded everywhere — but
+              the client cannot resolve non-admin roles, so these routes are
+              ProtectedRoute-only (no role gate). Admin procedure WRITES are
+              gated inline via PermissionGate (⭐ = ADMIN + CHIEF_DOCTOR).
+              Backend remains the ultimate authority ([MAP §9]).
+            */}
+            <Route
+              path={ROUTES.TREATMENT_PLANS}
+              element={<TreatmentPlanListPage />}
+            />
+            <Route
+              path={`${ROUTES.TREATMENT_PLANS}/:planId`}
+              element={<TreatmentPlanDetailsPage />}
+            />
+            <Route
+              path={ROUTES.PROCEDURES}
+              element={<ProcedureListPage />}
+            />
           </Route>
         </Route>
 
         {/* ── Catch-all: Redirect to login ─────────────── */}
         <Route path="*" element={<Navigate to={ROUTES.AUTH.LOGIN} replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };

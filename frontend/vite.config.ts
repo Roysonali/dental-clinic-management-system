@@ -6,6 +6,37 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [tailwindcss(), react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Vendor chunking per the DensCare engineering blueprint (§3.2):
+        // keeps framework/vendor code out of the route chunks and the main
+        // bundle (F-05). Vite 8 is Rolldown-powered, so the native
+        // `codeSplitting.groups` API is used (the Rollup-style object
+        // `manualChunks` form is no longer typed). Radix `ui` split omitted
+        // — not a dependency here.
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /node_modules[/\\](react|react-dom|react-router-dom)/,
+              priority: 2,
+            },
+            {
+              name: 'vendor-query',
+              test: /node_modules[/\\]@tanstack[/\\]react-query/,
+              priority: 2,
+            },
+            {
+              name: 'vendor-forms',
+              test: /node_modules[/\\](react-hook-form|zod|@hookform)/,
+              priority: 2,
+            },
+          ],
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

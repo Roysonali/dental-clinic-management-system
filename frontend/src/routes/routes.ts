@@ -20,6 +20,7 @@ export const ROUTES = {
   USERS: '/users',
   APPOINTMENTS: '/appointments',
   TREATMENT_PLANS: '/treatment-plans',
+  PROCEDURES: '/procedures',
   BILLING: '/billing',
   SETTINGS: '/settings',
 } as const;
