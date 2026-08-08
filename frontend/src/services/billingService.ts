@@ -7,6 +7,16 @@ import type {
   InvoiceListParams,
   InvoiceListResponse,
   InvoiceRead,
+  PaymentAllocatePayload,
+  PaymentCreatePayload,
+  PaymentDeallocatePayload,
+  PaymentListParams,
+  PaymentListResponse,
+  PaymentMetadataUpdatePayload,
+  PaymentRead,
+  PaymentStatusChangePayload,
+  ReceiptGeneratePayload,
+  ReceiptRead,
 } from '../types/billing';
 
 /**
@@ -16,10 +26,16 @@ import type {
  * - dashboard.py → GET /billing/dashboard
  * - invoice.py   → GET /billing/invoices, GET /{id}, POST '', PATCH /{id},
  *                  POST /{id}/issue, POST /{id}/cancel, DELETE /{id}
+ * - payment.py   → GET /billing/payments, GET /{id}, POST '', PATCH /{id},
+ *                  DELETE /{id}, POST /{id}/complete, /fail, /void, /allocate,
+ *                  /deallocate, GET /{id}/allocations
+ * - receipt.py   → POST /billing/receipts (generate for a completed payment)
  *
  * Phase 1 (Billing Dashboard) consumed only the dashboard endpoint. Phase 2
- * (Sprint 14A.2 — Invoices) adds the invoice endpoints; payments/receipts/
- * refunds/credit-notes are intentionally NOT exposed until their phases land.
+ * (Sprint 14A.2 — Invoices) added the invoice endpoints. Phase 3 (Sprint
+ * 14A.3 — Payments) adds the payment + receipt-generation endpoints;
+ * refunds/credit-notes remain intentionally NOT exposed until their phases
+ * land.
  *
  * The backend returns plain objects (no `{success, data}` envelope), so the
  * methods return `data` as-is. Errors bubble as Axios errors for
@@ -75,5 +91,73 @@ export const billingService = {
   /** DELETE /billing/invoices/{id} — permanently delete a Draft (204). */
   async deleteInvoice(id: string): Promise<void> {
     await api.delete(`/billing/invoices/${id}`);
+  },
+
+  /* ── Sprint 14A.3 — Payment endpoints (backend routers/payment.py) ── */
+
+  /** GET /billing/payments — paginated, filterable, sortable list. */
+  async listPayments(params: PaymentListParams): Promise<PaymentListResponse> {
+    const { data } = await api.get<PaymentListResponse>('/billing/payments', { params });
+    return data;
+  },
+
+  /** GET /billing/payments/{id} — full payment aggregate. */
+  async getPayment(id: string): Promise<PaymentRead> {
+    const { data } = await api.get<PaymentRead>(`/billing/payments/${id}`);
+    return data;
+  },
+
+  /** POST /billing/payments — create a payment in Pending status (201). */
+  async createPayment(payload: PaymentCreatePayload): Promise<PaymentRead> {
+    const { data } = await api.post<PaymentRead>('/billing/payments', payload);
+    return data;
+  },
+
+  /** PATCH /billing/payments/{id} — update a Pending payment (reference/notes). */
+  async updatePayment(id: string, payload: PaymentMetadataUpdatePayload): Promise<PaymentRead> {
+    const { data } = await api.patch<PaymentRead>(`/billing/payments/${id}`, payload);
+    return data;
+  },
+
+  /** DELETE /billing/payments/{id} — permanently delete a Pending payment (204). */
+  async deletePayment(id: string): Promise<void> {
+    await api.delete(`/billing/payments/${id}`);
+  },
+
+  /** POST /billing/payments/{id}/complete — transition Pending → Completed. */
+  async completePayment(id: string): Promise<PaymentRead> {
+    const { data } = await api.post<PaymentRead>(`/billing/payments/${id}/complete`);
+    return data;
+  },
+
+  /** POST /billing/payments/{id}/fail — mark a payment as failed. */
+  async failPayment(id: string, payload: PaymentStatusChangePayload): Promise<PaymentRead> {
+    const { data } = await api.post<PaymentRead>(`/billing/payments/${id}/fail`, payload);
+    return data;
+  },
+
+  /** POST /billing/payments/{id}/void — void a payment. */
+  async voidPayment(id: string, payload: PaymentStatusChangePayload): Promise<PaymentRead> {
+    const { data } = await api.post<PaymentRead>(`/billing/payments/${id}/void`, payload);
+    return data;
+  },
+
+  /** POST /billing/payments/{id}/allocate — allocate to a payable invoice (201). */
+  async allocatePayment(id: string, payload: PaymentAllocatePayload): Promise<unknown> {
+    const { data } = await api.post(`/billing/payments/${id}/allocate`, payload);
+    return data;
+  },
+
+  /** POST /billing/payments/{id}/deallocate — remove an allocation (204). */
+  async deallocatePayment(id: string, payload: PaymentDeallocatePayload): Promise<void> {
+    await api.post(`/billing/payments/${id}/deallocate`, payload);
+  },
+
+  /* ── Sprint 14A.3 — Receipt generation (backend routers/receipt.py) ── */
+
+  /** POST /billing/receipts — generate a receipt for a completed payment (201). */
+  async generateReceipt(payload: ReceiptGeneratePayload): Promise<ReceiptRead> {
+    const { data } = await api.post<ReceiptRead>('/billing/receipts', payload);
+    return data;
   },
 };

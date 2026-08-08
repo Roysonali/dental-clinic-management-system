@@ -25,6 +25,8 @@ export const ROUTES = {
   BILLING: '/billing',
   /** Invoice list (Phase 2 — Sprint 14A.2). */
   BILLING_INVOICES: '/billing/invoices',
+  /** Payment list (Phase 3 — Sprint 14A.3). */
+  BILLING_PAYMENTS: '/billing/payments',
   SETTINGS: '/settings',
 } as const;
 

@@ -1,12 +1,13 @@
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DataTable, type DataTableColumn } from '../common/DataTable';
 import { StatusBadge } from '../common/StatusBadge/StatusBadge';
 import { Button } from '../common/Button/Button';
-import { Tooltip } from '../common/Tooltip/Tooltip';
 import { SectionHeader } from '../common/SectionHeader';
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_VARIANTS } from '../../constants/billing';
 import { formatCurrency } from '../../utils/formatting';
 import { formatISODate } from '../../utils/date';
+import { ROUTES } from '../../routes/routes';
 import type { PaymentListItem } from '../../types/billing';
 
 interface RecentPaymentsProps {
@@ -16,19 +17,18 @@ interface RecentPaymentsProps {
   loading?: boolean;
 }
 
-const VIEW_ALL_HINT_ID = 'recent-payments-view-all-hint';
-const VIEW_ALL_HINT = 'Payment list arrives in the Payments phase';
-
 /**
  * RecentPayments — dashboard "Recent Payments" section.
  *
- * Reuses the shared DataTable. "View all" is disabled until the Payment List
- * module (Phase 3) ships a route — no navigation to non-existent workflows.
+ * Reuses the shared DataTable. "View all" and row clicks navigate to the
+ * Payment List / Detail routes now that Phase 3 (Sprint 14A.3) ships them.
  */
 export const RecentPayments: FC<RecentPaymentsProps> = ({
   payments,
   loading = false,
 }) => {
+  const navigate = useNavigate();
+
   const columns: DataTableColumn<PaymentListItem>[] = [
     {
       key: 'payment',
@@ -77,16 +77,13 @@ export const RecentPayments: FC<RecentPaymentsProps> = ({
         id="recent-payments-heading"
         title="Recent Payments"
         action={
-          <>
-            <Tooltip content={VIEW_ALL_HINT}>
-              <Button variant="ghost" size="sm" disabled aria-describedby={VIEW_ALL_HINT_ID}>
-                View all
-              </Button>
-            </Tooltip>
-            <span id={VIEW_ALL_HINT_ID} className="sr-only">
-              {VIEW_ALL_HINT} — this view is not available yet.
-            </span>
-          </>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(ROUTES.BILLING_PAYMENTS)}
+          >
+            View all
+          </Button>
         }
       />
       <div className="mt-4">
@@ -99,6 +96,7 @@ export const RecentPayments: FC<RecentPaymentsProps> = ({
           ariaLabel="Recent payments"
           emptyTitle="No payments yet"
           emptyDescription="Payments appear here once they are recorded."
+          onRowClick={(pay) => navigate(`${ROUTES.BILLING_PAYMENTS}/${pay.id}`)}
         />
       </div>
     </section>

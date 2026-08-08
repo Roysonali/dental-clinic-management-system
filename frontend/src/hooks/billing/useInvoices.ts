@@ -13,11 +13,12 @@ import type { InvoiceListParams, InvoiceListResponse } from '../../types/billing
  * `shouldRetryQuery` never retries 401/403 — a 403 surfaces as the
  * permission-denied state instead of hammering the endpoint.
  */
-export function useInvoices(params: InvoiceListParams) {
+export function useInvoices(params: InvoiceListParams, enabled = true) {
   return useQuery<InvoiceListResponse>({
     queryKey: billingQueryKeys.invoiceList(params),
     queryFn: () => billingService.listInvoices(params),
     placeholderData: keepPreviousData,
     retry: shouldRetryQuery,
+    enabled,
   });
 }

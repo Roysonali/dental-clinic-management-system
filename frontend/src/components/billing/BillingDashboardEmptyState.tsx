@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Receipt, CreditCard, PlusCircle } from 'lucide-react';
 import { EmptyState } from '../common/EmptyState/EmptyState';
 import { Button } from '../common/Button/Button';
-import { Tooltip } from '../common/Tooltip/Tooltip';
 import { Icon } from '../common/Icon/Icon';
 import { ROUTES } from '../../routes/routes';
 
@@ -13,9 +12,9 @@ import { ROUTES } from '../../routes/routes';
  * backend's own count totals, never from fake data).
  *
  * KPI cards above still show zero values. "New invoice" navigates to the
- * Invoice List route now that Phase 2 (Sprint 14A.2) ships it; "Record
- * payment" stays disabled with an explanatory tooltip because the Payment
- * workflow belongs to a later phase.
+ * Invoice List route (Phase 2, Sprint 14A.2) and "Record payment" navigates
+ * to the Payment List route (Phase 3, Sprint 14A.3) — each list's own header
+ * opens its create drawer.
  */
 export const BillingDashboardEmptyState: FC = () => {
   const navigate = useNavigate();
@@ -36,15 +35,13 @@ export const BillingDashboardEmptyState: FC = () => {
           </Button>
         }
         secondaryAction={
-          <Tooltip content="Record payment arrives in the Payments phase">
-            <Button
-              variant="secondary"
-              disabled
-              leftIcon={<Icon icon={CreditCard} size="sm" />}
-            >
-              Record payment
-            </Button>
-          </Tooltip>
+          <Button
+            variant="secondary"
+            onClick={() => navigate(ROUTES.BILLING_PAYMENTS)}
+            leftIcon={<Icon icon={CreditCard} size="sm" />}
+          >
+            Record payment
+          </Button>
         }
       />
     </div>

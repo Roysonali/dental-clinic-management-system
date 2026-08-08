@@ -49,6 +49,12 @@ const InvoiceListPage = lazy(() =>
 const InvoiceDetailsPage = lazy(() =>
   import('../pages/billing/InvoiceDetailsPage').then((m) => ({ default: m.InvoiceDetailsPage })),
 );
+const PaymentListPage = lazy(() =>
+  import('../pages/billing/PaymentListPage').then((m) => ({ default: m.PaymentListPage })),
+);
+const PaymentDetailsPage = lazy(() =>
+  import('../pages/billing/PaymentDetailsPage').then((m) => ({ default: m.PaymentDetailsPage })),
+);
 
 /** Suspense fallback for lazy routes — centred spinner with an accessible label. */
 const RouteFallback: FC = () => (
@@ -227,16 +233,16 @@ const AppRouter = () => {
               element={<PatientRecordDetailsPage />}
             />
 
-            {/* ── Billing Module (Phase 1: Dashboard, Phase 2: Invoices) ── */}
+            {/* ── Billing Module (Dashboard / Invoices / Payments) ── */}
             {/*
               Every /billing/dashboard endpoint allows ALL roles; the
-              /billing/invoices read endpoints allow the same set minus
-              DENTAL_ASSISTANT (backend routers/invoice.py `_INVOICE_READ_ROLES`).
-              Neither route carries a client-side role gate because the
-              client cannot resolve non-admin roles — the backend enforces
-              with 403, and the list/detail containers render the
-              permission-denied state in that case. Lazy-loaded for
-              route-level code splitting.
+              /billing/invoices and /billing/payments read endpoints allow
+              the same set minus DENTAL_ASSISTANT (backend routers/invoice.py
+              `_INVOICE_READ_ROLES`, routers/payment.py `_PAYMENT_READ_ROLES`).
+              No route carries a client-side role gate because the client
+              cannot resolve non-admin roles — the backend enforces with 403,
+              and the list/detail containers render the permission-denied
+              state in that case. Lazy-loaded for route-level code splitting.
             */}
             <Route
               path={ROUTES.BILLING}
@@ -249,6 +255,14 @@ const AppRouter = () => {
             <Route
               path={`${ROUTES.BILLING_INVOICES}/:invoiceId`}
               element={<InvoiceDetailsPage />}
+            />
+            <Route
+              path={ROUTES.BILLING_PAYMENTS}
+              element={<PaymentListPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_PAYMENTS}/:paymentId`}
+              element={<PaymentDetailsPage />}
             />
           </Route>
         </Route>

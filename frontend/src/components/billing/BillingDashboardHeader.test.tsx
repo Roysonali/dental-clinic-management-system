@@ -24,21 +24,13 @@ describe('BillingDashboardHeader', () => {
     expect(ROUTES.BILLING_INVOICES).toBe('/billing/invoices');
   });
 
-  it('keeps Record payment disabled — the Payments workflow is not part of this phase', () => {
-    renderWithProviders(<BillingDashboardHeader />);
-
-    expect(screen.getByRole('button', { name: 'Record payment' })).toBeDisabled();
-  });
-
-  it('keeps the disabled-CTA explanation accessible via aria-describedby + sr-only text', () => {
+  it('navigates to the Payment List route from the Record payment quick action (Phase 3)', () => {
+    // The Payment workflow ships in Sprint 14A.3, so the header CTA is now a
+    // real shortcut to the list page (its page header opens the drawer).
     renderWithProviders(<BillingDashboardHeader />);
 
     const recordPayment = screen.getByRole('button', { name: 'Record payment' });
-    const recordHintId = recordPayment.getAttribute('aria-describedby');
-
-    expect(recordHintId).toBeTruthy();
-    const recordHint = document.getElementById(recordHintId!);
-    expect(recordHint).toHaveClass('sr-only');
-    expect(recordHint?.textContent).toContain('Payments phase');
+    expect(recordPayment).toBeEnabled();
+    expect(ROUTES.BILLING_PAYMENTS).toBe('/billing/payments');
   });
 });

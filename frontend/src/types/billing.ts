@@ -310,3 +310,165 @@ export interface InvoiceDraftUpdatePayload {
 export interface CancelInvoicePayload {
   cancellation_reason: string;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Sprint 14A.3 — Payment module (list / detail / lifecycle / allocation)
+ *
+ * Mirrors backend `schemas/payment.py`, `schemas/receipt.py` and the router
+ * query params (`routers/payment.py`, `routers/receipt.py`). Monetary fields
+ * are quantized Decimal strings. Do NOT invent fields beyond the upstream
+ * contract.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/** Sort fields the backend allows for GET /billing/payments (`PaymentRepository._SORT_FIELDS`). */
+export type PaymentSortField =
+  | 'created_at'
+  | 'updated_at'
+  | 'payment_number'
+  | 'payment_date'
+  | 'total_amount'
+  | 'status'
+  | 'payment_method';
+
+/** Query params for GET /billing/payments (all server-side). */
+export interface PaymentListParams {
+  page: number;
+  page_size: number;
+  sort_by: PaymentSortField;
+  sort_order: SortOrder;
+  patient_id?: string;
+  /** Backend `PaymentMethod` exact-match filter. */
+  payment_method?: PaymentMethod;
+  /** Backend `PaymentStatus` exact-match filter. */
+  status?: PaymentStatus;
+  /** Filter payments with payment_date on/after this date (YYYY-MM-DD). */
+  date_from?: string;
+  /** Filter payments with payment_date on/before this date (YYYY-MM-DD). */
+  date_to?: string;
+}
+
+/** `PaymentListResponse` (schemas/payment.py) — GET /billing/payments. */
+export interface PaymentListResponse {
+  items: PaymentListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+/** `PaymentGatewayMetadata` (schemas/payment.py) — nullable on detail. */
+export interface PaymentGatewayMetadata {
+  gateway_txn_id: string | null;
+  gateway_order_id: string | null;
+  bank_reference_number: string | null;
+  payment_source: string | null;
+}
+
+/** `InvoiceSummary` (schemas/payment.py) — embedded in allocation summaries. */
+export interface PaymentInvoiceSummary {
+  id: string;
+  invoice_number: string;
+  patient: BillingPatientSummary;
+  invoice_date: string;
+  currency_code: string;
+  grand_total: Money;
+}
+
+/** `PaymentAllocationSummary` (schemas/payment.py) — payment↔invoice link. */
+export interface PaymentAllocationSummary {
+  id: string;
+  /** Null for advance/unallocated payments or refunds. */
+  invoice: PaymentInvoiceSummary | null;
+  allocated_amount: Money;
+  is_refund: boolean;
+  created_at: string;
+}
+
+/** `PaymentRead` (schemas/payment.py) — GET /billing/payments/{id}. */
+export interface PaymentRead {
+  id: string;
+  payment_number: string;
+  document_type: string;
+  status: PaymentStatus;
+  patient: BillingPatientSummary;
+  creator: BillingCreatorSummary | null;
+  updater: BillingCreatorSummary | null;
+  payment_method: PaymentMethod;
+  total_amount: Money;
+  payment_date: string;
+  currency_code: string;
+  reference_number: string | null;
+  is_reversed: boolean;
+  reversal_reason: string | null;
+  notes: string | null;
+  allocations: PaymentAllocationSummary[];
+  financials: PaymentFinancialSummary;
+  gateway_metadata: PaymentGatewayMetadata | null;
+  version: number;
+  doc_version: number;
+  created_at: string;
+  updated_at: string;
+  created_by: number;
+  updated_by: number | null;
+}
+
+/** Body for POST /billing/payments (`PaymentCreateRequest`). */
+export interface PaymentCreatePayload {
+  patient_id: string;
+  payment_method: PaymentMethod;
+  total_amount: Money;
+  payment_date: string;
+  reference_number?: string | null;
+  notes?: string | null;
+}
+
+/** Body for PATCH /billing/payments/{id} (`PaymentMetadataUpdateRequest`). */
+export interface PaymentMetadataUpdatePayload {
+  reference_number?: string | null;
+  notes?: string | null;
+}
+
+/** Body for POST /billing/payments/{id}/fail and /void (reason optional). */
+export interface PaymentStatusChangePayload {
+  reason?: string;
+}
+
+/** Body for POST /billing/payments/{id}/allocate (`PaymentAllocateRequest`). */
+export interface PaymentAllocatePayload {
+  invoice_id: string;
+  amount: Money;
+}
+
+/** Body for POST /billing/payments/{id}/deallocate (`PaymentDeallocateRequest`). */
+export interface PaymentDeallocatePayload {
+  invoice_id: string;
+}
+
+/** `ReceiptPaymentSummary` (schemas/receipt.py) — embedded on receipts. */
+export interface ReceiptPaymentSummary {
+  id: string;
+  payment_number: string;
+  payment_method: string;
+  total_amount: Money;
+  payment_date: string;
+  currency_code: string;
+}
+
+/**
+ * `ReceiptRead` (schemas/receipt.py) — the subset surfaced by the Payment
+ * detail's Receipt card (POST /billing/receipts returns the full aggregate).
+ */
+export interface ReceiptRead {
+  id: string;
+  receipt_number: string;
+  status: 'generated' | 'cancelled';
+  amount: Money;
+  currency_code: string;
+  receipt_date: string;
+  payment: ReceiptPaymentSummary;
+  created_at: string;
+}
+
+/** Body for POST /billing/receipts (`ReceiptGenerateRequest`). */
+export interface ReceiptGeneratePayload {
+  payment_id: string;
+}

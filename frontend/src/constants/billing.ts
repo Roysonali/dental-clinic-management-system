@@ -15,6 +15,7 @@ import type {
   InvoiceSortField,
   InvoiceStatus,
   PaymentMethod,
+  PaymentSortField,
   PaymentStatus,
 } from '../types/billing';
 
@@ -118,4 +119,85 @@ export const INVOICE_ITEM_DESCRIPTION_MAX_LENGTH = 500;
 export const INVOICE_MIN_LINE_ITEMS = 1;
 /** Minimum line-item quantity (MIN_LINE_ITEM_QUANTITY). */
 export const INVOICE_MIN_ITEM_QUANTITY = 1;
+
+/* ── Payment module list / form constants (Sprint 14A.3) ──────────── */
+
+/**
+ * Payment-module presentation currency (approved product requirement).
+ *
+ * Backend contract facts (verified against `app/modules/billing/`):
+ * - `CurrencyCode` (enums.py) supports USD / EUR / GBP / INR — INR is a
+ *   backend-supported ISO 4217 code.
+ * - `PaymentCreateRequest` (schemas/payment.py) accepts NO currency field —
+ *   the client never sends a currency.
+ * - The payment model has no currency column; the mapper derives
+ *   `currency_code` from the first allocation's invoice currency, falling
+ *   back to `DEFAULT_CURRENCY` (USD) for unallocated payments.
+ *
+ * Because the backend does not pin payments to USD (it is only the
+ * unallocated-payment fallback), the Payments UI presents all amounts in
+ * INR per the approved product requirement, using the shared
+ * `formatCurrency(value, PAYMENT_CURRENCY_CODE)` formatter (which already
+ * maps INR → ₹). This constant is the single point of change for the
+ * presentation currency.
+ */
+export const PAYMENT_CURRENCY_CODE: CurrencyCode = 'INR';
+
+/** Rupee glyph for the payment UI (matches the shared formatter's INR symbol). */
+export const PAYMENT_CURRENCY_SYMBOL = '₹';
+
+/** Default rows-per-page for GET /billing/payments (backend default 20). */
+export const PAYMENT_LIST_PAGE_SIZE = 20;
+
+/** Rows-per-page options (respects backend max page_size of 100). */
+export const PAYMENT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+
+/** Payment status options for the list Status filter (all backend enum values). */
+export const PAYMENT_STATUS_OPTIONS: readonly { value: PaymentStatus; label: string }[] = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'refunded', label: 'Refunded' },
+  { value: 'reversed', label: 'Reversed' },
+  { value: 'void', label: 'Void' },
+];
+
+/** Payment method options for the list Method filter (all backend enum values). */
+export const PAYMENT_METHOD_OPTIONS: readonly { value: PaymentMethod; label: string }[] = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'insurance', label: 'Insurance' },
+  { value: 'wallet', label: 'Wallet' },
+];
+
+/** Server-side sort options (backend `PaymentRepository._SORT_FIELDS`). */
+export const PAYMENT_SORT_OPTIONS: readonly { value: PaymentSortField; label: string }[] = [
+  { value: 'created_at', label: 'Created date' },
+  { value: 'payment_number', label: 'Payment number' },
+  { value: 'payment_date', label: 'Payment date' },
+  { value: 'total_amount', label: 'Total amount' },
+  { value: 'status', label: 'Status' },
+  { value: 'payment_method', label: 'Payment method' },
+  { value: 'updated_at', label: 'Updated date' },
+];
+
+/* ── Payment field length limits mirrored from backend constants.py ─ */
+
+/** `PAYMENT_NOTES_MAX_LENGTH` — payment notes max. */
+export const PAYMENT_NOTES_MAX_LENGTH = 500;
+/** `TRANSACTION_REFERENCE_MAX_LENGTH` — reference number max. */
+export const PAYMENT_REFERENCE_MAX_LENGTH = 100;
+/** `AUDIT_REASON_MAX_LENGTH` — fail/void/delete reason max. */
+export const PAYMENT_REASON_MAX_LENGTH = 500;
+
+/* ── Receipt presentation (backend `ReceiptStatus` enum) ──────────── */
+
+/** Receipt status → BadgeVariant map. */
+export const RECEIPT_STATUS_VARIANTS: Record<'generated' | 'cancelled', BadgeVariant> = {
+  generated: 'success',
+  cancelled: 'neutral',
+};
 
