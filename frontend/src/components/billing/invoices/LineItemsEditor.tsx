@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { IconButton } from '../../common/Button/IconButton';
 import { Icon } from '../../common/Icon/Icon';
-import { INVOICE_DISCOUNT_TYPE_OPTIONS } from '../../../constants/billing';
+import { INVOICE_DISCOUNT_TYPE_OPTIONS, PAYMENT_CURRENCY_CODE } from '../../../constants/billing';
 import { computeLineNetAmount } from '../../../utils/invoiceFormUtils';
 import { formatCurrency } from '../../../utils/formatting';
 import type { InvoiceCreateFormValues, InvoiceLineItemFormValues } from '../../../utils/invoiceFormSchema';
@@ -145,7 +145,7 @@ export const LineItemsEditor: FC<LineItemsEditorProps> = ({ control, register, e
               <p className="text-caption text-neutral-500">
                 Net amount:{' '}
                 <span className="font-medium text-neutral-800 tabular-nums">
-                  {formatCurrency(netAmount)}
+                  {formatCurrency(netAmount, PAYMENT_CURRENCY_CODE)}
                 </span>
               </p>
               <IconButton

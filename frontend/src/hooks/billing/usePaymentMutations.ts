@@ -19,7 +19,8 @@ import type {
  * ROOT is invalidated on success (the shared invalidation contract). The
  * payment detail key is also explicitly invalidated so an open detail page
  * refreshes immediately; allocation mutations additionally invalidate the
- * allocation list key and the affected invoice detail.
+ * allocation key (the Allocate dialog reads it to disable already-allocated
+ * invoices).
  *
  * Generate-receipt is a mutation with a meaningful payload: the backend has
  * no GET /receipts?payment_id lookup, so the returned `ReceiptRead` is
@@ -93,9 +94,11 @@ export function useAllocatePayment() {
     mutationFn: ({ id, payload }) => billingService.allocatePayment(id, payload),
     onSuccess: (_result, { id }) => {
       void queryClient.invalidateQueries({ queryKey: billingQueryKeys.all });
-      // The detail page renders allocations from the payment aggregate, so
-      // refreshing paymentDetail(id) is sufficient.
+      // The detail page renders allocations from the payment aggregate, and
+      // the Allocate dialog reads GET /{id}/allocations to disable invoices
+      // that already have an allocation — refresh both.
       void queryClient.invalidateQueries({ queryKey: billingQueryKeys.paymentDetail(id) });
+      void queryClient.invalidateQueries({ queryKey: billingQueryKeys.paymentAllocations(id) });
     },
   });
 }
@@ -108,6 +111,7 @@ export function useDeallocatePayment() {
     onSuccess: (_result, { id }) => {
       void queryClient.invalidateQueries({ queryKey: billingQueryKeys.all });
       void queryClient.invalidateQueries({ queryKey: billingQueryKeys.paymentDetail(id) });
+      void queryClient.invalidateQueries({ queryKey: billingQueryKeys.paymentAllocations(id) });
     },
   });
 }

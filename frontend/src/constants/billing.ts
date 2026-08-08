@@ -78,11 +78,15 @@ export const INVOICE_STATUS_OPTIONS: readonly { value: InvoiceStatus; label: str
   { value: 'void', label: 'Void' },
 ];
 
-/** Server-side sort options for the list (backend `ALLOWED_SORT_FIELDS`). */
+/**
+ * Server-side sort options for the list — only fields the backend whitelists
+ * (`InvoiceRepository._ALLOWED_SORT_FIELDS`). `grand_total` is intentionally
+ * absent: the repository silently falls back to the default sort for unknown
+ * fields, so offering it would sort by the wrong column without any error.
+ */
 export const INVOICE_SORT_OPTIONS: readonly { value: InvoiceSortField; label: string }[] = [
   { value: 'created_at', label: 'Created date' },
   { value: 'invoice_number', label: 'Invoice number' },
-  { value: 'grand_total', label: 'Grand total' },
   { value: 'status', label: 'Status' },
   { value: 'due_date', label: 'Due date' },
   { value: 'updated_at', label: 'Updated date' },
@@ -135,10 +139,16 @@ export const INVOICE_MIN_ITEM_QUANTITY = 1;
  *   back to `DEFAULT_CURRENCY` (USD) for unallocated payments.
  *
  * Because the backend does not pin payments to USD (it is only the
- * unallocated-payment fallback), the Payments UI presents all amounts in
- * INR per the approved product requirement, using the shared
+ * unallocated-payment fallback), the entire Billing frontend presents
+ * amounts in INR per the approved product requirement, using the shared
  * `formatCurrency(value, PAYMENT_CURRENCY_CODE)` formatter (which already
- * maps INR → ₹). This constant is the single point of change for the
+ * maps INR → ₹). This covers the Payments module, the Billing Dashboard
+ * (KPI totals, patient financial summary, recent invoices/payments) and the
+ * Invoice module display surfaces (list, detail, line items, dialogs), so a
+ * single payment or invoice reads identically everywhere in Billing. The
+ * Invoice create form also defaults to this currency (new invoices are
+ * recorded as currency_code=INR, which the backend CurrencyCode supports).
+ * This constant is the single point of change for the Billing INR
  * presentation currency.
  */
 export const PAYMENT_CURRENCY_CODE: CurrencyCode = 'INR';

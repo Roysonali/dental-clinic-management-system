@@ -13,6 +13,7 @@ import {
 } from '../../../../constants/billing';
 import { formatCurrency } from '../../../../utils/formatting';
 import { useInvoices } from '../../../../hooks/billing/useInvoices';
+import { usePaymentAllocations } from '../../../../hooks/billing/usePaymentAllocations';
 import type { DialogPayment } from './CompletePaymentDialog';
 
 interface AllocatePaymentDialogProps {
@@ -33,9 +34,12 @@ const PAYABLE_INVOICE_STATUSES = new Set(['issued', 'partially_paid', 'overdue']
  *
  * The backend requires a COMPLETED payment and a payable invoice (Issued /
  * Partially Paid / Overdue) with sufficient outstanding balance; a duplicate
- * allocation to the same invoice is rejected. The picker loads the payment's
- * patient invoices from the real list endpoint (page_size 100) and restricts
- * the chooser to payable, non-zero-outstanding rows — the backend remains the
+ * allocation to the same invoice is rejected with a 409. The picker loads the
+ * payment's patient invoices from the real list endpoint (page_size 100) and
+ * restricts the chooser to payable, non-zero-outstanding rows; invoices that
+ * already have an allocation from this payment (GET /{id}/allocations) are
+ * rendered VISIBLY DISABLED — matching the reference rule — instead of being
+ * selectable (the backend would reject them). The backend remains the
  * authority and enforces balance/duplicate rules with 409/422 if the UI is
  * ever out of date.
  *
@@ -70,6 +74,23 @@ export const AllocatePaymentDialog: FC<AllocatePaymentDialogProps> = ({
     open && payment !== null,
   );
 
+  // Existing allocations for THIS payment (GET /billing/payments/{id}/allocations)
+  // — the backend rejects a duplicate allocation to the same invoice with a
+  // 409, so those invoices are visibly disabled rather than selectable.
+  const allocationsQuery = usePaymentAllocations(
+    payment?.id ?? '',
+    open && payment !== null,
+  );
+
+  // Invoice ids already tied to this payment via a non-refund allocation.
+  const allocatedInvoiceIds = useMemo(() => {
+    return new Set(
+      (allocationsQuery.data ?? [])
+        .filter((a) => a.invoice !== null && !a.is_refund)
+        .map((a) => a.invoice!.id),
+    );
+  }, [allocationsQuery.data]);
+
   // Only invoices the backend will accept: payable status + outstanding > 0.
   const payableInvoices = useMemo(() => {
     return (invoicesQuery.data?.items ?? []).filter((inv) => {
@@ -78,7 +99,12 @@ export const AllocatePaymentDialog: FC<AllocatePaymentDialogProps> = ({
     });
   }, [invoicesQuery.data?.items]);
 
-  const selectedInvoice = payableInvoices.find((inv) => inv.id === selectedInvoiceId) ?? null;
+  const selectableInvoices = useMemo(
+    () => payableInvoices.filter((inv) => !allocatedInvoiceIds.has(inv.id)),
+    [payableInvoices, allocatedInvoiceIds],
+  );
+
+  const selectedInvoice = selectableInvoices.find((inv) => inv.id === selectedInvoiceId) ?? null;
 
   const unallocated = useMemo(
     () => Number(payment?.financials?.unallocated_amount ?? 0),
@@ -141,7 +167,7 @@ export const AllocatePaymentDialog: FC<AllocatePaymentDialogProps> = ({
             <legend className="text-label font-semibold text-neutral-700">
               Invoice <span className="text-danger" aria-hidden="true">*</span>
             </legend>
-            {invoicesQuery.isLoading ? (
+            {invoicesQuery.isLoading || allocationsQuery.isLoading ? (
               <p className="mt-2 text-body-sm text-neutral-500">Loading invoices…</p>
             ) : payableInvoices.length === 0 ? (
               <p className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-body-sm text-neutral-500">
@@ -155,8 +181,51 @@ export const AllocatePaymentDialog: FC<AllocatePaymentDialogProps> = ({
                 aria-label="Payable invoices"
                 className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pr-1"
               >
+                {selectableInvoices.length === 0 && (
+                  <p className="mb-2 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-body-sm text-neutral-500">
+                    All payable invoices for {payment?.patient.full_name ?? 'this patient'} are
+                    already allocated to this payment.
+                  </p>
+                )}
                 {payableInvoices.map((inv) => {
                   const isSelected = inv.id === selectedInvoiceId;
+                  const isAllocated = allocatedInvoiceIds.has(inv.id);
+                  // Already-allocated rows are VISIBLE but not selectable — the
+                  // backend rejects duplicate payment↔invoice allocations (409).
+                  if (isAllocated) {
+                    return (
+                      <div
+                        key={inv.id}
+                        aria-disabled="true"
+                        className="flex cursor-not-allowed items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 opacity-70"
+                      >
+                        <span className="flex items-center gap-3 min-w-0">
+                          <input
+                            type="radio"
+                            name="invoice-radio"
+                            value={inv.id}
+                            disabled
+                            aria-label={`${inv.invoice_number} — already allocated`}
+                            className="h-4 w-4 shrink-0"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-mono text-label font-medium text-neutral-500">
+                              {inv.invoice_number}
+                            </span>
+                            <span className="mt-0.5 block truncate text-caption text-neutral-400">
+                              {inv.patient.full_name}
+                            </span>
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <StatusBadge status={inv.status} statusMap={INVOICE_STATUS_VARIANTS} size="sm" />
+                          <span className="text-caption font-medium text-neutral-500">
+                            Already allocated
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  }
                   return (
                     <label
                       key={inv.id}

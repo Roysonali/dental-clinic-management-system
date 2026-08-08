@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { PAYMENT_CURRENCY_CODE } from '../../../constants/billing';
 import { formatCurrency } from '../../../utils/formatting';
 import type { InvoiceItemSummary } from '../../../types/billing';
 
@@ -39,12 +40,12 @@ export const InvoiceLineItemsTable: FC<InvoiceLineItemsTableProps> = ({ items })
                 {item.quantity}
               </td>
               <td className="px-5 py-4 text-right text-body text-neutral-800 tabular-nums">
-                {formatCurrency(item.unit_price, item.currency_code)}
+                {formatCurrency(item.unit_price, PAYMENT_CURRENCY_CODE)}
               </td>
               <td className="px-5 py-4 text-right text-body text-neutral-600 tabular-nums">
                 {item.discount_value !== null && item.discount_type ? (
                   <>
-                    {formatCurrency(item.discount_value, item.currency_code)}
+                    {formatCurrency(item.discount_value, PAYMENT_CURRENCY_CODE)}
                     <span className="ml-1 text-caption text-neutral-400">
                       · {item.discount_type === 'PERCENTAGE' ? 'Percentage' : 'Fixed'}
                     </span>
@@ -54,7 +55,7 @@ export const InvoiceLineItemsTable: FC<InvoiceLineItemsTableProps> = ({ items })
                 )}
               </td>
               <td className="px-5 py-4 text-right text-body font-medium text-neutral-900 tabular-nums">
-                {formatCurrency(item.net_amount, item.currency_code)}
+                {formatCurrency(item.net_amount, PAYMENT_CURRENCY_CODE)}
               </td>
             </tr>
           ))}

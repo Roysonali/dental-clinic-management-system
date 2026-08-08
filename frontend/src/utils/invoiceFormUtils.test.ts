@@ -50,7 +50,8 @@ describe('defaultCreateInvoiceValues', () => {
   it('prefills today + 30 days due date (backend documented default) and one item', () => {
     const values = defaultCreateInvoiceValues();
     expect(values.patient_id).toBe('');
-    expect(values.currency_code).toBe('USD');
+    // New invoices are recorded in INR (the Billing presentation currency).
+    expect(values.currency_code).toBe('INR');
     expect(values.items).toHaveLength(1);
     // invoice_date is today's local date; due = invoice + 30 days.
     expect(/^\d{4}-\d{2}-\d{2}$/.test(values.invoice_date)).toBe(true);
@@ -135,7 +136,7 @@ describe('invoiceFormValuesToCreatePayload', () => {
       treatment_plan_id: '',
       appointment_id: '',
       doctor_id: '',
-      currency_code: 'USD',
+      currency_code: 'INR',
       invoice_date: '2026-07-23',
       due_date: '2026-08-22',
       notes: '   ',
@@ -156,7 +157,7 @@ describe('invoiceFormValuesToCreatePayload', () => {
       treatment_plan_id: 'tp-1',
       appointment_id: 'apt-1',
       doctor_id: 'doc-1',
-      currency_code: 'USD',
+      currency_code: 'INR',
       invoice_date: '2026-07-23',
       due_date: '2026-08-22',
       notes: '  Please call  ',

@@ -291,3 +291,123 @@ Invoice implementation report.
 
 Full-suite validation after Sprint 14A.2: `npm test` 1281/1281 across 169
 files, `npm run lint` clean, `tsc -b` clean, `npm run build` succeeds.
+
+## 16. Independent production review (follow-up)
+
+An adversarial re-review of the Billing Dashboard was performed against the
+actual backend (`routers/dashboard.py`, `schemas/dashboard.py`,
+`services/billing_orchestration_service.py`, `app/core/constants.py`) and the
+current frontend implementation. Scope: contract compliance, RBAC and
+query-key invalidation. **No defects were found** — unlike the Invoice review
+(§16 of the 14A.2 report, `grand_total` sort bug) and the Payment review
+(§15 of the 14A.3 report, duplicate-allocation 409), the dashboard had no
+fixable contract violations. The verification and two minor observations are
+documented below.
+
+### 16.1 Contract compliance — verified exact
+
+| Item | Backend authority | Frontend | Verdict |
+| --- | --- | --- | --- |
+| Endpoint | `GET /billing/dashboard` (routers/dashboard.py) | `billingService.getDashboard(patientId?)` sends `patient_id` only when provided | ✅ exact |
+| Response shape | `BillingDashboardResponse` = `totals` + `recent_invoices` (≤5) + `recent_payments` (≤5) + `patient_summary` + `generated_at` | `BillingDashboardResponse` / `BillingTotals` / `PatientFinancialSummary` types mirror field-for-field; monetary fields are Decimal-string `Money` | ✅ exact |
+| Totals semantics | `calculate_billing_totals()` is **always system-wide**; `patient_id` only adds `patient_summary` | Container's empty-state check uses system totals; a selected patient with no activity correctly shows "No billing activity for this patient yet" (summary null) | ✅ semantically correct |
+| Unknown patient id | `calculate_patient_financial_summary(patient_id)` — no existence check, returns zeroed summary | Never 404s the whole dashboard; frontend renders the summary card | ✅ |
+| Recent lists | `search_invoices` / `search_payments`, page_size 5, created_at desc | Rows render real backend fields only; row-click navigates to the real detail routes | ✅ no invented data |
+| `/billing/summary` | Exists (lightweight widget totals) | Intentionally unused by the dashboard | ✅ documented, not a defect |
+
+### 16.2 RBAC — verified exact
+
+- `_REPORT_READ_ROLES` = `[ADMIN, RECEPTIONIST, DENTAL_ASSISTANT, *DOCTOR_ROLES]`
+  which is **every role in the system** (`ALL_ROLES` in app/core/constants.py) —
+  the AppRouter "all roles" comment is accurate (contrast: the Invoice/Payment
+  route comment was corrected in the previous review).
+- 403 → `BillingDashboardPermission` (no role names hardcoded);
+  `shouldRetryQuery` never auto-retries 401/403; the container does not hammer
+  the endpoint.
+- No client-side role gates anywhere on the dashboard; the backend is the
+  sole authority, matching the established DensCare pattern.
+
+### 16.3 Query-key invalidation — verified complete
+
+- Dashboard key: `['billing', 'dashboard', patientId ?? 'all']` — the patient
+  filter is part of the key, so switching patients refetches the correct
+  payload and switching back hits the cache.
+- **Every** invoice mutation (create/update/issue/cancel/delete) and **every**
+  payment mutation (create/complete/fail/void/allocate/deallocate/delete/
+  receipt-generate) invalidates the shared `['billing']` ROOT
+  (`useInvoiceMutations`, `usePaymentMutations`). The dashboard keys
+  prefix-match the root, so both the system-wide and any patient-filtered
+  snapshot refresh after mutations elsewhere — this is the contract the
+  earlier phases established, and it still holds.
+- Detail deletes also `removeQueries` their detail keys (no stale ghost
+  detail pages). Receipt generation invalidates the payment detail + root.
+- Tests pin the contract: `useBillingDashboard.test.tsx` asserts the
+  `['billing','dashboard','all']` cache entry and the patient-filter param;
+  `BillingDashboardContainer.test.tsx` covers 403 (never retried), empty
+  state, and enabled CTAs.
+
+### 16.4 Minor observations (no change required)
+
+1. **Orphaned patient filter in the global-empty corner** — if a patient is
+   selected and the clinic later becomes globally empty (every count zero,
+   e.g. all drafts deleted and payments removed), the empty state replaces
+   the PatientPicker, so the hidden filter can't be cleared from the UI until
+   navigation. Extremely rare, no data impact, resets on reload; the empty
+   state layout intentionally matches the reference, so no change was made.
+2. **Dashboard aggregate currency** — `BillingTotalsResponse` carries no
+   currency code, so KPI + patient-summary amounts used the shared
+   `formatCurrency` default (USD); Recent Invoices/Payments showed each
+   record's own backend currency. **Resolved in §17** — the dashboard now
+   presents INR, matching the Payments module.
+
+### 16.5 Validation
+
+No code changed in this review (no defects to fix). The current gates from
+the preceding work stand: `npm test` 1370/1370 across 179 files, `npm run
+lint` clean, `tsc -b` clean, `npm run build` succeeds. Backend untouched.
+
+## 17. Sprint 14A.3 follow-up — INR dashboard presentation
+
+Resolves the §16.4 observation: the dashboard now presents monetary values in
+INR via the shared `PAYMENT_CURRENCY_CODE` presentation constant, so a payment
+reads identically on the dashboard and on the Payments pages.
+
+### 17.1 What changed and why
+
+| Surface | Before | After | Rationale |
+| --- | --- | --- | --- |
+| KPI grid (5 monetary cards: Total Invoiced / Collected / Refunded / Outstanding / Credited) | `formatCurrency(value)` → USD default | `formatCurrency(value, PAYMENT_CURRENCY_CODE)` → ₹ | `BillingTotalsResponse` carries no currency code; INR is the approved Billing presentation currency |
+| Patient Financial Summary (4 rows) | `formatCurrency(value)` → USD default | `formatCurrency(value, PAYMENT_CURRENCY_CODE)` → ₹ | `PatientFinancialSummaryResponse` carries no currency code |
+| Recent Payments amount column | `formatCurrency(total, pay.financials.currency_code)` → backend-derived USD | `formatCurrency(total, PAYMENT_CURRENCY_CODE)` → ₹ | Payment presentation is INR module-wide; the backend payment `currency_code` is derived, not a stored per-payment choice |
+| Recent Invoices grand total | `formatCurrency(total, inv.financials.currency_code)` → invoice's own currency | `formatCurrency(total, PAYMENT_CURRENCY_CODE)` → ₹ | Product decision: the dashboard is fully uniform in INR. The Invoice module pages still display each invoice's own stored currency; only this dashboard card forces INR |
+
+Backend untouched — all amounts are the backend's; only the presentation
+symbol/currency is applied client-side through the existing shared formatter.
+
+### 17.2 Files changed
+
+- `frontend/src/components/billing/BillingKpiGrid.tsx` — 5 monetary KPI
+  definitions pass `PAYMENT_CURRENCY_CODE`.
+- `frontend/src/components/billing/PatientFinancialSummary.tsx` — 4 summary
+  rows pass `PAYMENT_CURRENCY_CODE`.
+- `frontend/src/components/billing/RecentPayments.tsx` — amount column uses
+  `PAYMENT_CURRENCY_CODE` instead of `pay.financials.currency_code`.
+- `frontend/src/components/billing/RecentInvoices.tsx` — grand-total column
+  uses `PAYMENT_CURRENCY_CODE` instead of `inv.financials.currency_code`
+  (dashboard card is uniform INR; Invoice module pages unchanged).
+- `frontend/src/constants/billing.ts` — `PAYMENT_CURRENCY_CODE` doc comment
+  now covers the dashboard (Billing INR presentation currency).
+- `frontend/src/components/billing/containers/BillingDashboardContainer.test.tsx`
+  — assertions updated to `₹` for KPIs, payment amount, patient summary and
+  the invoice grand total; invoice + payment fixtures set to INR (the
+  dashboard ignores each record's own currency); error-state negative
+  assertion checks the INR value is absent.
+
+### 17.3 Validation
+
+| Gate | Result |
+| --- | --- |
+| `npm test` | ✅ 179 files / **1370 tests passed** |
+| `npm run lint` | ✅ no errors |
+| `tsc -b` | ✅ no errors |
+| `npm run build` | ✅ built successfully |

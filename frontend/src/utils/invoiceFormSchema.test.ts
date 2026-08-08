@@ -22,7 +22,7 @@ function validForm(overrides: Record<string, unknown> = {}) {
     treatment_plan_id: '',
     appointment_id: '',
     doctor_id: '',
-    currency_code: 'USD',
+    currency_code: 'INR',
     invoice_date: '2026-07-23',
     due_date: '2026-08-22',
     notes: '',

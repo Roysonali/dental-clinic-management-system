@@ -13,6 +13,7 @@ import {
   FilePlus2,
 } from 'lucide-react';
 import { BillingKpiCard } from './BillingKpiCard';
+import { PAYMENT_CURRENCY_CODE } from '../../constants/billing';
 import { formatCurrency, formatCount } from '../../utils/formatting';
 import type { BillingTotals } from '../../types/billing';
 
@@ -40,6 +41,12 @@ interface KpiDefinition {
  * `BillingTotalsResponse` — nothing is derived or invented client-side.
  * Descriptions align with the backend schema `description`s (reference
  * screenshot copy used where the contract uses the same terminology).
+ *
+ * `BillingTotalsResponse` carries no currency code (the totals are
+ * system-wide aggregates), so the monetary KPIs present in INR — the same
+ * presentation currency as the Payments module (`PAYMENT_CURRENCY_CODE`),
+ * matching the approved product requirement. The backend remains the
+ * financial authority for the underlying amounts.
  */
 const KPI_DEFINITIONS: KpiDefinition[] = [
   {
@@ -48,7 +55,7 @@ const KPI_DEFINITIONS: KpiDefinition[] = [
     description: 'All invoices',
     icon: Receipt,
     iconClassName: 'text-primary-600',
-    value: (t) => formatCurrency(t.total_invoiced),
+    value: (t) => formatCurrency(t.total_invoiced, PAYMENT_CURRENCY_CODE),
   },
   {
     key: 'total-collected',
@@ -56,7 +63,7 @@ const KPI_DEFINITIONS: KpiDefinition[] = [
     description: 'Non-refund allocations',
     icon: Banknote,
     iconClassName: 'text-success',
-    value: (t) => formatCurrency(t.total_collected),
+    value: (t) => formatCurrency(t.total_collected, PAYMENT_CURRENCY_CODE),
   },
   {
     key: 'total-refunded',
@@ -64,7 +71,7 @@ const KPI_DEFINITIONS: KpiDefinition[] = [
     description: 'Refund allocations',
     icon: Undo2,
     iconClassName: 'text-danger',
-    value: (t) => formatCurrency(t.total_refunded),
+    value: (t) => formatCurrency(t.total_refunded, PAYMENT_CURRENCY_CODE),
   },
   {
     key: 'total-outstanding',
@@ -72,7 +79,7 @@ const KPI_DEFINITIONS: KpiDefinition[] = [
     description: 'Invoiced − collected + refunded',
     icon: Wallet,
     iconClassName: 'text-warning',
-    value: (t) => formatCurrency(t.total_outstanding),
+    value: (t) => formatCurrency(t.total_outstanding, PAYMENT_CURRENCY_CODE),
   },
   {
     key: 'total-credited',
@@ -80,7 +87,7 @@ const KPI_DEFINITIONS: KpiDefinition[] = [
     description: 'Credit note amounts',
     icon: BadgePercent,
     iconClassName: 'text-info',
-    value: (t) => formatCurrency(t.total_credited),
+    value: (t) => formatCurrency(t.total_credited, PAYMENT_CURRENCY_CODE),
   },
   {
     key: 'paid-invoice-count',

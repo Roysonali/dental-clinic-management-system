@@ -170,12 +170,19 @@ export interface BillingDashboardResponse {
 /** Sort direction accepted by GET /billing/invoices (`sort_order`). */
 export type SortOrder = 'asc' | 'desc';
 
-/** Sort fields the backend allows (`ALLOWED_SORT_FIELDS` in constants.py). */
+/**
+ * Sort fields the backend actually supports.
+ *
+ * Matches the invoice repository `_ALLOWED_SORT_FIELDS` whitelist
+ * (invoice_repository.py): created_at, updated_at, invoice_number,
+ * due_date, status. NOTE: `grand_total` is deliberately NOT included — the
+ * backend resolves unknown sort fields silently to the default (created_at),
+ * so offering it would silently sort by the wrong column.
+ */
 export type InvoiceSortField =
   | 'created_at'
   | 'updated_at'
   | 'invoice_number'
-  | 'grand_total'
   | 'status'
   | 'due_date';
 

@@ -17,7 +17,7 @@ const invoice: InvoiceRead = {
   updater: null,
   invoice_date: '2026-07-23',
   due_date: '2026-08-22',
-  currency_code: 'USD',
+  currency_code: 'INR',
   notes: 'Follow up call',
   cancellation_reason: null,
   void_reason: null,
@@ -32,11 +32,11 @@ const invoice: InvoiceRead = {
       discount_value: null,
       net_amount: '320.00',
       tax_amount: null,
-      currency_code: 'USD',
+      currency_code: 'INR',
     },
   ],
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     subtotal: '320.00',
     discount_total: '0.00',
     tax_total: '0.00',
@@ -65,7 +65,7 @@ describe('EditInvoiceDrawer', () => {
     // Read-only summary.
     expect(screen.getByText('Marcus Delaney')).toBeInTheDocument();
     expect(screen.getByText('Dr. Priya Raman')).toBeInTheDocument();
-    expect(screen.getByText('$320.00')).toBeInTheDocument();
+    expect(screen.getByText('₹320.00')).toBeInTheDocument();
 
     // Only the backend-editable fields exist. Due Date renders as a button
     // trigger (DatePicker) whose accessible name carries the label + value;

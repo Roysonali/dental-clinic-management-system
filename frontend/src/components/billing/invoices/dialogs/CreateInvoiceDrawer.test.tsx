@@ -192,10 +192,23 @@ describe('CreateInvoiceDrawer', () => {
   it('shows the preview grand total that mirrors the backend net formula', async () => {
     renderDrawer();
 
-    // Preview stays $0.00 until valid rows exist; with no rows entered the
+    // Preview stays ₹0.00 until valid rows exist; with no rows entered the
     // preview reflects the default empty row (0). The same string appears in
     // the per-row net-amount caption, so assert at least one match.
-    expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('₹0.00').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the preview in INR even when a different currency is selected (uniform display)', async () => {
+    renderDrawer();
+
+    // The create form records the selected currency (contract field), but
+    // every billing surface — including this preview — presents in INR.
+    const currency = screen.getByLabelText('Currency');
+    fireEvent.change(currency, { target: { value: 'EUR' } });
+    expect(currency).toHaveValue('EUR');
+
+    expect(screen.getAllByText('₹0.00').length).toBeGreaterThan(0);
+    expect(screen.queryByText('€0.00')).not.toBeInTheDocument();
   });
 
   it('renders a close button wired to onClose', () => {

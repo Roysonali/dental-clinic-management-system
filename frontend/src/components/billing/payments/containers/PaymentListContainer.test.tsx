@@ -45,6 +45,7 @@ vi.mock('../../../../services/billingService', () => ({
     voidPayment: vi.fn(),
     allocatePayment: vi.fn(),
     deallocatePayment: vi.fn(),
+    getPaymentAllocations: vi.fn(),
     generateReceipt: vi.fn(),
   },
 }));
@@ -67,6 +68,7 @@ const completeMock = vi.mocked(billingService.completePayment);
 const failMock = vi.mocked(billingService.failPayment);
 const voidMock = vi.mocked(billingService.voidPayment);
 const allocateMock = vi.mocked(billingService.allocatePayment);
+const allocationsMock = vi.mocked(billingService.getPaymentAllocations);
 const deleteMock = vi.mocked(billingService.deletePayment);
 const patientListMock = vi.mocked(patientService.list);
 
@@ -188,10 +190,13 @@ describe('PaymentListContainer', () => {
     failMock.mockReset();
     voidMock.mockReset();
     allocateMock.mockReset();
+    allocationsMock.mockReset();
     deleteMock.mockReset();
     patientListMock.mockReset();
 
     listMock.mockResolvedValue(listResponse);
+    // No existing allocations by default — invoices remain selectable.
+    allocationsMock.mockResolvedValue([]);
     patientListMock.mockResolvedValue({
       items: [patient],
       total: 1,
@@ -381,6 +386,50 @@ describe('PaymentListContainer', () => {
         amount: '300.00',
       }),
     );
+  });
+
+  it('disables invoices that already have an allocation from this payment', async () => {
+    // Backend contract: POST /billing/payments/{id}/allocate rejects a
+    // duplicate payment↔invoice allocation with a 409, so the dialog must
+    // show already-allocated invoices as VISIBLY DISABLED (reference rule),
+    // not selectable.
+    listMock.mockResolvedValue({ items: [completedPayment], total: 1, page: 1, page_size: 20 });
+    listInvoicesMock.mockResolvedValue({
+      items: [payableInvoice],
+      total: 1,
+      page: 1,
+      page_size: 100,
+    });
+    allocationsMock.mockResolvedValue([
+      {
+        id: 'alloc1',
+        invoice: {
+          id: 'inv1',
+          invoice_number: 'INV-01039',
+          patient,
+          invoice_date: '2026-07-20',
+          currency_code: 'INR',
+          grand_total: '3120.75',
+        },
+        allocated_amount: '300.00',
+        is_refund: false,
+        created_at: '2026-07-23T14:16:00Z',
+      },
+    ]);
+
+    renderList();
+
+    await screen.findByText('PAY-00002');
+    fireEvent.click(screen.getByRole('button', { name: 'Allocate payment PAY-00002' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Allocate payment to an invoice' });
+    // The already-allocated invoice stays visible but is disabled.
+    expect(await within(dialog).findByText('INV-01039', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(within(dialog).getByText('Already allocated')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('INV-01039 — already allocated')).toBeDisabled();
+    // No selectable radio remains for it, and the allocate CTA stays disabled.
+    expect(within(dialog).getByLabelText(/Allocation Amount/)).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Allocate' })).toBeDisabled();
   });
 
   it('deletes a pending payment through the delete dialog (admin-gated)', async () => {

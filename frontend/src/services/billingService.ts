@@ -8,6 +8,7 @@ import type {
   InvoiceListResponse,
   InvoiceRead,
   PaymentAllocatePayload,
+  PaymentAllocationSummary,
   PaymentCreatePayload,
   PaymentDeallocatePayload,
   PaymentListParams,
@@ -116,6 +117,19 @@ export const billingService = {
   /** PATCH /billing/payments/{id} — update a Pending payment (reference/notes). */
   async updatePayment(id: string, payload: PaymentMetadataUpdatePayload): Promise<PaymentRead> {
     const { data } = await api.patch<PaymentRead>(`/billing/payments/${id}`, payload);
+    return data;
+  },
+
+  /**
+   * GET /billing/payments/{id}/allocations — allocation summaries for a
+   * payment. Used by the Allocate dialog to exclude invoices that already
+   * have an allocation from this payment (the backend rejects duplicate
+   * allocations with a 409).
+   */
+  async getPaymentAllocations(id: string): Promise<PaymentAllocationSummary[]> {
+    const { data } = await api.get<PaymentAllocationSummary[]>(
+      `/billing/payments/${id}/allocations`,
+    );
     return data;
   },
 

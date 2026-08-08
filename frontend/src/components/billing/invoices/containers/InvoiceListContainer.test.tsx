@@ -96,7 +96,7 @@ const invoice: InvoiceListItem = {
   invoice_date: '2026-07-23',
   due_date: '2026-08-22',
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     subtotal: '3000.00',
     discount_total: '0.00',
     tax_total: '0.00',
@@ -165,7 +165,7 @@ describe('InvoiceListContainer', () => {
     expect(screen.getByText('Marcus Delaney')).toBeInTheDocument();
     // 'Issued' appears in both the status filter option and the status badge.
     expect(screen.getAllByText('Issued').length).toBeGreaterThan(0);
-    expect(screen.getByText('$3,000.00')).toBeInTheDocument();
+    expect(screen.getByText('₹3,000.00')).toBeInTheDocument();
     expect(listMock).toHaveBeenCalledWith(
       expect.objectContaining({ page: 1, page_size: 20, sort_by: 'created_at', sort_order: 'desc' }),
     );

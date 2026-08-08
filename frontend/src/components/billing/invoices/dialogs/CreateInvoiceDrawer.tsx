@@ -15,6 +15,7 @@ import { useAppointmentOptions } from '../../../../hooks/patientRecords/useAppoi
 import {
   INVOICE_NOTES_MAX_LENGTH,
   CURRENCY_OPTIONS,
+  PAYMENT_CURRENCY_CODE,
 } from '../../../../constants/billing';
 import {
   invoiceCreateFormSchema,
@@ -77,7 +78,6 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
 
   // useWatch (not form.watch) so React Compiler can memoize the drawer.
   const watchedPatientId = useWatch({ control, name: 'patient_id' });
-  const watchedCurrency = useWatch({ control, name: 'currency_code' });
   const watchedItems = useWatch({ control, name: 'items' });
   const watchedInvoiceDate = useWatch({ control, name: 'invoice_date' });
 
@@ -226,6 +226,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                   options={CURRENCY_OPTIONS}
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
+                  helperText="Invoices display in INR"
                 />
               )}
             />
@@ -280,7 +281,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                 <div className="flex items-center justify-between">
                   <p className="text-body-sm font-medium text-neutral-600">Preview grand total</p>
                   <p className="text-h4 font-semibold text-neutral-900 tabular-nums">
-                    {formatCurrency(previewGrandTotal(watchedItems ?? []), watchedCurrency)}
+                    {formatCurrency(previewGrandTotal(watchedItems ?? []), PAYMENT_CURRENCY_CODE)}
                   </p>
                 </div>
                 <p className="mt-0.5 text-caption text-neutral-400">

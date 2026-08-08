@@ -12,7 +12,7 @@ const invoice: InvoiceListItem = {
   invoice_date: '2026-07-23',
   due_date: '2026-08-22',
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     subtotal: '3000.00',
     discount_total: '0.00',
     tax_total: '0.00',

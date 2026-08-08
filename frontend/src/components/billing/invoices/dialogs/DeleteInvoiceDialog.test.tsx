@@ -12,7 +12,7 @@ const invoice: InvoiceListItem = {
   invoice_date: '2026-07-23',
   due_date: '2026-08-22',
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     subtotal: '3000.00',
     discount_total: '0.00',
     tax_total: '0.00',
@@ -33,7 +33,7 @@ describe('DeleteInvoiceDialog', () => {
     expect(screen.getByText('Delete this draft invoice?')).toBeInTheDocument();
     expect(screen.getByText('Marcus Delaney')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // line items
-    expect(screen.getByText('$3,000.00')).toBeInTheDocument();
+    expect(screen.getByText('₹3,000.00')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete draft' })).toBeInTheDocument();
   });
 

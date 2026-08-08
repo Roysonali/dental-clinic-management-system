@@ -56,7 +56,7 @@ const issuedInvoice: InvoiceRead = {
   updater: null,
   invoice_date: '2026-07-23',
   due_date: '2026-08-22',
-  currency_code: 'USD',
+  currency_code: 'INR',
   notes: 'Follow up in two weeks',
   cancellation_reason: null,
   void_reason: null,
@@ -71,11 +71,11 @@ const issuedInvoice: InvoiceRead = {
       discount_value: '32.00',
       net_amount: '288.00',
       tax_amount: null,
-      currency_code: 'USD',
+      currency_code: 'INR',
     },
   ],
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     subtotal: '320.00',
     discount_total: '32.00',
     tax_total: '0.00',
@@ -122,8 +122,8 @@ describe('InvoiceDetailsContainer', () => {
     expect(screen.getByText('TXN-000001')).toBeInTheDocument();
     expect(screen.getByText('APT-04412')).toBeInTheDocument();
     expect(screen.getByText('Composite restoration — tooth 26')).toBeInTheDocument();
-    // $288.00 appears in both the line-item net column and the grand total.
-    expect(screen.getAllByText('$288.00').length).toBeGreaterThan(0);
+    // ₹288.00 appears in both the line-item net column and the grand total.
+    expect(screen.getAllByText('₹288.00').length).toBeGreaterThan(0);
     expect(screen.getByText('Financial Summary')).toBeInTheDocument();
     expect(screen.getByText('Follow up in two weeks')).toBeInTheDocument();
     expect(screen.getByText('Record Information')).toBeInTheDocument();

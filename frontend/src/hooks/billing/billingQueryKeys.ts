@@ -17,8 +17,11 @@ import type { InvoiceListParams, PaymentListParams } from '../../types/billing';
  * Payment keys (Sprint 14A.3):
  * - `['billing', 'payments', 'list', params]` — server-side filter/sort/page.
  * - `['billing', 'payments', 'detail', id]` — full payment aggregate (the
- *   detail page renders `allocations` from this aggregate, so the backend's
- *   dedicated GET /{id}/allocations endpoint is not called by the UI).
+ *   detail page renders `allocations` from this aggregate).
+ * - `['billing', 'payments', 'allocations', id]` — GET /{id}/allocations,
+ *   consumed by the Allocate dialog to visibly disable invoices that already
+ *   have an allocation from this payment (the backend rejects duplicates
+ *   with a 409).
  * - `['billing', 'receipts', 'by-payment', id]` — receipt generated for a
  *   payment (the backend has no GET-by-payment lookup; the receipt is cached
  *   here from the generate mutation's response and surfaced by the Receipt
@@ -38,6 +41,9 @@ export const billingQueryKeys = {
     ['billing', 'payments', 'list', params] as const,
   /** Single payment aggregate. */
   paymentDetail: (id: string) => ['billing', 'payments', 'detail', id] as const,
+  /** Allocation summaries for a payment (GET /billing/payments/{id}/allocations). */
+  paymentAllocations: (id: string) =>
+    ['billing', 'payments', 'allocations', id] as const,
   /** Receipt generated for a payment (cache from the generate mutation). */
   receiptForPayment: (paymentId: string) =>
     ['billing', 'receipts', 'by-payment', paymentId] as const,

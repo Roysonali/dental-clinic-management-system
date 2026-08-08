@@ -8,7 +8,7 @@ import { Icon } from '../../../common/Icon/Icon';
 import { Form, FormActions, ValidationSummary } from '../../../common/Form';
 import { Textarea, DatePicker } from '../../../common/Input';
 import { Skeleton } from '../../../common/Skeleton/Skeleton';
-import { INVOICE_NOTES_MAX_LENGTH } from '../../../../constants/billing';
+import { INVOICE_NOTES_MAX_LENGTH, PAYMENT_CURRENCY_CODE } from '../../../../constants/billing';
 import { invoiceEditFormSchema, type InvoiceEditFormValues } from '../../../../utils/invoiceFormSchema';
 import { invoiceToEditFormValues } from '../../../../utils/invoiceFormUtils';
 import { formatCurrency } from '../../../../utils/formatting';
@@ -137,7 +137,7 @@ export const EditInvoiceDrawer: FC<EditInvoiceDrawerProps> = ({
                   <div>
                     <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Grand Total</dt>
                     <dd className="mt-1 text-body font-semibold text-neutral-900 tabular-nums">
-                      {formatCurrency(invoice.financials.grand_total, invoice.financials.currency_code)}
+                      {formatCurrency(invoice.financials.grand_total, PAYMENT_CURRENCY_CODE)}
                     </dd>
                   </div>
                 </dl>

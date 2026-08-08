@@ -33,7 +33,7 @@ const draft: InvoiceListItem = {
   invoice_date: '2026-07-23',
   due_date: '2026-08-22',
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     subtotal: '3000.00',
     discount_total: '0.00',
     tax_total: '0.00',
@@ -99,7 +99,7 @@ describe('InvoiceTable', () => {
     expect(screen.getByText('Dr. Priya Raman')).toBeInTheDocument();
     expect(screen.getByText('DOC-000001')).toBeInTheDocument();
     // Right-aligned currency via the shared formatter.
-    expect(screen.getByText('$3,000.00')).toBeInTheDocument();
+    expect(screen.getByText('₹3,000.00')).toBeInTheDocument();
     // Items column.
     expect(screen.getByText('2')).toBeInTheDocument();
   });

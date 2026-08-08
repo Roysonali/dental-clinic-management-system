@@ -69,8 +69,9 @@ describe('useInvoiceFilters', () => {
     act(() => result.current.setPageSize(50));
     expect(result.current.params.page_size).toBe(50);
     expect(result.current.page).toBe(1);
-    act(() => result.current.setSortBy('grand_total'));
-    expect(result.current.params.sort_by).toBe('grand_total');
+    // grand_total is not a backend sort field — use a whitelisted one.
+    act(() => result.current.setSortBy('invoice_number'));
+    expect(result.current.params.sort_by).toBe('invoice_number');
     act(() => result.current.setSortOrder('asc'));
     expect(result.current.params.sort_order).toBe('asc');
   });

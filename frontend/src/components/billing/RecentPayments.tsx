@@ -4,7 +4,7 @@ import { DataTable, type DataTableColumn } from '../common/DataTable';
 import { StatusBadge } from '../common/StatusBadge/StatusBadge';
 import { Button } from '../common/Button/Button';
 import { SectionHeader } from '../common/SectionHeader';
-import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_VARIANTS } from '../../constants/billing';
+import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_VARIANTS, PAYMENT_CURRENCY_CODE } from '../../constants/billing';
 import { formatCurrency } from '../../utils/formatting';
 import { formatISODate } from '../../utils/date';
 import { ROUTES } from '../../routes/routes';
@@ -22,6 +22,12 @@ interface RecentPaymentsProps {
  *
  * Reuses the shared DataTable. "View all" and row clicks navigate to the
  * Payment List / Detail routes now that Phase 3 (Sprint 14A.3) ships them.
+ *
+ * Amounts present in INR (`PAYMENT_CURRENCY_CODE`) — the same presentation
+ * currency as the Payments module, so a payment reads identically here and
+ * on the Payments pages. The backend's derived payment `currency_code` is
+ * ignored for display (presentation decision; amounts themselves are the
+ * backend's).
  */
 export const RecentPayments: FC<RecentPaymentsProps> = ({
   payments,
@@ -65,7 +71,7 @@ export const RecentPayments: FC<RecentPaymentsProps> = ({
       align: 'right',
       render: (pay) => (
         <span className="font-medium text-neutral-900 tabular-nums">
-          {formatCurrency(pay.total_amount, pay.financials.currency_code)}
+          {formatCurrency(pay.total_amount, PAYMENT_CURRENCY_CODE)}
         </span>
       ),
     },

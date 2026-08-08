@@ -132,6 +132,10 @@ export const InvoiceListContainer: FC = () => {
       filters.setSortOrder('desc');
       return;
     }
+    // Only whitelisted columns are sortable (backend InvoiceRepository
+    // `_ALLOWED_SORT_FIELDS`) — do NOT add sortable columns without also
+    // adding them to the backend whitelist, or the backend silently falls
+    // back to the default sort (created_at).
     filters.setSortBy(next.key as InvoiceSortField);
     filters.setSortOrder(next.direction);
   };

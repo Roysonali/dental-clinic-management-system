@@ -132,8 +132,10 @@ describe('InvoiceToolbar', () => {
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'paid' } });
     expect(onStatusChange).toHaveBeenCalledWith('paid');
 
-    fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'grand_total' } });
-    expect(onSortByChange).toHaveBeenCalledWith('grand_total');
+    // Only backend-whitelisted sort fields are offered (grand_total is not
+    // in InvoiceRepository._ALLOWED_SORT_FIELDS).
+    fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'due_date' } });
+    expect(onSortByChange).toHaveBeenCalledWith('due_date');
 
     fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'asc' } });
     expect(onSortOrderChange).toHaveBeenCalledWith('asc');

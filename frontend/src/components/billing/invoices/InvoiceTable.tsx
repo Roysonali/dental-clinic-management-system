@@ -6,7 +6,7 @@ import { IconButton } from '../../common/Button/IconButton';
 import { Icon } from '../../common/Icon/Icon';
 import { Tooltip } from '../../common/Tooltip/Tooltip';
 import { StatusBadge } from '../../common/StatusBadge/StatusBadge';
-import { INVOICE_STATUS_VARIANTS } from '../../../constants/billing';
+import { INVOICE_STATUS_VARIANTS, PAYMENT_CURRENCY_CODE } from '../../../constants/billing';
 import { formatCurrency } from '../../../utils/formatting';
 import { formatISODate, formatISODateTime } from '../../../utils/date';
 import { PermissionGate } from '../../rbac/PermissionGate';
@@ -125,13 +125,15 @@ export const InvoiceTable: FC<InvoiceTableProps> = ({
       render: (inv) => <span className="whitespace-nowrap">{formatISODate(inv.due_date)}</span>,
     },
     {
+      // NOT sortable: the backend sort whitelist (`_ALLOWED_SORT_FIELDS`)
+      // has no grand_total — an unknown sort field silently falls back to
+      // the default (created_at), so a clickable header would sort wrongly.
       key: 'grand_total',
       header: 'Grand Total',
       align: 'right',
-      sortable: true,
       render: (inv) => (
         <span className="whitespace-nowrap font-medium text-neutral-900 tabular-nums">
-          {formatCurrency(inv.financials.grand_total, inv.financials.currency_code)}
+          {formatCurrency(inv.financials.grand_total, PAYMENT_CURRENCY_CODE)}
         </span>
       ),
     },

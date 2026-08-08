@@ -13,6 +13,7 @@
 import { addDaysISO, todayLocalISO } from './date';
 import {
   INVOICE_ITEM_DESCRIPTION_MAX_LENGTH,
+  PAYMENT_CURRENCY_CODE,
 } from '../constants/billing';
 import type {
   InvoiceCreatePayload,
@@ -68,7 +69,10 @@ export function defaultCreateInvoiceValues(): InvoiceCreateFormValues {
     treatment_plan_id: '',
     appointment_id: '',
     doctor_id: '',
-    currency_code: 'USD',
+    // The clinic presents (and now records) billing in INR — the approved
+    // product currency. The backend CurrencyCode supports INR, so the
+    // create payload is sent as currency_code=INR.
+    currency_code: PAYMENT_CURRENCY_CODE,
     invoice_date: invoiceDate,
     // The backend create schema REQUIRES due_date; its service documents the
     // default as invoice_date + 30 days, so the form prefills that default.

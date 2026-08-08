@@ -65,8 +65,10 @@ const invoice: InvoiceListItem = {
   doctor: null,
   invoice_date: '2026-07-23',
   due_date: '2026-08-22',
+  // The dashboard presents all amounts in INR (PAYMENT_CURRENCY_CODE); the
+  // invoice's own stored currency is ignored for display on this card.
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     subtotal: '3000.00',
     discount_total: '0.00',
     tax_total: '0.00',
@@ -91,8 +93,10 @@ const payment: PaymentListItem = {
   payment_method: 'card',
   total_amount: '1500.00',
   payment_date: '2026-07-23',
+  // The Payments UI presents amounts in INR (PAYMENT_CURRENCY_CODE); the
+  // backend-derived currency is ignored for display.
   financials: {
-    currency_code: 'USD',
+    currency_code: 'INR',
     total_amount: '1500.00',
     allocated_amount: '1500.00',
     refunded_amount: '0.00',
@@ -167,10 +171,11 @@ describe('BillingDashboardContainer', () => {
 
     renderWithProviders(<BillingDashboardContainer />);
 
-    // KPI values (formatted per the shared currency formatter).
+    // KPI values present in INR (BillingTotalsResponse carries no currency,
+    // so the dashboard uses the Payments presentation currency).
     expect(await screen.findByText('Total Invoiced')).toBeInTheDocument();
-    expect(screen.getByText('$15,000.00')).toBeInTheDocument();
-    expect(screen.getByText('$3,500.00')).toBeInTheDocument();
+    expect(screen.getByText('₹15,000.00')).toBeInTheDocument();
+    expect(screen.getByText('₹3,500.00')).toBeInTheDocument();
     expect(screen.getByText('42')).toBeInTheDocument();
 
     // Recent invoices: number, patient (invoice + payment rows share it), status,
@@ -178,12 +183,13 @@ describe('BillingDashboardContainer', () => {
     expect(screen.getByText('INV-00001')).toBeInTheDocument();
     expect(screen.getAllByText('Marcus Delaney').length).toBeGreaterThan(0);
     expect(screen.getByText('Paid')).toBeInTheDocument();
-    expect(screen.getByText('$3,000.00')).toBeInTheDocument();
+    // Recent invoices present in INR too (fully uniform dashboard).
+    expect(screen.getByText('₹3,000.00')).toBeInTheDocument();
 
-    // Recent payments: number, method · date, amount.
+    // Recent payments: number, method · date, amount (INR presentation).
     expect(screen.getByText('PAY-00001')).toBeInTheDocument();
     expect(screen.getByText(/Card · Jul 23, 2026/)).toBeInTheDocument();
-    expect(screen.getByText('$1,500.00')).toBeInTheDocument();
+    expect(screen.getByText('₹1,500.00')).toBeInTheDocument();
 
     // System-wide query (no patient filter) and patient-summary prompt.
     expect(getDashboardMock).toHaveBeenCalledWith(undefined);
@@ -237,9 +243,10 @@ describe('BillingDashboardContainer', () => {
     expect(
       await screen.findByText("Couldn't load billing dashboard"),
     ).toBeInTheDocument();
-    // Raw backend messages are never exposed; metrics degrade to unavailable.
+    // Raw backend messages are never exposed; metrics degrade to unavailable
+    // (no stale INR totals either).
     expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
-    expect(screen.queryByText('$15,000.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('₹15,000.00')).not.toBeInTheDocument();
 
     // Retry refetches the query (no full page reload).
     getDashboardMock.mockClear();
@@ -272,8 +279,8 @@ describe('BillingDashboardContainer', () => {
     renderWithProviders(<BillingDashboardContainer />);
 
     expect(await screen.findByText('No billing activity yet')).toBeInTheDocument();
-    // KPI cards still show graceful zero values (count cards all render '0').
-    expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0);
+    // KPI cards still show graceful zero values in INR (count cards render '0').
+    expect(screen.getAllByText('₹0.00').length).toBeGreaterThan(0);
     expect(screen.getAllByText('0').length).toBeGreaterThan(0);
     // Empty-state CTAs are backend-capability aware: New invoice navigates to
     // the Invoice List route (Phase 2); Record payment navigates to the
@@ -319,9 +326,10 @@ describe('BillingDashboardContainer', () => {
 
     // The dashboard refetches with the patient filter and shows the summary.
     await waitFor(() => expect(getDashboardMock).toHaveBeenCalledWith('p1'));
-    expect(await screen.findByText('$4,210.00')).toBeInTheDocument();
-    expect(screen.getByText('$3,840.00')).toBeInTheDocument();
-    expect(screen.getByText('$370.00')).toBeInTheDocument();
+    // Patient summary values present in INR (same presentation currency).
+    expect(await screen.findByText('₹4,210.00')).toBeInTheDocument();
+    expect(screen.getByText('₹3,840.00')).toBeInTheDocument();
+    expect(screen.getByText('₹370.00')).toBeInTheDocument();
     expect(
       screen.queryByText('Select a patient to see their billing summary.'),
     ).not.toBeInTheDocument();

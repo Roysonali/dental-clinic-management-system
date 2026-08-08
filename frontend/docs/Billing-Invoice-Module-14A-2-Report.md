@@ -286,3 +286,143 @@ Dashboard regression: `BillingDashboardHeader.test.tsx` /
 
 Scope respected: only the Invoice module (Phase 2) was implemented; Payments,
 Receipts, Refunds, Credit Notes and Billing Reports were **not** started.
+
+## 16. Independent production review (follow-up)
+
+An adversarial re-review of the Invoice module was performed against the
+actual backend (routers, schemas, services, validators, enums, constants,
+repositories, RBAC). One genuine defect and one documentation inaccuracy were
+found and fixed.
+
+### 16.1 Review findings
+
+| Area | Verdict |
+| --- | --- |
+| **Backend contract compliance** | ✅ Endpoints (POST / PATCH / issue / cancel / DELETE / GET list / GET detail), query params, `InvoiceCreateRequest` (patient + invoice_date + due_date + currency, items ≥ 1), `InvoiceDraftUpdateRequest` (notes + due_date only), `CancelInvoiceRequest` (reason 1–500 required), delete (Draft + ADMIN) — all exact |
+| **Lifecycle edge cases** | ✅ State machine mirrors `INVOICE_TRANSITIONS` exactly; no `void` router endpoint exists, so the frontend correctly offers **no** actions on Paid invoices (whose only legal transition is `void`) and none on terminal Cancelled/Void. Edit drawer enforces `minDate = invoice_date` matching backend `validate_due_date` |
+| **RBAC** | ✅ Delete ADMIN-gated via `PermissionGate` (hide); read/write roles include DENTAL_ASSISTANT (backend `_INVOICE_READ/WRITE_ROLES`); workflow (issue/cancel) excludes DENTAL_ASSISTANT — backend 403 surfaces in-dialog (established DensCare pattern) |
+| **Audit trail** | ✅ Backend writes `BillingAuditLog` on issue + cancel and status history on every transition; frontend surfaces created/updated by + version + doc_version in the Record card and forwards cancellation reasons verbatim |
+| **Sorting contract** | 🐛 **Bug found & fixed** — see §16.2 |
+| **Route comment accuracy** | 📝 **Inaccuracy fixed** — see §16.3 |
+
+### 16.2 Bug fixed — `grand_total` was offered as a sort field the backend ignores
+
+**Root cause:** the backend invoice repository whitelists exactly
+`{created_at, updated_at, invoice_number, due_date, status}`
+(`InvoiceRepository._ALLOWED_SORT_FIELDS`); `_resolve_sort_field` silently
+falls back to the default (`created_at`) for any unknown value. The frontend
+surfaced `grand_total` in **three** places: the `InvoiceSortField` type, the
+`INVOICE_SORT_OPTIONS` toolbar select, and the sortable **Grand Total** table
+header. Selecting it produced **no error — the backend silently sorted by
+created_at**, which is a worse failure mode than an explicit rejection.
+
+**Fix (presentation-only, backend untouched):**
+
+- `frontend/src/types/billing.ts` — removed `'grand_total'` from the
+  `InvoiceSortField` union; documented the backend whitelist in the type
+  comment so the constraint survives future edits.
+- `frontend/src/constants/billing.ts` — removed the `Grand total` entry from
+  `INVOICE_SORT_OPTIONS`.
+- `frontend/src/components/billing/invoices/InvoiceTable.tsx` — removed
+  `sortable: true` from the `grand_total` column (the column still renders;
+  its header no longer claims a sort the backend cannot honour).
+- `frontend/src/components/billing/invoices/InvoiceToolbar.test.tsx` and
+  `frontend/src/hooks/billing/useInvoiceFilters.test.ts` — updated to assert
+  only backend-supported sort fields (`due_date`, `invoice_number`).
+
+### 16.3 Docs inaccuracy fixed — DENTAL_ASSISTANT and the read role set
+
+`AppRouter.tsx` claimed invoice/payment **read** endpoints allow "the same set
+minus DENTAL_ASSISTANT". The backend `_INVOICE_READ_ROLES` and
+`_PAYMENT_READ_ROLES` both **include** DENTAL_ASSISTANT (ADMIN, RECEPTIONIST,
+DENTAL_ASSISTANT, DOCTOR roles). DENTAL_ASSISTANT is excluded only from
+workflow actions (invoice issue/cancel; payment complete/fail/void/allocate),
+and delete is ADMIN-only. The route comment was rewritten to state the real
+role sets and the fail-closed behaviour.
+
+### 16.4 Re-verified correct (no change needed)
+
+- PATCH sends **only** `notes` + `due_date` — the router docstring claims
+  "replacement line items", but `InvoiceDraftUpdateRequest` (extra="forbid")
+  has no `items` field; the frontend already matches the *actual* schema
+  (documented as a backend docstring mismatch in §13, no frontend change).
+- Create payload omits optional FKs when empty; currency defaults USD matching
+  the backend default; notes trimmed to `null` when empty (schema strips
+  whitespace server-side).
+- All mutations invalidate the shared `['billing']` root + detail key; delete
+  also `removeQueries` the detail key (no stale ghost detail page).
+- `shouldRetryQuery` never auto-retries 401/403; 403 renders the
+  permission-denied state; field errors from `InvoiceValidationFailed` map to
+  `editFieldErrors` / `createFieldErrors`.
+
+### 16.5 Validation after the review
+
+| Gate | Result |
+| --- | --- |
+| `npm test` | ✅ 179 files / **1370 tests passed** |
+| `npm run lint` | ✅ no errors |
+| `tsc -b` | ✅ no errors |
+| `npm run build` | ✅ built successfully |
+
+Backend untouched. The Invoice module now offers only backend-whitelisted sort
+fields and the routing documentation matches the actual RBAC contract.
+
+## 17. INR presentation sweep (follow-up)
+
+Full-INR product decision: the Invoice module display surfaces now present
+amounts in INR (`PAYMENT_CURRENCY_CODE`) like the dashboard and Payments
+module, and the create form **defaults to INR** — so new invoices are recorded
+as `currency_code=INR` (backend `CurrencyCode` supports INR; the create
+contract is unchanged). Amounts themselves remain the backend's; only the
+presentation symbol/currency is applied client-side.
+
+### 17.1 Files changed
+
+- `src/utils/invoiceFormUtils.ts` — `defaultCreateInvoiceValues()` now defaults
+  `currency_code` to `PAYMENT_CURRENCY_CODE` ('INR'); the create payload is
+  sent as `currency_code=INR`.
+- `src/components/billing/invoices/InvoiceTable.tsx` — list Grand Total column
+  → `PAYMENT_CURRENCY_CODE`.
+- `src/components/billing/invoices/InvoiceFinancialSummaryCard.tsx` — subtotal
+  / discount / tax / grand total + the Currency label → `PAYMENT_CURRENCY_CODE`.
+- `src/components/billing/invoices/InvoiceLineItemsTable.tsx` — unit price /
+  discount / net amounts → `PAYMENT_CURRENCY_CODE`.
+- `src/components/billing/invoices/LineItemsEditor.tsx` — per-row net-amount
+  caption → `PAYMENT_CURRENCY_CODE`.
+- `src/components/billing/invoices/dialogs/CreateInvoiceDrawer.tsx` — preview
+  grand total → `PAYMENT_CURRENCY_CODE` (removed the now-unused
+  `watchedCurrency` watch; the Currency selector remains as the create
+  contract UI, now defaulting to INR).
+- `src/components/billing/invoices/dialogs/IssueInvoiceDialog.tsx`,
+  `EditInvoiceDrawer.tsx`, `DeleteInvoiceDialog.tsx` — confirmation amounts →
+  `PAYMENT_CURRENCY_CODE`.
+- `src/constants/billing.ts` — `PAYMENT_CURRENCY_CODE` doc comment now covers
+  the whole Billing module (Payments + Dashboard + Invoice display).
+- Tests: invoice fixtures → `INR` and `$` assertions → `₹` across
+  `InvoiceTable`, `InvoiceListContainer`, `InvoiceDetailsContainer`,
+  `CancelInvoiceDialog`, `CreateInvoiceDrawer`, `DeleteInvoiceDialog`,
+  `EditInvoiceDrawer`, `IssueInvoiceDialog`, `invoiceFormUtils`,
+  `invoiceFormSchema` tests.
+
+### 17.2 Sweep results
+
+- **Payment dialogs**: already fully INR (Complete / Fail / Void / Allocate /
+  Deallocate / Delete) — verified again, no stragglers.
+- **Zero `'USD'` and zero `$` remain** in the billing module source or tests
+  (grep sweep clean). The only remaining `currency_code` reads in billing
+  source are the create-form contract field and fixtures whose display is
+  now overridden by the presentation constant.
+- The Invoice create **selector** still offers all backend `CurrencyCode`
+  values (contract UI); display is uniformly INR regardless of the recorded
+  code, per the approved full-uniformity decision.
+
+### 17.3 Validation
+
+| Gate | Result |
+| --- | --- |
+| `npm test` | ✅ 179 files / **1370 tests passed** |
+| `npm run lint` | ✅ no errors |
+| `tsc -b` | ✅ no errors |
+| `npm run build` | ✅ built successfully |
+
+Backend untouched.

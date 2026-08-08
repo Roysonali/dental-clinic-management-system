@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { PatientPicker } from '../appointments/PatientPicker';
 import { SectionHeader } from '../common/SectionHeader';
 import { Skeleton } from '../common/Skeleton/Skeleton';
+import { PAYMENT_CURRENCY_CODE } from '../../constants/billing';
 import { formatCurrency } from '../../utils/formatting';
 import type { PatientFinancialSummary as PatientFinancialSummaryData } from '../../types/billing';
 
@@ -21,12 +22,17 @@ interface PatientFinancialSummaryProps {
  * `PatientFinancialSummaryResponse` (schemas/dashboard.py) — `total_paid` is
  * the "Collected" figure (non-refund payment allocations). Nothing is
  * calculated client-side.
+ *
+ * The response carries no currency code, so the values present in INR — the
+ * same presentation currency as the Payments module (`PAYMENT_CURRENCY_CODE`),
+ * matching the approved product requirement. The backend remains the
+ * financial authority for the underlying amounts.
  */
 const SUMMARY_ROWS = [
-  { key: 'invoiced', label: 'Invoiced', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_invoiced) },
-  { key: 'collected', label: 'Collected', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_paid) },
-  { key: 'outstanding', label: 'Outstanding', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_outstanding) },
-  { key: 'credited', label: 'Credited', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_credited) },
+  { key: 'invoiced', label: 'Invoiced', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_invoiced, PAYMENT_CURRENCY_CODE) },
+  { key: 'collected', label: 'Collected', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_paid, PAYMENT_CURRENCY_CODE) },
+  { key: 'outstanding', label: 'Outstanding', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_outstanding, PAYMENT_CURRENCY_CODE) },
+  { key: 'credited', label: 'Credited', value: (s: PatientFinancialSummaryData) => formatCurrency(s.total_credited, PAYMENT_CURRENCY_CODE) },
 ] as const;
 
 /**

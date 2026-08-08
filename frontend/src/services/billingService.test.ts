@@ -273,6 +273,29 @@ describe('billingService payment endpoints (Sprint 14A.3)', () => {
     expect(postMock).toHaveBeenCalledWith('/billing/payments/pay1/deallocate', payload);
   });
 
+  it('getPaymentAllocations GETs /billing/payments/{id}/allocations', async () => {
+    const allocations = [
+      {
+        id: 'alloc1',
+        invoice: {
+          id: 'inv1',
+          invoice_number: 'INV-01039',
+          patient: { id: 'p1', patient_code: 'PAT-000001', full_name: 'Marcus Delaney', is_active: true },
+          invoice_date: '2026-07-20',
+          currency_code: 'INR',
+          grand_total: '3120.75',
+        },
+        allocated_amount: '300.00',
+        is_refund: false,
+        created_at: '2026-07-23T14:16:00Z',
+      },
+    ];
+    getMock.mockResolvedValue({ data: allocations });
+
+    await expect(billingService.getPaymentAllocations('pay1')).resolves.toEqual(allocations);
+    expect(getMock).toHaveBeenCalledWith('/billing/payments/pay1/allocations');
+  });
+
   it('generateReceipt POSTs /billing/receipts with the payment id', async () => {
     const receipt = {
       id: 'rct1',

@@ -23,6 +23,7 @@ vi.mock('../../../../services/billingService', () => ({
     voidPayment: vi.fn(),
     allocatePayment: vi.fn(),
     deallocatePayment: vi.fn(),
+    getPaymentAllocations: vi.fn(),
     generateReceipt: vi.fn(),
   },
 }));

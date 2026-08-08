@@ -236,13 +236,18 @@ const AppRouter = () => {
             {/* ── Billing Module (Dashboard / Invoices / Payments) ── */}
             {/*
               Every /billing/dashboard endpoint allows ALL roles; the
-              /billing/invoices and /billing/payments read endpoints allow
-              the same set minus DENTAL_ASSISTANT (backend routers/invoice.py
-              `_INVOICE_READ_ROLES`, routers/payment.py `_PAYMENT_READ_ROLES`).
-              No route carries a client-side role gate because the client
-              cannot resolve non-admin roles — the backend enforces with 403,
-              and the list/detail containers render the permission-denied
-              state in that case. Lazy-loaded for route-level code splitting.
+              /billing/invoices and /billing/payments READ + WRITE endpoints
+              allow ADMIN / RECEPTIONIST / DENTAL_ASSISTANT / DOCTOR roles
+              (routers/invoice.py `_INVOICE_READ_ROLES` + `_INVOICE_WRITE_ROLES`,
+              routers/payment.py `_PAYMENT_READ_ROLES` + `_PAYMENT_WRITE_ROLES`).
+              DENTAL_ASSISTANT is excluded only from WORKFLOW actions
+              (invoice issue/cancel; payment complete/fail/void/allocate) and
+              DELETE is ADMIN-only. No route carries a client-side role gate
+              because the client cannot resolve non-admin roles — the backend
+              enforces with 403, and the list/detail containers render the
+              permission-denied state in that case (workflow buttons are shown
+              but fail closed server-side). Lazy-loaded for route-level code
+              splitting.
             */}
             <Route
               path={ROUTES.BILLING}

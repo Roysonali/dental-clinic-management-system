@@ -4,7 +4,7 @@ import { DataTable, type DataTableColumn } from '../common/DataTable';
 import { StatusBadge } from '../common/StatusBadge/StatusBadge';
 import { Button } from '../common/Button/Button';
 import { SectionHeader } from '../common/SectionHeader';
-import { INVOICE_STATUS_VARIANTS } from '../../constants/billing';
+import { INVOICE_STATUS_VARIANTS, PAYMENT_CURRENCY_CODE } from '../../constants/billing';
 import { formatCurrency } from '../../utils/formatting';
 import { formatISODate } from '../../utils/date';
 import { ROUTES } from '../../routes/routes';
@@ -23,6 +23,12 @@ interface RecentInvoicesProps {
  * Reuses the shared DataTable (no new table architecture). "View all" and row
  * clicks navigate to the Invoice List / Detail routes now that Phase 2
  * (Sprint 14A.2) ships them.
+ *
+ * Amounts present in INR (`PAYMENT_CURRENCY_CODE`) for a fully uniform
+ * dashboard, matching the KPI totals, patient summary and Recent Payments.
+ * The invoice's own stored `currency_code` is ignored for display on this
+ * dashboard card (the Invoice module pages still show each invoice's own
+ * currency). Amounts themselves remain the backend's.
  */
 export const RecentInvoices: FC<RecentInvoicesProps> = ({
   invoices,
@@ -64,7 +70,7 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({
       align: 'right',
       render: (inv) => (
         <span className="font-medium text-neutral-900 tabular-nums">
-          {formatCurrency(inv.financials.grand_total, inv.financials.currency_code)}
+          {formatCurrency(inv.financials.grand_total, PAYMENT_CURRENCY_CODE)}
         </span>
       ),
     },
