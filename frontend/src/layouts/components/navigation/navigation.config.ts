@@ -12,6 +12,7 @@ import {
   BookOpen,
   BarChart3,
   Settings,
+  ClipboardList,
 } from 'lucide-react';
 import { ROUTES } from '../../../routes/routes';
 import { ADMIN_ROLES } from '../../../constants/roles';
@@ -73,6 +74,13 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         label: 'Treatment Plans',
         icon: FileText,
         route: ROUTES.TREATMENT_PLANS,
+        group: 'clinical',
+      },
+      {
+        id: 'patient-records',
+        label: 'Patient Records',
+        icon: ClipboardList,
+        route: ROUTES.PATIENT_RECORDS,
         group: 'clinical',
       },
       {

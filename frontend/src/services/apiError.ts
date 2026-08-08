@@ -47,6 +47,14 @@ export interface ApiErrorInfo {
   message: string;
   /** Field → message map for inline form errors (snake_case keys) */
   fieldErrors: Record<string, string>;
+  /**
+   * Full dotted-path field errors, e.g. `items.2.medicine_name` (from
+   * `loc: ["body","items",2,"medicine_name"]`). Array index paths let
+   * array-of-object forms (prescription medicine rows) map each error to
+   * the exact row + field instead of colliding on the bare last segment.
+   * Top-level fields appear here with the same key as in `fieldErrors`.
+   */
+  nestedFieldErrors: Record<string, string>;
   /** HTTP status code (null for network-level failures) */
   status: number | null;
   /** Failure classification (see {@link ApiErrorKind}) */
@@ -70,6 +78,20 @@ function fieldKeyFromLoc(loc: unknown[] | undefined): string | null {
   if (!Array.isArray(loc) || loc.length === 0) return null;
   const last = loc[loc.length - 1];
   return typeof last === 'string' ? last : null;
+}
+
+/**
+ * Full dotted-path key from a Pydantic `loc` (e.g.
+ * ["body","items",2,"medicine_name"] → "items.2.medicine_name").
+ * The leading `"body"` is dropped; array indexes are preserved so nested
+ * array-of-object errors stay distinct per row.
+ */
+function nestedFieldKeyFromLoc(loc: unknown[] | undefined): string | null {
+  if (!Array.isArray(loc) || loc.length < 2) return null;
+  return loc
+    .slice(1)
+    .map((segment) => String(segment))
+    .join('.');
 }
 
 /* ── HTTP-status classification ────────────────────────────────────── */
@@ -166,6 +188,7 @@ export function parseApiError(error: unknown): ApiErrorInfo {
       kind: 'unknown',
       message: error instanceof Error ? error.message : 'An unexpected error occurred.',
       fieldErrors: {},
+      nestedFieldErrors: {},
       status: null,
     };
   }
@@ -177,16 +200,16 @@ export function parseApiError(error: unknown): ApiErrorInfo {
   if (status === null) {
     // Axios aborts with ECONNABORTED when the request exceeds `timeout`.
     if (axiosError.code === 'ECONNABORTED') {
-      return { kind: 'timeout', message: fallbackMessage('timeout', null), fieldErrors: {}, status: null };
+      return { kind: 'timeout', message: fallbackMessage('timeout', null), fieldErrors: {}, nestedFieldErrors: {}, status: null };
     }
 
     const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
     if (isOffline) {
-      return { kind: 'offline', message: fallbackMessage('offline', null), fieldErrors: {}, status: null };
+      return { kind: 'offline', message: fallbackMessage('offline', null), fieldErrors: {}, nestedFieldErrors: {}, status: null };
     }
 
     // Online but no response → the backend itself is unreachable.
-    return { kind: 'backend', message: fallbackMessage('backend', null), fieldErrors: {}, status: null };
+    return { kind: 'backend', message: fallbackMessage('backend', null), fieldErrors: {}, nestedFieldErrors: {}, status: null };
   }
 
   /* ── HTTP failures with a response ────────────────────────────── */
@@ -194,15 +217,20 @@ export function parseApiError(error: unknown): ApiErrorInfo {
   const message = data?.message ?? fallbackMessage(kind, status);
 
   const fieldErrors: Record<string, string> = {};
+  const nestedFieldErrors: Record<string, string> = {};
   if (Array.isArray(data?.details)) {
     for (const raw of data.details as PydanticFieldError[]) {
-      const key = fieldKeyFromLoc(raw?.loc);
       const msg = raw?.msg;
+      const key = fieldKeyFromLoc(raw?.loc);
       if (key && typeof msg === 'string' && !fieldErrors[key]) {
         fieldErrors[key] = msg;
+      }
+      const nestedKey = nestedFieldKeyFromLoc(raw?.loc);
+      if (nestedKey && typeof msg === 'string' && !nestedFieldErrors[nestedKey]) {
+        nestedFieldErrors[nestedKey] = msg;
       }
     }
   }
 
-  return { message, fieldErrors, status, kind };
+  return { message, fieldErrors, nestedFieldErrors, status, kind };
 }

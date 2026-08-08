@@ -6,6 +6,7 @@ import {
   useMemo,
   type FC,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, Clock, ArrowRight } from 'lucide-react';
 import { Icon } from '../Icon/Icon';
 import { Badge } from '../Badge/Badge';
@@ -181,7 +182,7 @@ export const CommandPaletteOverlay: FC<CommandPaletteOverlayProps> = ({
 
   const showRecent = !query.trim();
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-overlay"
       role="presentation"
@@ -342,6 +343,7 @@ export const CommandPaletteOverlay: FC<CommandPaletteOverlayProps> = ({
           <span className="text-caption text-neutral-300">Powered by DensCare</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

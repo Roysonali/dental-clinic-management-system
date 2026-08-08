@@ -34,6 +34,12 @@ const TreatmentPlanDetailsPage = lazy(() =>
 const ProcedureListPage = lazy(() =>
   import('../pages/procedures/ProcedureListPage').then((m) => ({ default: m.ProcedureListPage })),
 );
+const PatientRecordListPage = lazy(() =>
+  import('../pages/patientRecords/PatientRecordListPage').then((m) => ({ default: m.PatientRecordListPage })),
+);
+const PatientRecordDetailsPage = lazy(() =>
+  import('../pages/patientRecords/PatientRecordDetailsPage').then((m) => ({ default: m.PatientRecordDetailsPage })),
+);
 
 /** Suspense fallback for lazy routes — centred spinner with an accessible label. */
 const RouteFallback: FC = () => (
@@ -192,6 +198,24 @@ const AppRouter = () => {
             <Route
               path={ROUTES.PROCEDURES}
               element={<ProcedureListPage />}
+            />
+
+            {/* ── Patient Records Module ─────────────────────────── */}
+            {/*
+              Every patient-records endpoint allows the 6 read roles 🅰
+              (DENTAL_ASSISTANT excluded) — the client cannot resolve
+              non-admin roles, so the routes are ProtectedRoute-only (no
+              role gate) and the backend enforces with 403. Admin-only
+              record DELETE is gated inline via PermissionGate on the
+              detail page. Lazy-loaded for route-level code splitting.
+            */}
+            <Route
+              path={ROUTES.PATIENT_RECORDS}
+              element={<PatientRecordListPage />}
+            />
+            <Route
+              path={`${ROUTES.PATIENT_RECORDS}/:recordId`}
+              element={<PatientRecordDetailsPage />}
             />
           </Route>
         </Route>

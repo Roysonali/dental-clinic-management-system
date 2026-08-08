@@ -21,6 +21,7 @@ export const ROUTES = {
   APPOINTMENTS: '/appointments',
   TREATMENT_PLANS: '/treatment-plans',
   PROCEDURES: '/procedures',
+  PATIENT_RECORDS: '/patient-records',
   BILLING: '/billing',
   SETTINGS: '/settings',
 } as const;
