@@ -40,6 +40,9 @@ const PatientRecordListPage = lazy(() =>
 const PatientRecordDetailsPage = lazy(() =>
   import('../pages/patientRecords/PatientRecordDetailsPage').then((m) => ({ default: m.PatientRecordDetailsPage })),
 );
+const BillingDashboardPage = lazy(() =>
+  import('../pages/billing/BillingDashboardPage').then((m) => ({ default: m.BillingDashboardPage })),
+);
 
 /** Suspense fallback for lazy routes — centred spinner with an accessible label. */
 const RouteFallback: FC = () => (
@@ -216,6 +219,21 @@ const AppRouter = () => {
             <Route
               path={`${ROUTES.PATIENT_RECORDS}/:recordId`}
               element={<PatientRecordDetailsPage />}
+            />
+
+            {/* ── Billing Module (Phase 1: Dashboard) ──────────── */}
+            {/*
+              Every /billing/dashboard endpoint allows ALL roles
+              (ADMIN, RECEPTIONIST, DENTAL_ASSISTANT + doctors — see
+              `_REPORT_READ_ROLES` in the backend dashboard router), so the
+              route is ProtectedRoute-only (no role gate) and the backend
+              enforces with 403 when a user is denied — the dashboard
+              container renders the permission-denied state in that case.
+              Lazy-loaded for route-level code splitting.
+            */}
+            <Route
+              path={ROUTES.BILLING}
+              element={<BillingDashboardPage />}
             />
           </Route>
         </Route>

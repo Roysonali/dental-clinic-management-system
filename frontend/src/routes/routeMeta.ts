@@ -30,7 +30,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
   [ROUTES.TREATMENT_PLANS]: { title: 'Treatment Plans' },
   [ROUTES.PROCEDURES]: { title: 'Procedure Catalog' },
   [ROUTES.PATIENT_RECORDS]: { title: 'Patient Records' },
-  [ROUTES.BILLING]: { title: 'Billing' },
+  [ROUTES.BILLING]: { title: 'Billing Dashboard', subtitle: 'Clinic financial overview' },
   '/inventory': { title: 'Inventory' },
   '/laboratory': { title: 'Laboratory' },
   '/users': { title: 'Users' },

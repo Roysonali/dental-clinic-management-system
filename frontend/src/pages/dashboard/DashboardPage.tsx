@@ -15,7 +15,7 @@ import { ContentContainer } from '../../layouts/components/ContentContainer';
 import { PageHeader } from '../../components/common/PageHeader/PageHeader';
 import { Badge } from '../../components/common/Badge/Badge';
 import { DashboardStatCard } from './DashboardStatCard';
-import { SectionHeader } from './SectionHeader';
+import { SectionHeader } from '../../components/common/SectionHeader';
 import { QuickActionCard } from './QuickActionCard';
 import { ActivityItem } from './ActivityItem';
 import { UpcomingAppointments } from '../../components/appointments/UpcomingAppointments';

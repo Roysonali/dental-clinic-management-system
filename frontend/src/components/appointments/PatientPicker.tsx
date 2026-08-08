@@ -1,4 +1,4 @@
-import { useState, type FC } from 'react';
+import { useState, useId, type FC } from 'react';
 import { Search, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -57,6 +57,9 @@ export const PatientPicker: FC<PatientPickerProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  // Generated once per instance so the FormField label (`htmlFor`) and the
+  // search input (`id`) stay associated — same pattern as the shared `Input`.
+  const inputId = useId();
   // Retain the chosen patient so the chip shows the real name in create mode
   // (where `selectedLabel` is not supplied). Reset when the value is cleared.
   const [selectedOption, setSelectedOption] = useState<PatientListItem | null>(null);
@@ -103,7 +106,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
   };
 
   return (
-    <FormField label="Patient" error={error} helperText={helperText} required={required}>
+    <FormField label="Patient" error={error} helperText={helperText} required={required} inputId={inputId}>
       <div
         className={`relative ${wrapperClassName}`}
         onBlur={(e) => {
@@ -149,6 +152,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
             />
             <input
+              id={inputId}
               type="text"
               role="combobox"
               aria-expanded={showDropdown}
