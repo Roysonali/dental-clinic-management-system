@@ -93,11 +93,12 @@ the backend's consolidated contract is the single source of truth.
 - A backend `403` renders `BillingDashboardPermission` (lock icon, "You don't
   have permission", `Error 403 · Insufficient permissions`). No role names are
   hardcoded. `shouldRetryQuery` prevents automatic retry on 403.
-- Header quick actions ("New invoice", "Record payment") and "View all" are
-  rendered **disabled** — the corresponding workflows/routes do not exist yet,
-  so they must not be actionable (backend-compatible over visual
-  approximation). When Phases 2–3 ship their routes, these CTAs can be wired
-  through the existing `PermissionGate`/`RequireRole` infra.
+- Quick actions are **backend-capability aware**: when the Invoice phase
+  shipped (Sprint 14A.2), the "New invoice" CTA and the Recent Invoices
+  "View all" were wired to the real Invoice List route. "Record payment" and
+  the Recent Payments "View all" remain **disabled** — the Payments workflow
+  is Phase 3 and does not exist yet (backend-compatible over visual
+  approximation).
 
 ## 7. Dashboard states implemented
 
@@ -149,10 +150,11 @@ the backend's consolidated contract is the single source of truth.
 1. **Notification icon omitted from the page header** — the application's
    global header (`HeaderRight`) already renders the notification bell on every
    authenticated page; duplicating it in the page header would be redundant.
-2. **"Record payment" / "New invoice" / "View all" render disabled** — the
-   Invoice and Payment workflows are out of scope (Phases 2–3). Per the
-   "backend wins" rule, the buttons preserve the layout but are non-actionable,
-   with tooltips explaining the arriving phase.
+2. **"Record payment" and the payments "View all" render disabled** — the
+   Payment workflow is Phase 3. Per the "backend wins" rule, the buttons
+   preserve the layout but stay non-actionable (with accessible sr-only hints).
+   The Invoice CTAs ("New invoice", invoices "View all") shipped with the
+   Invoice phase (Sprint 14A.2) and now navigate to the Invoice List route.
 3. **Patient selector in the summary card reuses `PatientPicker`** (existing
    infrastructure) rather than a bespoke dashboard select; the selected chip
    shows the patient name (code is visible in the search results).
@@ -266,3 +268,26 @@ PostgreSQL data; frontend Vite dev server on `localhost:5173`):
 | Disabled CTA tooltip accessibility | ✅ Hover tooltips + `aria-describedby` → `sr-only` (see §13) |
 
 No backend behavior was changed.
+
+## 15. Sprint 14A.2 follow-up — Invoice phase shipped
+
+Sprint 14A.2 implemented the **Invoice module** (Phase 2 of the Billing build
+out). Impact on the dashboard:
+
+- **"New invoice" header CTA** now navigates to `/billing/invoices` (the
+  Invoice List page, whose toolbar opens the create-invoice drawer) instead of
+  rendering disabled.
+- **Recent Invoices "View all"** now navigates to `/billing/invoices`.
+- **Recent Payments "View all"** and **"Record payment"** remain disabled
+  (Payments = Phase 3); their `aria-describedby` → `sr-only` hints are
+  unchanged.
+- **Billing query-key invalidation is now shared**: `billingQueryKeys` gained
+  `invoiceList` / `invoiceDetail` factories and every invoice mutation
+  invalidates the `['billing']` root, which refreshes this dashboard after
+  invoice create/issue/cancel/delete/edit actions elsewhere in the module.
+
+See `frontend/docs/Billing-Invoice-Module-14A-2-Report.md` for the full
+Invoice implementation report.
+
+Full-suite validation after Sprint 14A.2: `npm test` 1281/1281 across 169
+files, `npm run lint` clean, `tsc -b` clean, `npm run build` succeeds.

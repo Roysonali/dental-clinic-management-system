@@ -188,6 +188,10 @@ export const DatePicker: FC<DatePickerProps> = ({
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState<CalendarView>('date');
   const dialogId = useId();
+  // The trigger button is a labelable element, so the shared FormField label
+  // (htmlFor) can be wired to it — the field name stays discoverable to
+  // assistive tech instead of relying on the visible placeholder alone.
+  const triggerId = useId();
 
   const isControlled = controlledValue !== undefined;
   const value = controlledValue !== undefined ? controlledValue : internalValue;
@@ -395,6 +399,7 @@ export const DatePicker: FC<DatePickerProps> = ({
       helperText={helperText}
       required={required}
       disabled={disabled}
+      inputId={triggerId}
       className={wrapperClassName}
     >
       <Popover
@@ -408,6 +413,16 @@ export const DatePicker: FC<DatePickerProps> = ({
         {/* Trigger */}
         <Popover.Trigger
           as="button"
+          id={triggerId}
+          // The host-language label (FormField htmlFor) associates this button
+          // with its field name (label association); the explicit aria-label
+          // supplies the computed accessible name and also carries the current
+          // value so assistive tech announces e.g. "Due Date: Aug 22, 2026".
+          ariaLabel={
+            label
+              ? `${label}: ${value ? formatDisplay(value) : placeholder}`
+              : undefined
+          }
           ariaHaspopup="dialog"
           ariaControls={open ? dialogId : undefined}
           ariaInvalid={!!error}

@@ -43,6 +43,12 @@ const PatientRecordDetailsPage = lazy(() =>
 const BillingDashboardPage = lazy(() =>
   import('../pages/billing/BillingDashboardPage').then((m) => ({ default: m.BillingDashboardPage })),
 );
+const InvoiceListPage = lazy(() =>
+  import('../pages/billing/InvoiceListPage').then((m) => ({ default: m.InvoiceListPage })),
+);
+const InvoiceDetailsPage = lazy(() =>
+  import('../pages/billing/InvoiceDetailsPage').then((m) => ({ default: m.InvoiceDetailsPage })),
+);
 
 /** Suspense fallback for lazy routes — centred spinner with an accessible label. */
 const RouteFallback: FC = () => (
@@ -221,19 +227,28 @@ const AppRouter = () => {
               element={<PatientRecordDetailsPage />}
             />
 
-            {/* ── Billing Module (Phase 1: Dashboard) ──────────── */}
+            {/* ── Billing Module (Phase 1: Dashboard, Phase 2: Invoices) ── */}
             {/*
-              Every /billing/dashboard endpoint allows ALL roles
-              (ADMIN, RECEPTIONIST, DENTAL_ASSISTANT + doctors — see
-              `_REPORT_READ_ROLES` in the backend dashboard router), so the
-              route is ProtectedRoute-only (no role gate) and the backend
-              enforces with 403 when a user is denied — the dashboard
-              container renders the permission-denied state in that case.
-              Lazy-loaded for route-level code splitting.
+              Every /billing/dashboard endpoint allows ALL roles; the
+              /billing/invoices read endpoints allow the same set minus
+              DENTAL_ASSISTANT (backend routers/invoice.py `_INVOICE_READ_ROLES`).
+              Neither route carries a client-side role gate because the
+              client cannot resolve non-admin roles — the backend enforces
+              with 403, and the list/detail containers render the
+              permission-denied state in that case. Lazy-loaded for
+              route-level code splitting.
             */}
             <Route
               path={ROUTES.BILLING}
               element={<BillingDashboardPage />}
+            />
+            <Route
+              path={ROUTES.BILLING_INVOICES}
+              element={<InvoiceListPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_INVOICES}/:invoiceId`}
+              element={<InvoiceDetailsPage />}
             />
           </Route>
         </Route>

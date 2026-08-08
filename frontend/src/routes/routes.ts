@@ -23,6 +23,8 @@ export const ROUTES = {
   PROCEDURES: '/procedures',
   PATIENT_RECORDS: '/patient-records',
   BILLING: '/billing',
+  /** Invoice list (Phase 2 — Sprint 14A.2). */
+  BILLING_INVOICES: '/billing/invoices',
   SETTINGS: '/settings',
 } as const;
 

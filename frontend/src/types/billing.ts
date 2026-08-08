@@ -158,3 +158,155 @@ export interface BillingDashboardResponse {
   patient_summary: PatientFinancialSummary | null;
   generated_at: string;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Sprint 14A.2 — Invoice module (list / detail / lifecycle)
+ *
+ * Mirrors backend `schemas/invoice.py`, `schemas/invoice_item.py` and the
+ * router query params (`routers/invoice.py`). Monetary fields are quantized
+ * Decimal strings. Do NOT invent fields beyond the upstream contract.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/** Sort direction accepted by GET /billing/invoices (`sort_order`). */
+export type SortOrder = 'asc' | 'desc';
+
+/** Sort fields the backend allows (`ALLOWED_SORT_FIELDS` in constants.py). */
+export type InvoiceSortField =
+  | 'created_at'
+  | 'updated_at'
+  | 'invoice_number'
+  | 'grand_total'
+  | 'status'
+  | 'due_date';
+
+/** Query params for GET /billing/invoices (all server-side). */
+export interface InvoiceListParams {
+  page: number;
+  page_size: number;
+  sort_by: InvoiceSortField;
+  sort_order: SortOrder;
+  /** Free-text search across invoice number and patient name. */
+  query?: string;
+  patient_id?: string;
+  doctor_id?: string;
+  /** Backend `InvoiceStatus` exact-match filter. */
+  status?: InvoiceStatus;
+  /** Filter invoices with invoice_date on/after this date (YYYY-MM-DD). */
+  date_from?: string;
+  /** Filter invoices with invoice_date on/before this date (YYYY-MM-DD). */
+  date_to?: string;
+}
+
+/** `InvoiceListResponse` (schemas/invoice.py) — GET /billing/invoices. */
+export interface InvoiceListResponse {
+  items: InvoiceListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+/** `TreatmentPlanSummary` (schemas/invoice.py) — nested on invoice detail. */
+export interface BillingTreatmentPlanSummary {
+  id: string;
+  /** e.g. TXN-000003 */
+  plan_code: string;
+  status: string;
+}
+
+/** `AppointmentSummary` (schemas/invoice.py) — nested on invoice detail. */
+export interface BillingAppointmentSummary {
+  id: string;
+  /** e.g. APT-20260727-0003 */
+  appointment_number: string;
+  appointment_date: string;
+}
+
+/** `CreatorSummary` (schemas/summaries.py) — audit trail on invoice detail. */
+export interface BillingCreatorSummary {
+  id: number;
+  full_name: string | null;
+}
+
+/** `InvoiceItemSummary` (schemas/invoice_item.py) — line items on invoice. */
+export interface InvoiceItemSummary {
+  id: string;
+  sequence_number: number;
+  description: string;
+  quantity: number;
+  unit_price: Money;
+  discount_type: string | null;
+  discount_value: Money | null;
+  net_amount: Money;
+  tax_amount: Money | null;
+  currency_code: string;
+}
+
+/** `InvoiceRead` (schemas/invoice.py) — GET /billing/invoices/{id}. */
+export interface InvoiceRead {
+  id: string;
+  invoice_number: string;
+  document_type: string;
+  status: InvoiceStatus;
+  patient: BillingPatientSummary;
+  doctor: BillingDoctorSummary | null;
+  treatment_plan: BillingTreatmentPlanSummary | null;
+  appointment: BillingAppointmentSummary | null;
+  creator: BillingCreatorSummary | null;
+  updater: BillingCreatorSummary | null;
+  invoice_date: string;
+  due_date: string;
+  currency_code: string;
+  notes: string | null;
+  cancellation_reason: string | null;
+  void_reason: string | null;
+  items: InvoiceItemSummary[];
+  financials: InvoiceFinancialSummary;
+  version: number;
+  doc_version: number;
+  created_at: string;
+  updated_at: string;
+  created_by: number;
+  updated_by: number | null;
+}
+
+/** Discount kinds accepted by the backend (`discount_type` on items). */
+export type InvoiceDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+
+/** A line item as submitted to POST /billing/invoices. */
+export interface InvoiceItemCreatePayload {
+  description: string;
+  quantity: number;
+  unit_price: Money;
+  discount_type: InvoiceDiscountType | null;
+  discount_value: Money | null;
+  net_amount: Money;
+  sequence_number: number;
+  plan_item_id?: string;
+  diagnosis_id?: string;
+  original_price?: Money;
+  override_reason?: string;
+}
+
+/** Body for POST /billing/invoices (`InvoiceCreateRequest`). */
+export interface InvoiceCreatePayload {
+  patient_id: string;
+  treatment_plan_id?: string;
+  appointment_id?: string;
+  doctor_id?: string;
+  invoice_date: string;
+  due_date: string;
+  currency_code: string;
+  notes?: string;
+  items: InvoiceItemCreatePayload[];
+}
+
+/** Body for PATCH /billing/invoices/{id} (`InvoiceDraftUpdateRequest`). */
+export interface InvoiceDraftUpdatePayload {
+  notes: string | null;
+  due_date?: string;
+}
+
+/** Body for POST /billing/invoices/{id}/cancel. */
+export interface CancelInvoicePayload {
+  cancellation_reason: string;
+}

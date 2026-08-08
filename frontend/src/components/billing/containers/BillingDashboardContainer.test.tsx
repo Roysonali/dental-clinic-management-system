@@ -191,21 +191,25 @@ describe('BillingDashboardContainer', () => {
       screen.getByText('Select a patient to see their billing summary.'),
     ).toBeInTheDocument();
 
-    // "View all" actions must not be actionable: the list routes do not exist
-    // yet (header quick actions are covered by the BillingDashboardHeader test).
+    // "View all" on Recent Invoices now navigates to the Invoice List route
+    // (Phase 2 ships it); Recent Payments' "View all" stays disabled because
+    // the Payment List workflow is not part of this phase.
     const viewAllButtons = screen.getAllByRole('button', { name: 'View all' });
     expect(viewAllButtons).toHaveLength(2);
-    for (const button of viewAllButtons) {
-      expect(button).toBeDisabled();
 
-      // Natively disabled buttons cannot be focused, so the reason must remain
-      // reachable via aria-describedby → sr-only text (tooltip is hover-only).
-      const hintId = button.getAttribute('aria-describedby');
-      expect(hintId).toBeTruthy();
-      const hint = document.getElementById(hintId!);
-      expect(hint).toHaveClass('sr-only');
-      expect(hint?.textContent).toContain('not available yet');
-    }
+    const invoicesViewAll = screen.getAllByRole('button', { name: 'View all' })[0];
+    expect(invoicesViewAll).toBeEnabled();
+
+    const paymentsViewAll = screen.getAllByRole('button', { name: 'View all' })[1];
+    expect(paymentsViewAll).toBeDisabled();
+
+    // The disabled payments "View all" stays reachable via
+    // aria-describedby → sr-only text (tooltip is hover-only).
+    const hintId = paymentsViewAll.getAttribute('aria-describedby');
+    expect(hintId).toBeTruthy();
+    const hint = document.getElementById(hintId!);
+    expect(hint).toHaveClass('sr-only');
+    expect(hint?.textContent).toContain('not available yet');
   });
 
   it('renders skeleton placeholders while the dashboard is loading', () => {
@@ -279,8 +283,10 @@ describe('BillingDashboardContainer', () => {
     // KPI cards still show graceful zero values (count cards all render '0').
     expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0);
     expect(screen.getAllByText('0').length).toBeGreaterThan(0);
-    // Empty-state CTAs respect capability (workflows not built → disabled).
-    expect(screen.getByRole('button', { name: 'New invoice' })).toBeDisabled();
+    // Empty-state CTAs respect capability: New invoice navigates to the
+    // Invoice List route (Phase 2); Record payment stays disabled (Payments
+    // workflow not built yet).
+    expect(screen.getByRole('button', { name: 'New invoice' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Record payment' })).toBeDisabled();
   });
 

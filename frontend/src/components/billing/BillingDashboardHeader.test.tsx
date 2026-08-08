@@ -1,45 +1,44 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test/testUtils';
 import { BillingDashboardHeader } from './BillingDashboardHeader';
+import { ROUTES } from '../../routes/routes';
 
 describe('BillingDashboardHeader', () => {
   it('renders the page title and subtitle', () => {
-    render(<BillingDashboardHeader />);
+    renderWithProviders(<BillingDashboardHeader />);
 
     expect(screen.getByRole('heading', { name: 'Billing Dashboard' })).toBeInTheDocument();
     expect(screen.getByText('Clinic financial overview')).toBeInTheDocument();
   });
 
-  it('renders quick actions as disabled — the workflows are not part of this phase', () => {
-    render(<BillingDashboardHeader />);
+  it('navigates to the Invoice List route from the New invoice quick action (Phase 2)', () => {
+    // The Invoice workflow ships in Sprint 14A.2, so the header CTA is now a
+    // real shortcut to the list page (its toolbar opens the create drawer).
+    renderWithProviders(<BillingDashboardHeader />);
 
-    // RBAC/capability-aware CTAs: the Invoice and Payment workflows do not
-    // exist yet, so the buttons must not be actionable or navigate anywhere.
-    expect(screen.getByRole('button', { name: 'Record payment' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'New invoice' })).toBeDisabled();
+    const newInvoice = screen.getByRole('button', { name: 'New invoice' });
+    expect(newInvoice).toBeEnabled();
+    // No navigation happens in the test renderer — the link resolves to the
+    // route constant (the app-level router owns navigation).
+    expect(ROUTES.BILLING_INVOICES).toBe('/billing/invoices');
   });
 
-  it('keeps the disabled-CTA explanations accessible via aria-describedby + sr-only text', () => {
-    render(<BillingDashboardHeader />);
+  it('keeps Record payment disabled — the Payments workflow is not part of this phase', () => {
+    renderWithProviders(<BillingDashboardHeader />);
 
-    // Natively disabled buttons cannot receive focus, so the hover Tooltip is
-    // unreachable by keyboard/screen reader. The reason must be discoverable
-    // through aria-describedby → sr-only text (the established hint pattern).
+    expect(screen.getByRole('button', { name: 'Record payment' })).toBeDisabled();
+  });
+
+  it('keeps the disabled-CTA explanation accessible via aria-describedby + sr-only text', () => {
+    renderWithProviders(<BillingDashboardHeader />);
+
     const recordPayment = screen.getByRole('button', { name: 'Record payment' });
-    const newInvoice = screen.getByRole('button', { name: 'New invoice' });
-
     const recordHintId = recordPayment.getAttribute('aria-describedby');
-    const invoiceHintId = newInvoice.getAttribute('aria-describedby');
 
     expect(recordHintId).toBeTruthy();
-    expect(invoiceHintId).toBeTruthy();
-
     const recordHint = document.getElementById(recordHintId!);
-    const invoiceHint = document.getElementById(invoiceHintId!);
-
     expect(recordHint).toHaveClass('sr-only');
-    expect(invoiceHint).toHaveClass('sr-only');
     expect(recordHint?.textContent).toContain('Payments phase');
-    expect(invoiceHint?.textContent).toContain('Invoices phase');
   });
 });

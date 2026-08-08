@@ -1,12 +1,13 @@
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DataTable, type DataTableColumn } from '../common/DataTable';
 import { StatusBadge } from '../common/StatusBadge/StatusBadge';
 import { Button } from '../common/Button/Button';
-import { Tooltip } from '../common/Tooltip/Tooltip';
 import { SectionHeader } from '../common/SectionHeader';
 import { INVOICE_STATUS_VARIANTS } from '../../constants/billing';
 import { formatCurrency } from '../../utils/formatting';
 import { formatISODate } from '../../utils/date';
+import { ROUTES } from '../../routes/routes';
 import type { InvoiceListItem } from '../../types/billing';
 
 interface RecentInvoicesProps {
@@ -16,20 +17,19 @@ interface RecentInvoicesProps {
   loading?: boolean;
 }
 
-const VIEW_ALL_HINT_ID = 'recent-invoices-view-all-hint';
-const VIEW_ALL_HINT = 'Invoice list arrives in the Invoices phase';
-
 /**
  * RecentInvoices — dashboard "Recent Invoices" section.
  *
- * Reuses the shared DataTable (no new table architecture). "View all" is
- * disabled until the Invoice List module (Phase 2) ships a route — the button
- * must not navigate to a non-existent workflow.
+ * Reuses the shared DataTable (no new table architecture). "View all" and row
+ * clicks navigate to the Invoice List / Detail routes now that Phase 2
+ * (Sprint 14A.2) ships them.
  */
 export const RecentInvoices: FC<RecentInvoicesProps> = ({
   invoices,
   loading = false,
 }) => {
+  const navigate = useNavigate();
+
   const columns: DataTableColumn<InvoiceListItem>[] = [
     {
       key: 'invoice',
@@ -76,16 +76,13 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({
         id="recent-invoices-heading"
         title="Recent Invoices"
         action={
-          <>
-            <Tooltip content={VIEW_ALL_HINT}>
-              <Button variant="ghost" size="sm" disabled aria-describedby={VIEW_ALL_HINT_ID}>
-                View all
-              </Button>
-            </Tooltip>
-            <span id={VIEW_ALL_HINT_ID} className="sr-only">
-              {VIEW_ALL_HINT} — this view is not available yet.
-            </span>
-          </>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(ROUTES.BILLING_INVOICES)}
+          >
+            View all
+          </Button>
         }
       />
       <div className="mt-4">
@@ -98,6 +95,7 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({
           ariaLabel="Recent invoices"
           emptyTitle="No invoices yet"
           emptyDescription="Invoices appear here once they are created."
+          onRowClick={(inv) => navigate(`${ROUTES.BILLING_INVOICES}/${inv.id}`)}
         />
       </div>
     </section>

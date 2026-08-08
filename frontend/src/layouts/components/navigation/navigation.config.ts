@@ -98,9 +98,18 @@ export const NAV_GROUPS: NavGroupConfig[] = [
     items: [
       {
         id: 'billing',
-        label: 'Billing',
+        label: 'Billing Dashboard',
         icon: Receipt,
         route: ROUTES.BILLING,
+        group: 'financial',
+      },
+      {
+        // Invoice list route ships with Phase 2 (Sprint 14A.2); the backend
+        // read/write endpoint set is fully supported, so the item is live.
+        id: 'invoices',
+        label: 'Invoices',
+        icon: FileText,
+        route: ROUTES.BILLING_INVOICES,
         group: 'financial',
       },
     ],
