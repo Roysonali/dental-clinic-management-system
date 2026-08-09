@@ -143,6 +143,7 @@ export const Drawer: FC<DrawerProps> & {
             w-full ${sizeMap[size]} h-full
             ${positionMap[position]}
             animate-in ${slideMap[position]} duration-300
+            overscroll-contain
             focus-visible:outline-none
             ${className}
           `}

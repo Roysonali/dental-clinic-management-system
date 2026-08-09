@@ -9,7 +9,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
 import { useGlobalShortcut } from '../../hooks/useGlobalShortcut';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import { ROUTES } from '../../routes/routes';
+import { MOBILE_COMPACT_HEADER_ROUTES } from '../../routes/routes';
 import { CommandPaletteOverlay } from '../../components/common/CommandPalette/CommandPaletteOverlay';
 
 /**
@@ -60,15 +60,13 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
-  // The mobile billing LIST pages render their own compact header (reference
-  // mobile screens), so the global header is hidden on those routes at the
-  // phone breakpoint. Detail pages and every other route keep the global
-  // header. The compact header's hamburger opens this shell's drawer via
-  // the MobileNavProvider below.
-  const isMobileBillingList =
-    isMobileViewport &&
-    (location.pathname === ROUTES.BILLING_INVOICES ||
-      location.pathname === ROUTES.BILLING_PAYMENTS);
+  // List pages that render their own compact mobile header (hamburger +
+  // title + add action, reference screens 47/48) hide the global header at
+  // the phone breakpoint. Detail pages and every other route keep the
+  // global header. The compact header's hamburger opens this shell's drawer
+  // via the MobileNavProvider below.
+  const isCompactMobileHeader =
+    isMobileViewport && MOBILE_COMPACT_HEADER_ROUTES.includes(location.pathname);
 
   // ── Global keyboard shortcut: Ctrl/Cmd + K ────────────
   const handleGlobalShortcut = useCallback((e: KeyboardEvent) => {
@@ -96,6 +94,13 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
     }
   }, [isMobile]);
 
+  // While the mobile navigation drawer is open the rest of the app is
+  // made `inert`: pointer interaction, focus and background scrolling of
+  // the main area are all blocked (the drawer panel itself is a sibling
+  // and stays interactive). Backdrop click / Escape close the drawer and
+  // remove `inert`, restoring normal interaction and scroll position.
+  const mainAreaInert = isMobile && mobileDrawerOpen;
+
   const handleCloseMobileDrawer = () => {
     setMobileDrawerOpen(false);
   };
@@ -114,7 +119,9 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
   }, []);
 
   return (
-    <MobileNavProvider value={{ openNav: () => setMobileDrawerOpen(true) }}>
+    <MobileNavProvider
+      value={{ openNav: () => setMobileDrawerOpen(true), isOpen: mobileDrawerOpen }}
+    >
       <div className="flex h-dvh w-full overflow-hidden bg-white">
         {/* ── Command Palette Overlay ─────────────────────── */}
         <CommandPaletteOverlay
@@ -134,13 +141,17 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
           onCollapsedChange={handleSidebarCollapsedChange}
         />
 
-        {/* ── Main Area ─────────────────────────────────────── */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {!isMobileBillingList && (
+        {/* ── Main Area (inert while the mobile nav drawer is open) ── */}
+        <div
+          className="flex min-w-0 flex-1 flex-col"
+          {...(mainAreaInert ? { inert: true } : {})}
+        >
+          {!isCompactMobileHeader && (
             <HeaderPlaceholder
               pageTitle={pageTitle}
               onToggleSidebar={handleToggleSidebar}
               onOpenCommandPalette={handleOpenCommandPalette}
+              mobileDrawerOpen={mobileDrawerOpen}
             />
           )}
           <Workspace>

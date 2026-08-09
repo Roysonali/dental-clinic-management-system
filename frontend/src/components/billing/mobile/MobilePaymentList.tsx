@@ -123,7 +123,7 @@ export const MobilePaymentList: FC<MobilePaymentListProps> = ({
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4 px-6 pb-24">
+    <div className="flex w-full min-w-0 flex-col gap-4 pb-24">
       {/* Active filter chips (single horizontal row, scrolls, never wraps) */}
       {chips.length > 0 && (
         <div className="-mx-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

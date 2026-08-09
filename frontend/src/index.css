@@ -177,6 +177,61 @@
 } /* end @theme */
 
 /* ══════════════════════════════════════════════════════════════════════
+   Z-INDEX UTILITIES
+   ══════════════════════════════════════════════════════════════════════
+   The `--z-*` theme namespace does NOT generate `z-<name>` utilities in
+   Tailwind v4 (only bare numeric values like `z-30` are recognised), so
+   every class that relied on `z-drawer`, `z-modal`, `z-tooltip`, ... was
+   silently dropped from the compiled CSS. Overlays (Drawer/Modal) then
+   fell back to `z-index:auto` and painted in DOM order — e.g. the mobile
+   navigation drawer rendered BEFORE the main content, so page controls
+   appeared over/through it (Patient Records screenshot bug).
+
+   These `@utility` definitions make the design tokens real utilities
+   again. Keep the values in sync with the `--z-*` tokens above.
+   ══════════════════════════════════════════════════════════════════════ */
+
+@utility z-base {
+  z-index: var(--z-base);
+}
+
+@utility z-elevated {
+  z-index: var(--z-elevated);
+}
+
+@utility z-sticky {
+  z-index: var(--z-sticky);
+}
+
+@utility z-tooltip {
+  z-index: var(--z-tooltip);
+}
+
+@utility z-dropdown {
+  z-index: var(--z-dropdown);
+}
+
+@utility z-datepicker {
+  z-index: var(--z-datepicker);
+}
+
+@utility z-drawer {
+  z-index: var(--z-drawer);
+}
+
+@utility z-modal {
+  z-index: var(--z-modal);
+}
+
+@utility z-notification {
+  z-index: var(--z-notification);
+}
+
+@utility z-overlay {
+  z-index: var(--z-overlay);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    LAYOUT SHELL DIMENSIONS
    ══════════════════════════════════════════════════════════════════════
    Single source of truth for shell component sizes.

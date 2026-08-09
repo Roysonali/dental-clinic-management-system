@@ -64,7 +64,7 @@ export const MobileInvoiceList: FC<MobileInvoiceListProps> = ({
   onPageSizeChange,
 }) => {
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4 px-6 pb-24">
+    <div className="flex w-full min-w-0 flex-col gap-4 pb-24">
       {/* Search + Filter */}
       <div className="flex items-center gap-3">
         <div className="relative min-w-0 flex-1">

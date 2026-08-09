@@ -46,5 +46,23 @@ export const ROUTES = {
  */
 export const INVOICE_CREATE_QUERY_PARAM = 'create';
 
+/**
+ * List routes that render their own compact mobile header (hamburger +
+ * page title + add action, reference screens 47/48) on the phone breakpoint
+ * and therefore hide the global header there. Detail pages keep the global
+ * header. Single source of truth shared by AppShell (header hiding) and the
+ * list pages themselves.
+ */
+export const MOBILE_COMPACT_HEADER_ROUTES: readonly string[] = [
+  ROUTES.BILLING_INVOICES,
+  ROUTES.BILLING_PAYMENTS,
+  ROUTES.PATIENTS,
+  ROUTES.APPOINTMENTS,
+  ROUTES.TREATMENT_PLANS,
+  ROUTES.PATIENT_RECORDS,
+  ROUTES.DOCTORS,
+  ROUTES.USERS,
+] as const;
+
 /** Auth route paths */
 export type AuthRoute = (typeof ROUTES.AUTH)[keyof typeof ROUTES.AUTH];

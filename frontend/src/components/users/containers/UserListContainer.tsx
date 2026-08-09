@@ -5,6 +5,10 @@ import { Pagination } from '../../common/Pagination/Pagination';
 import { UserStatusDialog, type UserStatusIntent } from '../UserStatusDialog';
 import { UserRoleDialog } from '../UserRoleDialog';
 import { ToastContainer, type Toast } from '../../common/Toast';
+import { MobileUserList } from '../mobile/MobileUserList';
+import { MobilePageHeader } from '../../../layouts/components/mobile/MobilePageHeader';
+import { MobileBottomNav } from '../../../layouts/components/mobile/MobileBottomNav';
+import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { UserCreateContainer, type UserCreationResult } from './UserCreateContainer';
 import { useUsers } from '../../../hooks/users/useUsers';
 import { useUserFilters } from '../../../hooks/users/useUserFilters';
@@ -34,6 +38,7 @@ type StatusState = { user: UserListItem; intent: UserStatusIntent } | null;
  * success.
  */
 export const UserListContainer: FC = () => {
+  const isMobile = useIsMobileViewport();
   const filters = useUserFilters();
   const usersQuery = useUsers(filters.params);
   const navigate = useNavigate();
@@ -119,6 +124,38 @@ export const UserListContainer: FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
+      {isMobile ? (
+        <>
+          <MobilePageHeader
+            title="Users"
+            addLabel="Add user"
+            onAdd={() => setCreateOpen(true)}
+          />
+          <MobileUserList
+            users={usersQuery.data?.items ?? []}
+            loading={usersQuery.isLoading}
+            error={queryError}
+            onRetry={() => void usersQuery.refetch()}
+            searchValue={filters.searchInput}
+            onSearchChange={filters.setSearchInput}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            roleId={filters.roleId}
+            onRoleChange={filters.setRole}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+            onView={(user) => navigate(`${ROUTES.USERS}/${user.id}`)}
+            page={filters.page}
+            totalPages={totalPages}
+            totalCount={usersQuery.data?.total}
+            pageSize={filters.pageSize}
+            onPageChange={filters.setPage}
+            onPageSizeChange={filters.setPageSize}
+          />
+          <MobileBottomNav />
+        </>
+      ) : (
+        <>
       <UserTable
         users={usersQuery.data?.items ?? []}
         loading={usersQuery.isLoading}
@@ -149,6 +186,8 @@ export const UserListContainer: FC = () => {
         totalCount={usersQuery.data?.total}
         pageSize={filters.pageSize}
       />
+        </>
+      )}
 
       <UserStatusDialog
         open={statusState !== null}

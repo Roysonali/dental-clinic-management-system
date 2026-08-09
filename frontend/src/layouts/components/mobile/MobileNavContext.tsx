@@ -13,6 +13,8 @@ import { createContext, useContext, type ReactNode } from 'react';
 export interface MobileNavContextValue {
   /** Open the slide-in navigation drawer (mobile viewports only). */
   openNav: () => void;
+  /** Current drawer open state (drives the hamburger's aria-expanded). */
+  isOpen?: boolean;
 }
 
 const MobileNavContext = createContext<MobileNavContextValue | null>(null);
