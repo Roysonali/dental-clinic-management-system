@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, type FC, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SidebarPlaceholder } from './SidebarPlaceholder';
 import { HeaderPlaceholder } from './HeaderPlaceholder';
 import { MobileDrawer } from './MobileDrawer';
 import { Workspace } from './Workspace';
+import { MobileNavProvider } from './mobile/MobileNavContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
 import { useGlobalShortcut } from '../../hooks/useGlobalShortcut';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { ROUTES } from '../../routes/routes';
 import { CommandPaletteOverlay } from '../../components/common/CommandPalette/CommandPaletteOverlay';
 
 /**
@@ -49,10 +53,22 @@ interface AppShellProps {
 
 export const AppShell: FC<AppShellProps> = ({ children }) => {
   const isMobile = useMediaQuery('(max-width: 1023px)');
+  const isMobileViewport = useIsMobileViewport();
+  const location = useLocation();
   const pageTitle = usePageTitle();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // The mobile billing LIST pages render their own compact header (reference
+  // mobile screens), so the global header is hidden on those routes at the
+  // phone breakpoint. Detail pages and every other route keep the global
+  // header. The compact header's hamburger opens this shell's drawer via
+  // the MobileNavProvider below.
+  const isMobileBillingList =
+    isMobileViewport &&
+    (location.pathname === ROUTES.BILLING_INVOICES ||
+      location.pathname === ROUTES.BILLING_PAYMENTS);
 
   // ── Global keyboard shortcut: Ctrl/Cmd + K ────────────
   const handleGlobalShortcut = useCallback((e: KeyboardEvent) => {
@@ -98,36 +114,40 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
   }, []);
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-white">
-      {/* ── Command Palette Overlay ─────────────────────── */}
-      <CommandPaletteOverlay
-        open={commandPaletteOpen}
-        onClose={handleCloseCommandPalette}
-      />
-
-      {/* ── Mobile Drawer ────────────────────────────────── */}
-      <MobileDrawer
-        open={mobileDrawerOpen}
-        onClose={handleCloseMobileDrawer}
-      />
-
-      {/* ── Desktop Sidebar ──────────────────────────────── */}
-      <SidebarPlaceholder
-        collapsed={sidebarCollapsed}
-        onCollapsedChange={handleSidebarCollapsedChange}
-      />
-
-      {/* ── Main Area ─────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <HeaderPlaceholder
-          pageTitle={pageTitle}
-          onToggleSidebar={handleToggleSidebar}
-          onOpenCommandPalette={handleOpenCommandPalette}
+    <MobileNavProvider value={{ openNav: () => setMobileDrawerOpen(true) }}>
+      <div className="flex h-dvh w-full overflow-hidden bg-white">
+        {/* ── Command Palette Overlay ─────────────────────── */}
+        <CommandPaletteOverlay
+          open={commandPaletteOpen}
+          onClose={handleCloseCommandPalette}
         />
-        <Workspace>
-          {children}
-        </Workspace>
+
+        {/* ── Mobile Drawer ────────────────────────────────── */}
+        <MobileDrawer
+          open={mobileDrawerOpen}
+          onClose={handleCloseMobileDrawer}
+        />
+
+        {/* ── Desktop Sidebar ──────────────────────────────── */}
+        <SidebarPlaceholder
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={handleSidebarCollapsedChange}
+        />
+
+        {/* ── Main Area ─────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {!isMobileBillingList && (
+            <HeaderPlaceholder
+              pageTitle={pageTitle}
+              onToggleSidebar={handleToggleSidebar}
+              onOpenCommandPalette={handleOpenCommandPalette}
+            />
+          )}
+          <Workspace>
+            {children}
+          </Workspace>
+        </div>
       </div>
-    </div>
+    </MobileNavProvider>
   );
 };

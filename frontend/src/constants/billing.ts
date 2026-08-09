@@ -47,6 +47,43 @@ export const PAYMENT_STATUS_VARIANTS: Record<PaymentStatus, BadgeVariant> = {
   void: 'neutral',
 };
 
+/* ── Mobile list status presentation (reference mobile screens) ────── */
+
+/**
+ * Invoice status → BadgeVariant map for the MOBILE card list ONLY.
+ *
+ * The reference mobile screens (47/48) specify their own pastel pill
+ * colours: ISSUED blue, DRAFT gray, OVERDUE amber, PAID green,
+ * PARTIALLY PAID blue. The desktop tables keep the existing desktop map
+ * above untouched (no desktop regression) — these maps exist solely to
+ * reproduce the reference mobile look via the shared StatusBadge.
+ */
+export const MOBILE_INVOICE_STATUS_VARIANTS: Record<InvoiceStatus, BadgeVariant> = {
+  draft: 'neutral',
+  issued: 'info',
+  partially_paid: 'info',
+  paid: 'success',
+  overdue: 'warning',
+  cancelled: 'danger',
+  void: 'neutral',
+};
+
+/**
+ * Payment status → BadgeVariant map for the MOBILE card list ONLY.
+ *
+ * Reference mobile payment list: COMPLETED green, PENDING gray,
+ * REFUNDED violet, FAILED red. `violet` is the shared Badge variant added
+ * for the REFUNDED pill (backward-compatible union extension).
+ */
+export const MOBILE_PAYMENT_STATUS_VARIANTS: Record<PaymentStatus, BadgeVariant> = {
+  pending: 'neutral',
+  completed: 'success',
+  failed: 'danger',
+  refunded: 'violet',
+  reversed: 'neutral',
+  void: 'neutral',
+};
+
 /* ── Payment method display labels (display only) ─────────────────── */
 
 /** Backend `PaymentMethod` enum → human-readable label. */

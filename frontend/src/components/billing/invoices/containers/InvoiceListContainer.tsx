@@ -10,6 +10,10 @@ import { CancelInvoiceDialog } from '../dialogs/CancelInvoiceDialog';
 import { DeleteInvoiceDialog } from '../dialogs/DeleteInvoiceDialog';
 import { Pagination } from '../../../common/Pagination/Pagination';
 import { ToastContainer, type Toast } from '../../../common/Toast';
+import { MobileInvoiceList } from '../../mobile/MobileInvoiceList';
+import { MobileFilterSheet } from '../../mobile/MobileFilterSheet';
+import { MobileCreateInvoiceForm } from '../../mobile/MobileCreateInvoiceForm';
+import { useIsMobileViewport } from '../../../../hooks/useIsMobileViewport';
 import { INVOICE_PAGE_SIZE_OPTIONS } from '../../../../constants/billing';
 import { useInvoices } from '../../../../hooks/billing/useInvoices';
 import { useInvoiceFilters } from '../../../../hooks/billing/useInvoiceFilters';
@@ -31,6 +35,15 @@ import type { InvoiceListItem, InvoiceSortField } from '../../../../types/billin
 
 /** Toast lifetime before auto-dismiss (ms). */
 const TOAST_DURATION_MS = 5000;
+
+interface InvoiceListContainerProps {
+  /** Controlled open state for the create form (owned by the page — the mobile header + desktop toolbar both drive it). */
+  createOpen?: boolean;
+  /** Called when the create form should close. */
+  onCreateClose?: () => void;
+  /** Called when a create request originates inside the container. */
+  onRequestCreate?: () => void;
+}
 
 /**
  * InvoiceListContainer — invoice list orchestration (Sprint 14A.2).
@@ -56,25 +69,36 @@ const TOAST_DURATION_MS = 5000;
  * clean `/billing/invoices` URL and browser Back/Forward can never re-open
  * the drawer unexpectedly.
  */
-export const InvoiceListContainer: FC = () => {
+export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
+  createOpen: createOpenProp = false,
+  onCreateClose = () => undefined,
+  onRequestCreate = () => undefined,
+}) => {
   const navigate = useNavigate();
   const filters = useInvoiceFilters();
   const [searchParams, setSearchParams] = useSearchParams();
+  // The mobile card presentation replaces the desktop table below the md
+  // breakpoint; both presentations share the same query/filter state.
+  const isMobile = useIsMobileViewport();
 
   const [toast, setToast] = useState<Toast | null>(null);
+  // Mobile filter sheet open state (desktop uses the inline toolbar).
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   /* ── Query state ─────────────────────────────────────────────── */
   const invoicesQuery = useInvoices(filters.params);
   const doctorsQuery = useDoctors(); // active doctors, 5-min cache (dropdown)
 
   /* ── Dialog state ────────────────────────────────────────────── */
-  // The create drawer is derived from BOTH the local toolbar/table CTA and
-  // the URL create intent (`/billing/invoices?create=true` from the
-  // dashboard). Deriving keeps setState out of effects and opens the drawer
-  // on the first render when the intent is present.
+  // The create form is derived from the page-controlled CTA (mobile header
+  // / desktop toolbar), a local fallback (keeps the container usable
+  // standalone, e.g. in tests), and the URL create intent
+  // (`/billing/invoices?create=true` from the dashboard). Deriving keeps
+  // setState out of effects and opens the form on the first render when the
+  // intent is present.
   const createRequested = searchParams.get(INVOICE_CREATE_QUERY_PARAM) === 'true';
   const [createOpenLocal, setCreateOpenLocal] = useState(false);
-  const createOpen = createRequested || createOpenLocal;
+  const createOpen = createRequested || createOpenProp || createOpenLocal;
   const [createError, setCreateError] = useState<string | null>(null);
   const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({});
 
@@ -168,10 +192,11 @@ export const InvoiceListContainer: FC = () => {
     setSearchParams(next, { replace: true });
   };
 
-  const openCreateDrawer = () => {
+  const requestCreate = () => {
     setCreateError(null);
     setCreateFieldErrors({});
     setCreateOpenLocal(true);
+    onRequestCreate();
   };
 
   const closeCreateDrawer = () => {
@@ -179,6 +204,7 @@ export const InvoiceListContainer: FC = () => {
     setCreateError(null);
     setCreateFieldErrors({});
     clearCreateIntent();
+    onCreateClose();
   };
 
   const handleCreate = (values: InvoiceCreateFormValues) => {
@@ -186,10 +212,11 @@ export const InvoiceListContainer: FC = () => {
     setCreateFieldErrors({});
     createMutation.mutate(invoiceFormValuesToCreatePayload(values), {
       onSuccess: (invoice) => {
-        setCreateOpenLocal(false);
         // Strip the intent BEFORE navigating so a later Back from the new
-        // invoice's detail page returns to a clean list (no drawer re-open).
+        // invoice's detail page returns to a clean list (no form re-open).
+        setCreateOpenLocal(false);
         clearCreateIntent();
+        onCreateClose();
         showToast('success', `${invoice.invoice_number} saved as draft`);
         navigate(`${ROUTES.BILLING_INVOICES}/${invoice.id}`);
       },
@@ -266,94 +293,148 @@ export const InvoiceListContainer: FC = () => {
     });
   };
 
+  const createProps = {
+    open: createOpen,
+    onClose: closeCreateDrawer,
+    onSubmit: handleCreate,
+    submitting: createMutation.isPending,
+    serverErrors: createFieldErrors,
+    serverMessage: createError,
+  };
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
-      <InvoiceToolbar
-        searchValue={filters.searchInput}
-        onSearchChange={filters.setSearchInput}
-        searchLoading={invoicesQuery.isFetching && !invoicesQuery.isPlaceholderData}
-        status={filters.status}
-        onStatusChange={filters.setStatus}
-        patientId={filters.patientId}
-        onPatientChange={filters.setPatientId}
-        doctorId={filters.doctorId}
-        onDoctorChange={filters.setDoctorId}
-        doctorOptions={doctorOptions}
-        doctorsLoading={doctorsQuery.isLoading}
-        dateFrom={filters.dateFrom}
-        onDateFromChange={filters.setDateFrom}
-        dateTo={filters.dateTo}
-        onDateToChange={filters.setDateTo}
-        sortBy={filters.sortBy}
-        onSortByChange={filters.setSortBy}
-        sortOrder={filters.sortOrder}
-        onSortOrderChange={filters.setSortOrder}
-        hasActiveFilters={filters.hasActiveFilters}
-        onClearFilters={filters.clearFilters}
-        onCreate={openCreateDrawer}
-      />
+      {isMobile ? (
+        /* ── Mobile presentation (reference screens 47/49) ─────── */
+        <>
+          <MobileInvoiceList
+            invoices={items}
+            loading={invoicesQuery.isLoading}
+            error={queryError}
+            onRetry={() => void invoicesQuery.refetch()}
+            hasActiveFilters={filters.hasActiveFilters}
+            onClearFilters={filters.clearFilters}
+            onView={(inv) => navigate(`${ROUTES.BILLING_INVOICES}/${inv.id}`)}
+            searchValue={filters.searchInput}
+            onSearchChange={filters.setSearchInput}
+            onOpenFilters={() => setFilterSheetOpen(true)}
+            page={filters.page}
+            totalPages={totalPages}
+            totalCount={total}
+            pageSize={filters.pageSize}
+            onPageChange={filters.setPage}
+            onPageSizeChange={filters.setPageSize}
+          />
 
-      <InvoiceTable
-        invoices={items}
-        loading={invoicesQuery.isLoading}
-        error={queryError}
-        onRetry={() => void invoicesQuery.refetch()}
-        sortState={sortState}
-        onSortChange={handleSortChange}
-        onView={(inv) => navigate(`${ROUTES.BILLING_INVOICES}/${inv.id}`)}
-        onRowClick={(inv) => navigate(`${ROUTES.BILLING_INVOICES}/${inv.id}`)}
-        onIssue={(inv) => {
-          setIssueError(null);
-          setIssueTarget(inv);
-        }}
-        onEdit={(inv) => {
-          setEditError(null);
-          setEditFieldErrors({});
-          setEditTarget(inv);
-        }}
-        onCancel={(inv) => {
-          setCancelError(null);
-          setCancelTarget(inv);
-        }}
-        onDelete={(inv) => {
-          setDeleteError(null);
-          setDeleteTarget(inv);
-        }}
-        onCreate={openCreateDrawer}
-        onClearFilters={filters.clearFilters}
-        hasActiveFilters={filters.hasActiveFilters}
-      />
+          <MobileFilterSheet
+            open={filterSheetOpen}
+            onClose={() => setFilterSheetOpen(false)}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            patientId={filters.patientId}
+            onPatientChange={filters.setPatientId}
+            doctorId={filters.doctorId}
+            onDoctorChange={filters.setDoctorId}
+            doctorOptions={doctorOptions}
+            doctorsLoading={doctorsQuery.isLoading}
+            dateFrom={filters.dateFrom}
+            onDateFromChange={filters.setDateFrom}
+            dateTo={filters.dateTo}
+            onDateToChange={filters.setDateTo}
+            sortBy={filters.sortBy}
+            onSortByChange={filters.setSortBy}
+            sortOrder={filters.sortOrder}
+            onSortOrderChange={filters.setSortOrder}
+            hasActiveFilters={filters.hasActiveFilters}
+            onClearFilters={filters.clearFilters}
+          />
 
-      <Pagination
-        currentPage={filters.page}
-        totalPages={totalPages}
-        onPageChange={filters.setPage}
-        totalCount={total}
-        pageSize={filters.pageSize}
-        pageSizeSelector={
-          <select
-            value={filters.pageSize}
-            onChange={(e) => filters.setPageSize(Number(e.target.value))}
-            aria-label="Rows per page"
-            className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-caption text-neutral-700 transition-colors duration-150 hover:border-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-          >
-            {INVOICE_PAGE_SIZE_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        }
-      />
+          <MobileCreateInvoiceForm {...createProps} />
+        </>
+      ) : (
+        /* ── Desktop presentation (unchanged) ─────────────────── */
+        <>
+          <InvoiceToolbar
+            searchValue={filters.searchInput}
+            onSearchChange={filters.setSearchInput}
+            searchLoading={invoicesQuery.isFetching && !invoicesQuery.isPlaceholderData}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            patientId={filters.patientId}
+            onPatientChange={filters.setPatientId}
+            doctorId={filters.doctorId}
+            onDoctorChange={filters.setDoctorId}
+            doctorOptions={doctorOptions}
+            doctorsLoading={doctorsQuery.isLoading}
+            dateFrom={filters.dateFrom}
+            onDateFromChange={filters.setDateFrom}
+            dateTo={filters.dateTo}
+            onDateToChange={filters.setDateTo}
+            sortBy={filters.sortBy}
+            onSortByChange={filters.setSortBy}
+            sortOrder={filters.sortOrder}
+            onSortOrderChange={filters.setSortOrder}
+            hasActiveFilters={filters.hasActiveFilters}
+            onClearFilters={filters.clearFilters}
+            onCreate={requestCreate}
+          />
 
-      <CreateInvoiceDrawer
-        open={createOpen}
-        onClose={closeCreateDrawer}
-        onSubmit={handleCreate}
-        submitting={createMutation.isPending}
-        serverErrors={createFieldErrors}
-        serverMessage={createError}
-      />
+          <InvoiceTable
+            invoices={items}
+            loading={invoicesQuery.isLoading}
+            error={queryError}
+            onRetry={() => void invoicesQuery.refetch()}
+            sortState={sortState}
+            onSortChange={handleSortChange}
+            onView={(inv) => navigate(`${ROUTES.BILLING_INVOICES}/${inv.id}`)}
+            onRowClick={(inv) => navigate(`${ROUTES.BILLING_INVOICES}/${inv.id}`)}
+            onIssue={(inv) => {
+              setIssueError(null);
+              setIssueTarget(inv);
+            }}
+            onEdit={(inv) => {
+              setEditError(null);
+              setEditFieldErrors({});
+              setEditTarget(inv);
+            }}
+            onCancel={(inv) => {
+              setCancelError(null);
+              setCancelTarget(inv);
+            }}
+            onDelete={(inv) => {
+              setDeleteError(null);
+              setDeleteTarget(inv);
+            }}
+            onCreate={requestCreate}
+            onClearFilters={filters.clearFilters}
+            hasActiveFilters={filters.hasActiveFilters}
+          />
+
+          <Pagination
+            currentPage={filters.page}
+            totalPages={totalPages}
+            onPageChange={filters.setPage}
+            totalCount={total}
+            pageSize={filters.pageSize}
+            pageSizeSelector={
+              <select
+                value={filters.pageSize}
+                onChange={(e) => filters.setPageSize(Number(e.target.value))}
+                aria-label="Rows per page"
+                className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-caption text-neutral-700 transition-colors duration-150 hover:border-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              >
+                {INVOICE_PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+
+          <CreateInvoiceDrawer {...createProps} />
+        </>
+      )}
 
       <EditInvoiceDrawer
         key={editTarget?.id ?? 'closed'}

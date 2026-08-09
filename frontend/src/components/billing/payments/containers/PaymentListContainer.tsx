@@ -11,6 +11,8 @@ import { AllocatePaymentDialog } from '../dialogs/AllocatePaymentDialog';
 import { DeletePaymentDialog } from '../dialogs/DeletePaymentDialog';
 import { Pagination } from '../../../common/Pagination/Pagination';
 import { ToastContainer, type Toast } from '../../../common/Toast';
+import { MobilePaymentList } from '../../mobile/MobilePaymentList';
+import { useIsMobileViewport } from '../../../../hooks/useIsMobileViewport';
 import { PAYMENT_PAGE_SIZE_OPTIONS } from '../../../../constants/billing';
 import { usePayments } from '../../../../hooks/billing/usePayments';
 import { usePaymentFilters } from '../../../../hooks/billing/usePaymentFilters';
@@ -67,6 +69,9 @@ export const PaymentListContainer: FC<PaymentListContainerProps> = ({
 }) => {
   const navigate = useNavigate();
   const filters = usePaymentFilters();
+  // The mobile card presentation replaces the desktop table below the md
+  // breakpoint; both presentations share the same query/filter state.
+  const isMobile = useIsMobileViewport();
 
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -230,84 +235,114 @@ export const PaymentListContainer: FC<PaymentListContainerProps> = ({
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
-      <PaymentToolbar
-        patientId={filters.patientId}
-        onPatientChange={filters.setPatientId}
-        method={filters.method}
-        onMethodChange={filters.setMethod}
-        status={filters.status}
-        onStatusChange={filters.setStatus}
-        dateFrom={filters.dateFrom}
-        onDateFromChange={filters.setDateFrom}
-        dateTo={filters.dateTo}
-        onDateToChange={filters.setDateTo}
-        sortBy={filters.sortBy}
-        onSortByChange={filters.setSortBy}
-        sortOrder={filters.sortOrder}
-        onSortOrderChange={filters.setSortOrder}
-        hasActiveFilters={filters.hasActiveFilters}
-        onClearFilters={filters.clearFilters}
-      />
+      {isMobile ? (
+        /* ── Mobile presentation (reference screen 48) ────────── */
+        <MobilePaymentList
+          payments={items}
+          loading={paymentsQuery.isLoading}
+          error={queryError}
+          onRetry={() => void paymentsQuery.refetch()}
+          hasActiveFilters={filters.hasActiveFilters}
+          onClearFilters={filters.clearFilters}
+          onView={(pay) => navigate(`${ROUTES.BILLING_PAYMENTS}/${pay.id}`)}
+          method={filters.method}
+          onMethodChange={filters.setMethod}
+          status={filters.status}
+          onStatusChange={filters.setStatus}
+          dateFrom={filters.dateFrom}
+          dateTo={filters.dateTo}
+          onDateFromChange={filters.setDateFrom}
+          onDateToChange={filters.setDateTo}
+          page={filters.page}
+          totalPages={totalPages}
+          totalCount={total}
+          pageSize={filters.pageSize}
+          onPageChange={filters.setPage}
+          onPageSizeChange={filters.setPageSize}
+        />
+      ) : (
+        /* ── Desktop presentation (unchanged) ─────────────────── */
+        <>
+          <PaymentToolbar
+            patientId={filters.patientId}
+            onPatientChange={filters.setPatientId}
+            method={filters.method}
+            onMethodChange={filters.setMethod}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            dateFrom={filters.dateFrom}
+            onDateFromChange={filters.setDateFrom}
+            dateTo={filters.dateTo}
+            onDateToChange={filters.setDateTo}
+            sortBy={filters.sortBy}
+            onSortByChange={filters.setSortBy}
+            sortOrder={filters.sortOrder}
+            onSortOrderChange={filters.setSortOrder}
+            hasActiveFilters={filters.hasActiveFilters}
+            onClearFilters={filters.clearFilters}
+          />
 
-      <PaymentTable
-        payments={items}
-        loading={paymentsQuery.isLoading}
-        error={queryError}
-        onRetry={() => void paymentsQuery.refetch()}
-        sortState={sortState}
-        onSortChange={handleSortChange}
-        onView={(pay) => navigate(`${ROUTES.BILLING_PAYMENTS}/${pay.id}`)}
-        onRowClick={(pay) => navigate(`${ROUTES.BILLING_PAYMENTS}/${pay.id}`)}
-        onComplete={(pay) => {
-          setCompleteError(null);
-          setCompleteTarget(pay);
-        }}
-        onFail={(pay) => {
-          setFailError(null);
-          setFailTarget(pay);
-        }}
-        onVoid={(pay) => {
-          setVoidError(null);
-          setVoidTarget(pay);
-        }}
-        onAllocate={(pay) => {
-          setAllocateError(null);
-          setAllocateTarget(pay);
-        }}
-        onDelete={(pay) => {
-          setDeleteError(null);
-          setDeleteTarget(pay);
-        }}
-        onCreate={() => {
-          setCreateError(null);
-          setCreateFieldErrors({});
-          onRequestCreate();
-        }}
-        onClearFilters={filters.clearFilters}
-        hasActiveFilters={filters.hasActiveFilters}
-      />
+          <PaymentTable
+            payments={items}
+            loading={paymentsQuery.isLoading}
+            error={queryError}
+            onRetry={() => void paymentsQuery.refetch()}
+            sortState={sortState}
+            onSortChange={handleSortChange}
+            onView={(pay) => navigate(`${ROUTES.BILLING_PAYMENTS}/${pay.id}`)}
+            onRowClick={(pay) => navigate(`${ROUTES.BILLING_PAYMENTS}/${pay.id}`)}
+            onComplete={(pay) => {
+              setCompleteError(null);
+              setCompleteTarget(pay);
+            }}
+            onFail={(pay) => {
+              setFailError(null);
+              setFailTarget(pay);
+            }}
+            onVoid={(pay) => {
+              setVoidError(null);
+              setVoidTarget(pay);
+            }}
+            onAllocate={(pay) => {
+              setAllocateError(null);
+              setAllocateTarget(pay);
+            }}
+            onDelete={(pay) => {
+              setDeleteError(null);
+              setDeleteTarget(pay);
+            }}
+            onCreate={() => {
+              setCreateError(null);
+              setCreateFieldErrors({});
+              onRequestCreate();
+            }}
+            onClearFilters={filters.clearFilters}
+            hasActiveFilters={filters.hasActiveFilters}
+          />
 
-      <Pagination
-        currentPage={filters.page}
-        totalPages={totalPages}
-        onPageChange={filters.setPage}
-        totalCount={total}
-        pageSize={filters.pageSize}
-        pageSizeSelector={
-          <select
-            value={filters.pageSize}
-            onChange={(e) => filters.setPageSize(Number(e.target.value))}
-            aria-label="Rows per page"
-            className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-caption text-neutral-700 transition-colors duration-150 hover:border-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-          >
-            {PAYMENT_PAGE_SIZE_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        }
-      />
+          <Pagination
+            currentPage={filters.page}
+            totalPages={totalPages}
+            onPageChange={filters.setPage}
+            totalCount={total}
+            pageSize={filters.pageSize}
+            pageSizeSelector={
+              <select
+                value={filters.pageSize}
+                onChange={(e) => filters.setPageSize(Number(e.target.value))}
+                aria-label="Rows per page"
+                className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-caption text-neutral-700 transition-colors duration-150 hover:border-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              >
+                {PAYMENT_PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        </>
+      )}
 
       <RecordPaymentDrawer
         open={createOpen}
