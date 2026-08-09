@@ -55,6 +55,9 @@ const PaymentListPage = lazy(() =>
 const PaymentDetailsPage = lazy(() =>
   import('../pages/billing/PaymentDetailsPage').then((m) => ({ default: m.PaymentDetailsPage })),
 );
+const CreditNoteDetailsPage = lazy(() =>
+  import('../pages/billing/CreditNoteDetailsPage').then((m) => ({ default: m.CreditNoteDetailsPage })),
+);
 
 /** Suspense fallback for lazy routes — centred spinner with an accessible label. */
 const RouteFallback: FC = () => (
@@ -268,6 +271,10 @@ const AppRouter = () => {
             <Route
               path={`${ROUTES.BILLING_PAYMENTS}/:paymentId`}
               element={<PaymentDetailsPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_CREDIT_NOTES}/:creditNoteId`}
+              element={<CreditNoteDetailsPage />}
             />
           </Route>
         </Route>

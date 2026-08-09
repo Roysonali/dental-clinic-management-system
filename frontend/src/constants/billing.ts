@@ -14,6 +14,7 @@ import type {
   InvoiceDiscountType,
   InvoiceSortField,
   InvoiceStatus,
+  CreditNoteStatus,
   PaymentMethod,
   PaymentSortField,
   PaymentStatus,
@@ -210,4 +211,23 @@ export const RECEIPT_STATUS_VARIANTS: Record<'generated' | 'cancelled', BadgeVar
   generated: 'success',
   cancelled: 'neutral',
 };
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Sprint 14A.4 — Credit Note module
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/** Credit note status → BadgeVariant map. */
+export const CREDIT_NOTE_STATUS_VARIANTS: Record<CreditNoteStatus, BadgeVariant> = {
+  draft: 'neutral',
+  issued: 'info',
+  applied: 'success',
+  void: 'danger',
+  expired: 'neutral',
+};
+
+/** Credit note reason max length (backend `CREDIT_NOTE_REASON_MAX_LENGTH`). */
+export const CREDIT_NOTE_REASON_MAX_LENGTH = 500;
+
+/** Credit note void reason max length (backend `VOID_REASON_MAX_LENGTH`). */
+export const CREDIT_NOTE_VOID_REASON_MAX_LENGTH = 500;
 

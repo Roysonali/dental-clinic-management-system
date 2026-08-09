@@ -479,3 +479,129 @@ export interface ReceiptRead {
 export interface ReceiptGeneratePayload {
   payment_id: string;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Sprint 14A.4 — Credit Note module (create / issue / apply / void)
+ *
+ * Mirrors backend `schemas/credit_note.py` and the router endpoints.
+ * Monetary fields are quantized Decimal strings.
+ * NOTE: The backend currently exposes NO GET endpoints for credit notes
+ * (no list, no detail). The mutation responses (create/issue/apply/void)
+ * return CreditNoteRead, which is cached client-side for the detail page.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/** Backend `CreditNoteStatus` enum (enums.py). */
+export type CreditNoteStatus = 'draft' | 'issued' | 'applied' | 'void' | 'expired';
+
+/** `CreditNoteInvoiceSummary` — minimal invoice data embedded in credit note responses. */
+export interface CreditNoteInvoiceSummary {
+  id: string;
+  invoice_number: string;
+  invoice_date: string;
+  currency_code: string;
+  grand_total: Money;
+}
+
+/** `CreditNoteFinancialSummary` — financial snapshot for a credit note. */
+export interface CreditNoteFinancialSummary {
+  currency_code: string;
+  amount: Money;
+  remaining_balance: Money;
+}
+
+/** `CreditNoteDocumentMetadata` — document numbering and versioning. */
+export interface CreditNoteDocumentMetadata {
+  document_type: string;
+  sequence_number: number | null;
+  version: number;
+  doc_version: number;
+  issued_at: string | null;
+  generated_at: string;
+}
+
+/** `CreditNoteAuditSummary` — lightweight audit snapshot. */
+export interface CreditNoteAuditSummary {
+  action: string;
+  performed_by: BillingCreatorSummary;
+  occurred_at: string;
+  reason: string | null;
+}
+
+/** `CreditNoteSummary` — high-level summary for embed contexts. */
+export interface CreditNoteSummary {
+  id: string;
+  credit_note_number: string;
+  status: CreditNoteStatus;
+  patient: BillingPatientSummary;
+  invoice: CreditNoteInvoiceSummary;
+  amount: Money;
+  remaining_balance: Money;
+  reason: string;
+  financials: CreditNoteFinancialSummary;
+  created_at: string;
+}
+
+/** `CreditNoteListItem` — lightweight representation for paginated lists. */
+export interface CreditNoteListItem {
+  id: string;
+  credit_note_number: string;
+  status: CreditNoteStatus;
+  patient: BillingPatientSummary;
+  invoice: CreditNoteInvoiceSummary;
+  amount: Money;
+  remaining_balance: Money;
+  reason: string;
+  financials: CreditNoteFinancialSummary;
+  created_at: string;
+}
+
+/** `CreditNoteRead` — full credit note aggregate. */
+export interface CreditNoteRead {
+  id: string;
+  credit_note_number: string;
+  document_type: string;
+  status: CreditNoteStatus;
+  patient: BillingPatientSummary;
+  invoice: CreditNoteInvoiceSummary;
+  creator: BillingCreatorSummary | null;
+  updater: BillingCreatorSummary | null;
+  amount: Money;
+  remaining_balance: Money;
+  reason: string;
+  issue_date: string | null;
+  expiry_date: string | null;
+  void_reason: string | null;
+  financials: CreditNoteFinancialSummary;
+  document_metadata: CreditNoteDocumentMetadata;
+  audit_trail: CreditNoteAuditSummary[];
+  version: number;
+  doc_version: number;
+  created_at: string;
+  created_by: number;
+  updated_at: string;
+  updated_by: number | null;
+}
+
+/** Body for POST /billing/credit-notes (`CreditNoteCreateRequest`). */
+export interface CreditNoteCreatePayload {
+  invoice_id: string;
+  patient_id: string;
+  amount: Money;
+  reason: string;
+  expiry_date?: string | null;
+}
+
+/** Body for POST /billing/credit-notes/{id}/void (`CreditNoteVoidRequest`). */
+export interface CreditNoteVoidPayload {
+  void_reason: string;
+}
+
+/** Invoice list item augmented with credit note info for the create drawer. */
+export interface CreditNoteInvoiceOption {
+  id: string;
+  invoice_number: string;
+  patient: BillingPatientSummary;
+  financials: InvoiceFinancialSummary;
+  already_credited: Money;
+  remaining_allowed: Money;
+}

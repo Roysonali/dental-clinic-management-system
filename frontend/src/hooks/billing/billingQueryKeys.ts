@@ -47,4 +47,7 @@ export const billingQueryKeys = {
   /** Receipt generated for a payment (cache from the generate mutation). */
   receiptForPayment: (paymentId: string) =>
     ['billing', 'receipts', 'by-payment', paymentId] as const,
+  /** Single credit note aggregate (cached from mutation responses — backend has no GET endpoint). */
+  creditNoteDetail: (id: string) =>
+    ['billing', 'credit-notes', 'detail', id] as const,
 } as const;

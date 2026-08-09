@@ -1,7 +1,9 @@
 import { useEffect, useState, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FileText } from 'lucide-react';
 import { Card } from '../../../common/Card/Card';
 import { Button } from '../../../common/Button/Button';
+import { Icon } from '../../../common/Icon/Icon';
 import { ToastContainer, type Toast } from '../../../common/Toast';
 import { StatusBadge } from '../../../common/StatusBadge/StatusBadge';
 import { InvoiceSummaryCards } from '../InvoiceSummaryCards';
@@ -17,6 +19,7 @@ import { EditInvoiceDrawer } from '../dialogs/EditInvoiceDrawer';
 import { IssueInvoiceDialog } from '../dialogs/IssueInvoiceDialog';
 import { CancelInvoiceDialog } from '../dialogs/CancelInvoiceDialog';
 import { DeleteInvoiceDialog } from '../dialogs/DeleteInvoiceDialog';
+import { CreateCreditNoteDrawer } from '../../creditNotes/CreateCreditNoteDrawer';
 import { INVOICE_STATUS_VARIANTS } from '../../../../constants/billing';
 import { useInvoice } from '../../../../hooks/billing/useInvoice';
 import {
@@ -25,6 +28,7 @@ import {
   useCancelInvoice,
   useDeleteInvoice,
 } from '../../../../hooks/billing/useInvoiceMutations';
+import { useCreateCreditNote } from '../../../../hooks/billing/useCreditNoteMutations';
 import { parseApiError } from '../../../../services/apiError';
 import { ROUTES } from '../../../../routes/routes';
 import { editFormValuesToUpdatePayload } from '../../../../utils/invoiceFormUtils';
@@ -70,6 +74,11 @@ export const InvoiceDetailsContainer: FC<{ invoiceId: string }> = ({ invoiceId }
   const issueMutation = useIssueInvoice();
   const cancelMutation = useCancelInvoice();
   const deleteMutation = useDeleteInvoice();
+  const createCreditNoteMutation = useCreateCreditNote();
+
+  /* ── Credit note drawer state ─────────────────────────────────── */
+  const [createCreditNoteOpen, setCreateCreditNoteOpen] = useState(false);
+  const [createCreditNoteError, setCreateCreditNoteError] = useState<string | null>(null);
 
   // Auto-dismiss the transient toast.
   useEffect(() => {
@@ -175,11 +184,32 @@ export const InvoiceDetailsContainer: FC<{ invoiceId: string }> = ({ invoiceId }
     });
   };
 
+  const handleCreateCreditNote = (values: { invoice_id: string; patient_id: string; amount: string; reason: string; expiry_date?: string }) => {
+    setCreateCreditNoteError(null);
+    createCreditNoteMutation.mutate(
+      {
+        invoice_id: values.invoice_id,
+        patient_id: values.patient_id,
+        amount: values.amount,
+        reason: values.reason,
+        expiry_date: values.expiry_date || undefined,
+      },
+      {
+        onSuccess: (created) => {
+          setCreateCreditNoteOpen(false);
+          showToast('success', `${created.credit_note_number} created`, 'Saved as draft');
+        },
+        onError: (error) => setCreateCreditNoteError(parseApiError(error).message),
+      },
+    );
+  };
+
   const actionsSubmitting =
     editMutation.isPending ||
     issueMutation.isPending ||
     cancelMutation.isPending ||
-    deleteMutation.isPending;
+    deleteMutation.isPending ||
+    createCreditNoteMutation.isPending;
 
   // The lifecycle dialogs accept a list-shaped invoice (patient + financials
   // + item_count); the detail aggregate carries items instead of item_count.
@@ -218,27 +248,38 @@ export const InvoiceDetailsContainer: FC<{ invoiceId: string }> = ({ invoiceId }
                 {invoice.doctor?.user_full_name ? ` · ${invoice.doctor.user_full_name}` : ''}
               </p>
             </div>
-            <InvoiceDetailActions
-              status={invoice.status}
-              submitting={actionsSubmitting}
-              onIssue={() => {
-                setIssueError(null);
-                setIssueOpen(true);
-              }}
-              onEdit={() => {
-                setEditError(null);
-                setEditFieldErrors({});
-                setEditOpen(true);
-              }}
-              onCancel={() => {
-                setCancelError(null);
-                setCancelOpen(true);
-              }}
-              onDelete={() => {
-                setDeleteError(null);
-                setDeleteOpen(true);
-              }}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setCreateCreditNoteOpen(true)}
+                disabled={actionsSubmitting}
+                leftIcon={<Icon icon={FileText} size="xs" />}
+              >
+                Create credit note
+              </Button>
+              <InvoiceDetailActions
+                status={invoice.status}
+                submitting={actionsSubmitting}
+                onIssue={() => {
+                  setIssueError(null);
+                  setIssueOpen(true);
+                }}
+                onEdit={() => {
+                  setEditError(null);
+                  setEditFieldErrors({});
+                  setEditOpen(true);
+                }}
+                onCancel={() => {
+                  setCancelError(null);
+                  setCancelOpen(true);
+                }}
+                onDelete={() => {
+                  setDeleteError(null);
+                  setDeleteOpen(true);
+                }}
+              />
+            </div>
           </div>
         </Card.Body>
       </Card>
@@ -315,6 +356,20 @@ export const InvoiceDetailsContainer: FC<{ invoiceId: string }> = ({ invoiceId }
           setDeleteOpen(false);
           setDeleteError(null);
         }}
+      />
+
+      <CreateCreditNoteDrawer
+        key={createCreditNoteOpen ? 'open' : 'closed'}
+        open={createCreditNoteOpen}
+        defaultInvoiceId={invoice.id}
+        defaultPatientId={invoice.patient.id}
+        onClose={() => {
+          setCreateCreditNoteOpen(false);
+          setCreateCreditNoteError(null);
+        }}
+        onSubmit={handleCreateCreditNote}
+        submitting={createCreditNoteMutation.isPending}
+        serverMessage={createCreditNoteError}
       />
 
       {toast && (

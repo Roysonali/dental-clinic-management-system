@@ -2,6 +2,9 @@ import { api } from './api';
 import type {
   BillingDashboardResponse,
   CancelInvoicePayload,
+  CreditNoteCreatePayload,
+  CreditNoteVoidPayload,
+  CreditNoteRead,
   InvoiceCreatePayload,
   InvoiceDraftUpdatePayload,
   InvoiceListParams,
@@ -172,6 +175,32 @@ export const billingService = {
   /** POST /billing/receipts — generate a receipt for a completed payment (201). */
   async generateReceipt(payload: ReceiptGeneratePayload): Promise<ReceiptRead> {
     const { data } = await api.post<ReceiptRead>('/billing/receipts', payload);
+    return data;
+  },
+
+  /* ── Sprint 14A.4 — Credit Note endpoints (backend routers/credit_note.py) ── */
+
+  /** POST /billing/credit-notes — create a Draft credit note (201). */
+  async createCreditNote(payload: CreditNoteCreatePayload): Promise<CreditNoteRead> {
+    const { data } = await api.post<CreditNoteRead>('/billing/credit-notes', payload);
+    return data;
+  },
+
+  /** POST /billing/credit-notes/{id}/issue — issue a Draft credit note. */
+  async issueCreditNote(id: string): Promise<CreditNoteRead> {
+    const { data } = await api.post<CreditNoteRead>(`/billing/credit-notes/${id}/issue`);
+    return data;
+  },
+
+  /** POST /billing/credit-notes/{id}/void — void a credit note (requires void_reason). */
+  async voidCreditNote(id: string, payload: CreditNoteVoidPayload): Promise<CreditNoteRead> {
+    const { data } = await api.post<CreditNoteRead>(`/billing/credit-notes/${id}/void`, payload);
+    return data;
+  },
+
+  /** POST /billing/credit-notes/{id}/apply — apply an issued credit note. */
+  async applyCreditNote(id: string): Promise<CreditNoteRead> {
+    const { data } = await api.post<CreditNoteRead>(`/billing/credit-notes/${id}/apply`);
     return data;
   },
 };
