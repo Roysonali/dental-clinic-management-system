@@ -450,6 +450,18 @@ export interface PaymentDeallocatePayload {
   invoice_id: string;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ * Sprint 14A.5 — Receipt module (detail / generate / regenerate)
+ *
+ * Mirrors backend `schemas/receipt.py` + `routers/receipt.py`. Monetary
+ * fields are quantized Decimal strings. NOTE: the current mapper always
+ * returns `print_metadata: null` and `audit_trail: []` — the UI renders
+ * those cards from the schema shape with graceful placeholders.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/** Backend `ReceiptStatus` enum (enums.py). */
+export type ReceiptStatus = 'generated' | 'cancelled';
+
 /** `ReceiptPaymentSummary` (schemas/receipt.py) — embedded on receipts. */
 export interface ReceiptPaymentSummary {
   id: string;
@@ -460,24 +472,194 @@ export interface ReceiptPaymentSummary {
   currency_code: string;
 }
 
+/** `ReceiptInvoiceSummary` (schemas/receipt.py) — consolidated receipts. */
+export interface ReceiptInvoiceSummary {
+  id: string;
+  invoice_number: string;
+  invoice_date: string;
+  currency_code: string;
+  grand_total: Money;
+}
+
+/** `ReceiptFinancialSummary` (schemas/receipt.py). */
+export interface ReceiptFinancialSummary {
+  currency_code: string;
+  total_amount: Money;
+  allocated_amount: Money;
+  unallocated_amount: Money;
+}
+
+/** `ReceiptPrintMetadata` (schemas/receipt.py) — nullable on the response. */
+export interface ReceiptPrintMetadata {
+  receipt_number: string;
+  print_count: number;
+  last_printed_at: string | null;
+  printed_by: number | null;
+  template_version: string | null;
+  duplicate_copy: boolean;
+  print_notes: string | null;
+}
+
+/** `ReceiptDocumentMetadata` (schemas/receipt.py). */
+export interface ReceiptDocumentMetadata {
+  document_type: string;
+  sequence_number: number | null;
+  version: number;
+  doc_version: number;
+  issued_at: string | null;
+  generated_at: string;
+}
+
+/** `ReceiptAuditSummary` (schemas/receipt.py) — ordered audit events. */
+export interface ReceiptAuditSummary {
+  action: string;
+  performed_by: BillingCreatorSummary;
+  occurred_at: string;
+  reason: string | null;
+}
+
 /**
- * `ReceiptRead` (schemas/receipt.py) — the subset surfaced by the Payment
- * detail's Receipt card (POST /billing/receipts returns the full aggregate).
+ * `ReceiptRead` (schemas/receipt.py) — full receipt aggregate returned by
+ * GET /billing/receipts/{id} and POST /billing/receipts (+ regenerate).
+ * This superset shape replaces the earlier payment-card-only subset; every
+ * field the payment detail's Receipt card consumed still exists.
  */
 export interface ReceiptRead {
   id: string;
   receipt_number: string;
-  status: 'generated' | 'cancelled';
+  document_type: string;
+  status: ReceiptStatus;
+  patient: BillingPatientSummary;
+  payment: ReceiptPaymentSummary;
+  creator: BillingCreatorSummary | null;
+  updater: BillingCreatorSummary | null;
+  receipt_date: string;
   amount: Money;
   currency_code: string;
-  receipt_date: string;
-  payment: ReceiptPaymentSummary;
+  notes: string | null;
+  cancellation_reason: string | null;
+  receipt_invoices: ReceiptInvoiceSummary[];
+  financials: ReceiptFinancialSummary;
+  print_metadata: ReceiptPrintMetadata | null;
+  document_metadata: ReceiptDocumentMetadata;
+  audit_trail: ReceiptAuditSummary[];
   created_at: string;
+  created_by: number;
+  updated_at: string;
+  updated_by: number | null;
 }
 
 /** Body for POST /billing/receipts (`ReceiptGenerateRequest`). */
 export interface ReceiptGeneratePayload {
   payment_id: string;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Sprint 14A.5 — Refund module (create / approve / reject / complete)
+ *
+ * Mirrors backend `schemas/refund.py` + `routers/refund.py`. There is NO
+ * GET endpoint for refunds — `RefundRead` is only returned by mutations and
+ * is cached client-side (same contract as credit notes). Monetary fields
+ * are quantized Decimal strings.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/** Backend `RefundStatus` enum (enums.py) — PENDING → APPROVED → COMPLETED | REJECTED. */
+export type RefundStatus = 'pending' | 'approved' | 'rejected' | 'completed';
+
+/** `RefundPaymentSummary` (schemas/refund.py) — embedded on refunds. */
+export interface RefundPaymentSummary {
+  id: string;
+  payment_number: string;
+  payment_method: string;
+  total_amount: Money;
+  payment_date: string;
+  currency_code: string;
+}
+
+/** `RefundInvoiceSummary` (schemas/refund.py) — resolved from payment allocations. */
+export interface RefundInvoiceSummary {
+  id: string;
+  invoice_number: string;
+  patient: BillingPatientSummary;
+  invoice_date: string;
+  currency_code: string;
+  grand_total: Money;
+}
+
+/** `RefundFinancialSummary` (schemas/refund.py). */
+export interface RefundFinancialSummary {
+  currency_code: string;
+  refund_amount: Money;
+  payment_total: Money;
+  remaining_on_payment: Money;
+  refund_count: number;
+}
+
+/** `RefundAuditSummary` (schemas/refund.py) — ordered audit events. */
+export interface RefundAuditSummary {
+  action: string;
+  performed_by: BillingCreatorSummary;
+  occurred_at: string;
+  reason: string | null;
+}
+
+/** `RefundGatewayMetadata` (schemas/refund.py) — nullable on the response. */
+export interface RefundGatewayMetadata {
+  gateway_refund_id: string | null;
+  gateway_payment_id: string | null;
+  bank_reference_number: string | null;
+  refund_source: string | null;
+}
+
+/** `RefundDocumentMetadata` (schemas/refund.py). */
+export interface RefundDocumentMetadata {
+  document_type: string;
+  sequence_number: number | null;
+  issued_at: string | null;
+  generated_at: string;
+}
+
+/** `RefundRead` (schemas/refund.py) — full refund aggregate (mutation responses only). */
+export interface RefundRead {
+  id: string;
+  refund_number: string;
+  document_type: string;
+  status: RefundStatus;
+  patient: BillingPatientSummary;
+  payment: RefundPaymentSummary;
+  invoices: RefundInvoiceSummary[];
+  creator: BillingCreatorSummary | null;
+  updater: BillingCreatorSummary | null;
+  reviewer: BillingCreatorSummary | null;
+  amount: Money;
+  reason: string;
+  currency_code: string;
+  notes: string | null;
+  rejection_reason: string | null;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  financials: RefundFinancialSummary;
+  gateway_metadata: RefundGatewayMetadata | null;
+  document_metadata: RefundDocumentMetadata;
+  audit_trail: RefundAuditSummary[];
+  version: number;
+  doc_version: number;
+  created_at: string;
+  created_by: number;
+  updated_at: string;
+  updated_by: number | null;
+}
+
+/** Body for POST /billing/refunds (`RefundCreateRequest`). */
+export interface RefundCreatePayload {
+  payment_id: string;
+  amount: Money;
+  reason: string;
+}
+
+/** Body for POST /billing/refunds/{id}/reject (`RefundWorkflowRequest`). */
+export interface RefundWorkflowPayload {
+  reason?: string;
 }
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -21,6 +21,8 @@ import { VoidPaymentDialog } from '../dialogs/VoidPaymentDialog';
 import { AllocatePaymentDialog } from '../dialogs/AllocatePaymentDialog';
 import { DeallocatePaymentDialog } from '../dialogs/DeallocatePaymentDialog';
 import { DeletePaymentDialog } from '../dialogs/DeletePaymentDialog';
+import { GenerateReceiptDialog } from '../../receipts/dialogs/GenerateReceiptDialog';
+import { CreateRefundDrawer } from '../../refunds/drawers/CreateRefundDrawer';
 import { PAYMENT_STATUS_VARIANTS } from '../../../../constants/billing';
 import { usePayment } from '../../../../hooks/billing/usePayment';
 import { billingQueryKeys } from '../../../../hooks/billing/billingQueryKeys';
@@ -33,8 +35,11 @@ import {
   useDeletePayment,
   useGenerateReceipt,
 } from '../../../../hooks/billing/usePaymentMutations';
+import { useCreateRefund } from '../../../../hooks/billing/useRefundMutations';
 import { parseApiError } from '../../../../services/apiError';
 import { ROUTES } from '../../../../routes/routes';
+import { refundFormValuesToCreatePayload } from '../../../../utils/refundFormUtils';
+import type { RefundFormValues } from '../../../../utils/refundFormSchema';
 import type { PaymentAllocationSummary, ReceiptRead } from '../../../../types/billing';
 
 /** Toast lifetime before auto-dismiss (ms). */
@@ -72,7 +77,11 @@ export const PaymentDetailsContainer: FC<{ paymentId: string }> = ({ paymentId }
   const [deallocateError, setDeallocateError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [generateReceiptOpen, setGenerateReceiptOpen] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundFieldErrors, setRefundFieldErrors] = useState<Record<string, string>>({});
 
   /* ── Mutations ───────────────────────────────────────────────── */
   const completeMutation = useCompletePayment();
@@ -82,6 +91,7 @@ export const PaymentDetailsContainer: FC<{ paymentId: string }> = ({ paymentId }
   const deallocateMutation = useDeallocatePayment();
   const deleteMutation = useDeletePayment();
   const receiptMutation = useGenerateReceipt();
+  const refundMutation = useCreateRefund();
 
   // The backend has no GET /receipts?payment_id lookup, so the generated
   // receipt lives in the query cache (set by useGenerateReceipt's onSuccess)
@@ -227,11 +237,33 @@ export const PaymentDetailsContainer: FC<{ paymentId: string }> = ({ paymentId }
       { payment_id: payment.id },
       {
         onSuccess: (receipt) => {
+          setGenerateReceiptOpen(false);
           showToast('success', `${receipt.receipt_number} generated`);
+          navigate(`${ROUTES.BILLING_RECEIPTS}/${receipt.id}`);
         },
         onError: (error) => setReceiptError(parseApiError(error).message),
       },
     );
+  };
+
+  const handleCreateRefund = (values: RefundFormValues) => {
+    setRefundError(null);
+    setRefundFieldErrors({});
+    refundMutation.mutate(refundFormValuesToCreatePayload(values), {
+      onSuccess: (refund) => {
+        setRefundOpen(false);
+        showToast('success', `${refund.refund_number} created`, 'Saved as pending — it must be approved before completing.');
+        navigate(`${ROUTES.BILLING_REFUNDS}/${refund.id}`);
+      },
+      onError: (error) => {
+        const info = parseApiError(error);
+        if (info.kind === 'validation' && Object.keys(info.fieldErrors).length > 0) {
+          setRefundFieldErrors(info.fieldErrors);
+        } else {
+          setRefundError(info.message);
+        }
+      },
+    });
   };
 
   const actionsSubmitting =
@@ -243,6 +275,8 @@ export const PaymentDetailsContainer: FC<{ paymentId: string }> = ({ paymentId }
     deleteMutation.isPending;
 
   const canAllocate = payment.status === 'completed' && unallocated > 0;
+  const refundableBalance =
+    Number(payment.total_amount) - Number(payment.financials.refunded_amount);
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6">
@@ -291,6 +325,11 @@ export const PaymentDetailsContainer: FC<{ paymentId: string }> = ({ paymentId }
                 setDeleteError(null);
                 setDeleteOpen(true);
               }}
+              onRefund={() => {
+                setRefundError(null);
+                setRefundFieldErrors({});
+                setRefundOpen(true);
+              }}
             />
           </div>
         </Card.Body>
@@ -324,7 +363,11 @@ export const PaymentDetailsContainer: FC<{ paymentId: string }> = ({ paymentId }
             canGenerate={payment.status === 'completed'}
             generating={receiptMutation.isPending}
             error={receiptError}
-            onGenerate={handleGenerateReceipt}
+            onGenerate={() => {
+              setReceiptError(null);
+              setGenerateReceiptOpen(true);
+            }}
+            onView={(viewedReceipt) => navigate(`${ROUTES.BILLING_RECEIPTS}/${viewedReceipt.id}`)}
           />
           <PaymentRecordCard payment={payment} />
         </div>
@@ -402,6 +445,32 @@ export const PaymentDetailsContainer: FC<{ paymentId: string }> = ({ paymentId }
           setDeleteOpen(false);
           setDeleteError(null);
         }}
+      />
+
+      <GenerateReceiptDialog
+        open={generateReceiptOpen}
+        payment={payment}
+        submitting={receiptMutation.isPending}
+        error={receiptError}
+        onConfirm={handleGenerateReceipt}
+        onClose={() => {
+          setGenerateReceiptOpen(false);
+          setReceiptError(null);
+        }}
+      />
+
+      <CreateRefundDrawer
+        open={refundOpen && refundableBalance > 0}
+        payment={payment}
+        submitting={refundMutation.isPending}
+        serverErrors={refundFieldErrors}
+        serverMessage={refundError}
+        onClose={() => {
+          setRefundOpen(false);
+          setRefundError(null);
+          setRefundFieldErrors({});
+        }}
+        onSubmit={handleCreateRefund}
       />
 
       {toast && (

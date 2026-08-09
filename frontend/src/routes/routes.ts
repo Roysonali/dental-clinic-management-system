@@ -29,8 +29,22 @@ export const ROUTES = {
   BILLING_CREDIT_NOTES: '/billing/credit-notes',
   /** Payment list (Phase 3 — Sprint 14A.3). */
   BILLING_PAYMENTS: '/billing/payments',
+  /** Receipt detail (Phase 5 — Sprint 14A.5). */
+  BILLING_RECEIPTS: '/billing/receipts',
+  /** Refund timeline (Phase 5 — Sprint 14A.5). */
+  BILLING_REFUNDS: '/billing/refunds',
   SETTINGS: '/settings',
 } as const;
+
+/**
+ * Query param name that asks the invoice list to auto-open the create drawer.
+ *
+ * The Billing Dashboard's "New invoice" CTA navigates to
+ * `/billing/invoices?create=true` so the user lands directly on the invoice
+ * creation form — no second click. The invoice list consumes the intent on
+ * mount and strips it again when the drawer closes.
+ */
+export const INVOICE_CREATE_QUERY_PARAM = 'create';
 
 /** Auth route paths */
 export type AuthRoute = (typeof ROUTES.AUTH)[keyof typeof ROUTES.AUTH];

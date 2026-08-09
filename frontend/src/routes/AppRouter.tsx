@@ -58,6 +58,12 @@ const PaymentDetailsPage = lazy(() =>
 const CreditNoteDetailsPage = lazy(() =>
   import('../pages/billing/CreditNoteDetailsPage').then((m) => ({ default: m.CreditNoteDetailsPage })),
 );
+const ReceiptDetailsPage = lazy(() =>
+  import('../pages/billing/ReceiptDetailsPage').then((m) => ({ default: m.ReceiptDetailsPage })),
+);
+const RefundDetailsPage = lazy(() =>
+  import('../pages/billing/RefundDetailsPage').then((m) => ({ default: m.RefundDetailsPage })),
+);
 
 /** Suspense fallback for lazy routes — centred spinner with an accessible label. */
 const RouteFallback: FC = () => (
@@ -275,6 +281,14 @@ const AppRouter = () => {
             <Route
               path={`${ROUTES.BILLING_CREDIT_NOTES}/:creditNoteId`}
               element={<CreditNoteDetailsPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_RECEIPTS}/:receiptId`}
+              element={<ReceiptDetailsPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_REFUNDS}/:refundId`}
+              element={<RefundDetailsPage />}
             />
           </Route>
         </Route>

@@ -136,11 +136,14 @@ export function useGenerateReceipt() {
     onSuccess: (receipt) => {
       void queryClient.invalidateQueries({ queryKey: billingQueryKeys.all });
       // The backend has no GET-by-payment lookup — cache the generated
-      // receipt so the Payment detail's Receipt card can render it.
+      // receipt so the Payment detail's Receipt card can render it, and
+      // cache the full aggregate under the receipt detail key so the
+      // Receipt detail page renders instantly after navigation.
       void queryClient.setQueryData(
         billingQueryKeys.receiptForPayment(receipt.payment.id),
         receipt,
       );
+      void queryClient.setQueryData(billingQueryKeys.receiptDetail(receipt.id), receipt);
     },
   });
 }

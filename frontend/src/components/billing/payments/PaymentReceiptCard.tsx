@@ -18,6 +18,8 @@ interface PaymentReceiptCardProps {
   generating?: boolean;
   error?: string | null;
   onGenerate: () => void;
+  /** Opens the full receipt detail page. */
+  onView?: (receipt: ReceiptRead) => void;
 }
 
 /**
@@ -37,6 +39,7 @@ export const PaymentReceiptCard: FC<PaymentReceiptCardProps> = ({
   generating = false,
   error = null,
   onGenerate,
+  onView,
 }) => {
   return (
     <Card>
@@ -44,32 +47,45 @@ export const PaymentReceiptCard: FC<PaymentReceiptCardProps> = ({
         <h3 className="text-h4 font-semibold text-neutral-900">Receipt</h3>
 
         {receipt ? (
-          <dl className="mt-4 space-y-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-body-sm text-neutral-500">Receipt</dt>
-              <dd className="font-mono text-body-sm font-medium text-neutral-900">
-                {receipt.receipt_number}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-body-sm text-neutral-500">Status</dt>
-              <dd>
-                <StatusBadge status={receipt.status} statusMap={RECEIPT_STATUS_VARIANTS} size="sm" />
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-body-sm text-neutral-500">Amount</dt>
-              <dd className="text-body-sm font-semibold text-neutral-900 tabular-nums">
-                {formatCurrency(receipt.amount, PAYMENT_CURRENCY_CODE)}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-body-sm text-neutral-500">Date</dt>
-              <dd className="text-body-sm font-medium text-neutral-800">
-                {formatISODate(receipt.receipt_date)}
-              </dd>
-            </div>
-          </dl>
+          <>
+            <dl className="mt-4 space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-body-sm text-neutral-500">Receipt</dt>
+                <dd className="font-mono text-body-sm font-medium text-neutral-900">
+                  {receipt.receipt_number}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-body-sm text-neutral-500">Status</dt>
+                <dd>
+                  <StatusBadge status={receipt.status} statusMap={RECEIPT_STATUS_VARIANTS} size="sm" />
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-body-sm text-neutral-500">Amount</dt>
+                <dd className="text-body-sm font-semibold text-neutral-900 tabular-nums">
+                  {formatCurrency(receipt.amount, PAYMENT_CURRENCY_CODE)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-body-sm text-neutral-500">Date</dt>
+                <dd className="text-body-sm font-medium text-neutral-800">
+                  {formatISODate(receipt.receipt_date)}
+                </dd>
+              </div>
+            </dl>
+            {onView && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-4"
+                onClick={() => onView(receipt)}
+                leftIcon={<Icon icon={Receipt} size="xs" />}
+              >
+                View receipt
+              </Button>
+            )}
+          </>
         ) : (
           <div className="mt-4 flex flex-col items-start gap-3">
             <p className="flex items-start gap-2 text-body-sm text-neutral-500">

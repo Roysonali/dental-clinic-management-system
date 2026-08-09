@@ -20,7 +20,16 @@ import type { PaymentStatus } from '../types/billing';
  * Completed: allocate (further gated in the UI on unallocated_amount > 0).
  * Failed / Refunded / Reversed / Void: none (no router-exposed transitions).
  */
-export type PaymentActionId = 'complete' | 'fail' | 'void' | 'delete' | 'allocate';
+export type PaymentActionId =
+  | 'complete'
+  | 'fail'
+  | 'void'
+  | 'delete'
+  | 'allocate'
+  /** Create Refund — not returned by getPaymentActions (the backend exposes
+   *  a separate /billing/refunds workflow); the payment detail page adds it
+   *  for completed payments with a refundable balance. */
+  | 'refund';
 
 /** Lifecycle actions available for a given backend status. */
 export function getPaymentActions(status: PaymentStatus): PaymentActionId[] {
@@ -44,6 +53,7 @@ export const PAYMENT_ACTION_LABELS: Record<PaymentActionId, string> = {
   void: 'Void',
   delete: 'Delete',
   allocate: 'Allocate',
+  refund: 'Create refund',
 };
 
 /** A payment is only editable/deletable in Pending status (backend rule). */

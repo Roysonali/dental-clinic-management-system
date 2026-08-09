@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { ArrowUpRight, Ban, CircleCheck, CircleX, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Ban, CircleCheck, CircleX, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { Icon } from '../../common/Icon/Icon';
 import { PermissionGate } from '../../rbac/PermissionGate';
@@ -15,6 +15,8 @@ interface PaymentDetailActionsProps {
   onVoid: () => void;
   onAllocate: () => void;
   onDelete: () => void;
+  /** Opens the Create Refund drawer (completed payments with a refundable balance). */
+  onRefund?: () => void;
 }
 
 /**
@@ -23,9 +25,10 @@ interface PaymentDetailActionsProps {
  * Renders exactly the actions the backend permits for the payment's status
  * (`getPaymentActions`, mirroring PAYMENT_TRANSITIONS + the router's exposed
  * endpoints): a Pending payment shows Complete (primary) + Mark as failed /
- * Void (destructive), a Completed payment shows Allocate (secondary), and
- * terminal statuses show none. Allocate is additionally hidden when there is
- * nothing left to allocate (unallocated balance = 0). Delete is
+ * Void (destructive), a Completed payment shows Allocate (secondary) and
+ * Create refund (secondary), and terminal statuses show none. Allocate is
+ * hidden when there is nothing left to allocate, and refund is hidden when
+ * the refundable balance (total − refunded) is exhausted. Delete is
  * ADMIN-gated via PermissionGate (backend `_PAYMENT_DELETE_ROLES`).
  */
 export const PaymentDetailActions: FC<PaymentDetailActionsProps> = ({
@@ -36,11 +39,19 @@ export const PaymentDetailActions: FC<PaymentDetailActionsProps> = ({
   onVoid,
   onAllocate,
   onDelete,
+  onRefund,
 }) => {
+  const refundableBalance =
+    Number(payment.total_amount) - Number(payment.financials.refunded_amount);
+
   const actions = getPaymentActions(payment.status).filter(
     // Allocate is only meaningful while there is a positive unallocated balance.
     (action) => action !== 'allocate' || Number(payment.financials.unallocated_amount) > 0,
   );
+
+  if (onRefund && payment.status === 'completed' && refundableBalance > 0) {
+    actions.push('refund');
+  }
 
   if (actions.length === 0) {
     return (
@@ -71,6 +82,17 @@ export const PaymentDetailActions: FC<PaymentDetailActionsProps> = ({
         leftIcon={<Icon icon={ArrowUpRight} size="xs" />}
       >
         Allocate
+      </Button>
+    ),
+    refund: (
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onRefund}
+        disabled={submitting}
+        leftIcon={<Icon icon={RotateCcw} size="xs" />}
+      >
+        Create refund
       </Button>
     ),
     fail: (

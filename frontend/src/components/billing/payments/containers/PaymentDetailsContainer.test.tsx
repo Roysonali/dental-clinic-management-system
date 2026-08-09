@@ -121,10 +121,9 @@ const completedWithAllocation: PaymentRead = {
 const receipt: ReceiptRead = {
   id: 'rct1',
   receipt_number: 'RCT-00001',
+  document_type: 'receipt',
   status: 'generated',
-  amount: '1500.00',
-  currency_code: 'INR',
-  receipt_date: '2026-07-23',
+  patient,
   payment: {
     id: 'pay1',
     payment_number: 'PAY-00001',
@@ -133,7 +132,34 @@ const receipt: ReceiptRead = {
     payment_date: '2026-07-23',
     currency_code: 'INR',
   },
+  creator: { id: 1, full_name: 'Admin' },
+  updater: null,
+  receipt_date: '2026-07-23',
+  amount: '1500.00',
+  currency_code: 'INR',
+  notes: null,
+  cancellation_reason: null,
+  receipt_invoices: [],
+  financials: {
+    currency_code: 'INR',
+    total_amount: '1500.00',
+    allocated_amount: '1500.00',
+    unallocated_amount: '0.00',
+  },
+  print_metadata: null,
+  document_metadata: {
+    document_type: 'receipt',
+    sequence_number: null,
+    version: 1,
+    doc_version: 1,
+    issued_at: '2026-07-23T14:20:00Z',
+    generated_at: '2026-07-23T14:20:00Z',
+  },
+  audit_trail: [],
   created_at: '2026-07-23T14:20:00Z',
+  created_by: 1,
+  updated_at: '2026-07-23T14:20:00Z',
+  updated_by: null,
 };
 
 function renderDetail(paymentId = 'pay1', queryClient?: QueryClient) {
@@ -235,13 +261,19 @@ describe('PaymentDetailsContainer', () => {
     );
   });
 
-  it('generates a receipt and surfaces it in the Receipt card', async () => {
+  it('generates a receipt through the confirm dialog and surfaces it in the Receipt card', async () => {
     getPaymentMock.mockResolvedValue(completedWithAllocation);
     generateReceiptMock.mockResolvedValue(receipt as never);
     renderDetail();
 
     await screen.findByText('PAY-00001');
     fireEvent.click(screen.getByRole('button', { name: 'Generate receipt' }));
+
+    // The confirm dialog opens over the payment detail page (no navigation).
+    const dialog = await screen.findByRole('dialog', { name: 'Generate receipt' });
+    expect(within(dialog).getByText('Generate receipt?')).toBeInTheDocument();
+    expect(within(dialog).getByText('₹1,500.00')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Generate receipt' }));
 
     await waitFor(() => expect(generateReceiptMock).toHaveBeenCalledWith({ payment_id: 'pay1' }));
     // The generated ReceiptRead is read back from the query cache.

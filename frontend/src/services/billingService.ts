@@ -21,6 +21,9 @@ import type {
   PaymentStatusChangePayload,
   ReceiptGeneratePayload,
   ReceiptRead,
+  RefundCreatePayload,
+  RefundRead,
+  RefundWorkflowPayload,
 } from '../types/billing';
 
 /**
@@ -170,11 +173,49 @@ export const billingService = {
     await api.post(`/billing/payments/${id}/deallocate`, payload);
   },
 
-  /* ── Sprint 14A.3 — Receipt generation (backend routers/receipt.py) ── */
+  /* ── Sprint 14A.3/14A.5 — Receipt endpoints (backend routers/receipt.py) ── */
 
   /** POST /billing/receipts — generate a receipt for a completed payment (201). */
   async generateReceipt(payload: ReceiptGeneratePayload): Promise<ReceiptRead> {
     const { data } = await api.post<ReceiptRead>('/billing/receipts', payload);
+    return data;
+  },
+
+  /** GET /billing/receipts/{id} — full receipt aggregate. */
+  async getReceipt(id: string): Promise<ReceiptRead> {
+    const { data } = await api.get<ReceiptRead>(`/billing/receipts/${id}`);
+    return data;
+  },
+
+  /** POST /billing/receipts/{id}/regenerate — re-produce an existing receipt (200). */
+  async regenerateReceipt(id: string): Promise<ReceiptRead> {
+    const { data } = await api.post<ReceiptRead>(`/billing/receipts/${id}/regenerate`);
+    return data;
+  },
+
+  /* ── Sprint 14A.5 — Refund endpoints (backend routers/refund.py) ── */
+
+  /** POST /billing/refunds — create a refund request in Pending status (201). */
+  async createRefund(payload: RefundCreatePayload): Promise<RefundRead> {
+    const { data } = await api.post<RefundRead>('/billing/refunds', payload);
+    return data;
+  },
+
+  /** POST /billing/refunds/{id}/approve — approve a Pending refund. */
+  async approveRefund(id: string): Promise<RefundRead> {
+    const { data } = await api.post<RefundRead>(`/billing/refunds/${id}/approve`);
+    return data;
+  },
+
+  /** POST /billing/refunds/{id}/reject — reject a Pending refund (reason required). */
+  async rejectRefund(id: string, payload: RefundWorkflowPayload): Promise<RefundRead> {
+    const { data } = await api.post<RefundRead>(`/billing/refunds/${id}/reject`, payload);
+    return data;
+  },
+
+  /** POST /billing/refunds/{id}/complete — complete an Approved refund. */
+  async completeRefund(id: string): Promise<RefundRead> {
+    const { data } = await api.post<RefundRead>(`/billing/refunds/${id}/complete`);
     return data;
   },
 

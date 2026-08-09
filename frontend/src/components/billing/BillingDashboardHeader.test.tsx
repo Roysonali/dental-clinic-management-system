@@ -1,8 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { screen } from '@testing-library/react';
+import type { FC } from 'react';
+import { screen, fireEvent } from '@testing-library/react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { renderWithProviders } from '../../test/testUtils';
 import { BillingDashboardHeader } from './BillingDashboardHeader';
-import { ROUTES } from '../../routes/routes';
+import { ROUTES, INVOICE_CREATE_QUERY_PARAM } from '../../routes/routes';
+
+/** Renders the resolved URL (pathname + query) for navigation assertions. */
+const LocationDisplay: FC = () => {
+  const location = useLocation();
+  return (
+    <div data-testid="current-location">
+      {location.pathname}
+      {location.search}
+    </div>
+  );
+};
 
 describe('BillingDashboardHeader', () => {
   it('renders the page title and subtitle', () => {
@@ -12,15 +25,30 @@ describe('BillingDashboardHeader', () => {
     expect(screen.getByText('Clinic financial overview')).toBeInTheDocument();
   });
 
-  it('navigates to the Invoice List route from the New invoice quick action (Phase 2)', () => {
-    // The Invoice workflow ships in Sprint 14A.2, so the header CTA is now a
-    // real shortcut to the list page (its toolbar opens the create drawer).
-    renderWithProviders(<BillingDashboardHeader />);
+  it('navigates to the Invoice List WITH the create intent from the New invoice quick action (Sprint 14A.2.x)', () => {
+    // The dashboard CTA carries the user's create intent through to the list
+    // (`?create=true`), so the drawer opens without a second click.
+    renderWithProviders(
+      <Routes>
+        <Route path="/billing" element={<BillingDashboardHeader />} />
+        <Route
+          path="/billing/invoices"
+          element={
+            <>
+              <div>Invoices page</div>
+              <LocationDisplay />
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/billing' },
+    );
 
-    const newInvoice = screen.getByRole('button', { name: 'New invoice' });
-    expect(newInvoice).toBeEnabled();
-    // No navigation happens in the test renderer — the link resolves to the
-    // route constant (the app-level router owns navigation).
+    fireEvent.click(screen.getByRole('button', { name: 'New invoice' }));
+
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      `${ROUTES.BILLING_INVOICES}?${INVOICE_CREATE_QUERY_PARAM}=true`,
+    );
     expect(ROUTES.BILLING_INVOICES).toBe('/billing/invoices');
   });
 

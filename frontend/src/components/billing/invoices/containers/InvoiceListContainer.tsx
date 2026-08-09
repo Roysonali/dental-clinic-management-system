@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { InvoiceToolbar } from '../InvoiceToolbar';
 import { InvoiceTable } from '../InvoiceTable';
 import { InvoiceListPermission } from '../InvoiceListPermission';
@@ -23,7 +23,7 @@ import {
 } from '../../../../hooks/billing/useInvoiceMutations';
 import { useDoctors } from '../../../../hooks/doctors/useDoctors';
 import { parseApiError } from '../../../../services/apiError';
-import { ROUTES } from '../../../../routes/routes';
+import { ROUTES, INVOICE_CREATE_QUERY_PARAM } from '../../../../routes/routes';
 import { invoiceFormValuesToCreatePayload, editFormValuesToUpdatePayload } from '../../../../utils/invoiceFormUtils';
 import type { SortState } from '../../../common/DataTable';
 import type { InvoiceEditFormValues, InvoiceCreateFormValues } from '../../../../utils/invoiceFormSchema';
@@ -48,10 +48,18 @@ const TOAST_DURATION_MS = 5000;
  *
  * Row actions are state-machine driven (getInvoiceActions) and Delete is
  * admin-gated via PermissionGate in the table.
+ *
+ * Create-intent handoff (Sprint 14A.2.x): the Billing Dashboard's "New
+ * invoice" CTA navigates here with `?create=true`. The intent is derived
+ * directly from the URL (drawer opens on the first render — no flash) and
+ * stripped again the moment the drawer closes, so closing always leaves a
+ * clean `/billing/invoices` URL and browser Back/Forward can never re-open
+ * the drawer unexpectedly.
  */
 export const InvoiceListContainer: FC = () => {
   const navigate = useNavigate();
   const filters = useInvoiceFilters();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -60,7 +68,13 @@ export const InvoiceListContainer: FC = () => {
   const doctorsQuery = useDoctors(); // active doctors, 5-min cache (dropdown)
 
   /* ── Dialog state ────────────────────────────────────────────── */
-  const [createOpen, setCreateOpen] = useState(false);
+  // The create drawer is derived from BOTH the local toolbar/table CTA and
+  // the URL create intent (`/billing/invoices?create=true` from the
+  // dashboard). Deriving keeps setState out of effects and opens the drawer
+  // on the first render when the intent is present.
+  const createRequested = searchParams.get(INVOICE_CREATE_QUERY_PARAM) === 'true';
+  const [createOpenLocal, setCreateOpenLocal] = useState(false);
+  const createOpen = createRequested || createOpenLocal;
   const [createError, setCreateError] = useState<string | null>(null);
   const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({});
 
@@ -142,12 +156,40 @@ export const InvoiceListContainer: FC = () => {
 
   /* ── Handlers ────────────────────────────────────────────────── */
 
+  /**
+   * Remove the URL create intent (`?create=true`) with `replace` so the
+   * history entry becomes a clean `/billing/invoices` — Back/Forward can
+   * never land on a stale intent and re-open the drawer.
+   */
+  const clearCreateIntent = () => {
+    if (!createRequested) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete(INVOICE_CREATE_QUERY_PARAM);
+    setSearchParams(next, { replace: true });
+  };
+
+  const openCreateDrawer = () => {
+    setCreateError(null);
+    setCreateFieldErrors({});
+    setCreateOpenLocal(true);
+  };
+
+  const closeCreateDrawer = () => {
+    setCreateOpenLocal(false);
+    setCreateError(null);
+    setCreateFieldErrors({});
+    clearCreateIntent();
+  };
+
   const handleCreate = (values: InvoiceCreateFormValues) => {
     setCreateError(null);
     setCreateFieldErrors({});
     createMutation.mutate(invoiceFormValuesToCreatePayload(values), {
       onSuccess: (invoice) => {
-        setCreateOpen(false);
+        setCreateOpenLocal(false);
+        // Strip the intent BEFORE navigating so a later Back from the new
+        // invoice's detail page returns to a clean list (no drawer re-open).
+        clearCreateIntent();
         showToast('success', `${invoice.invoice_number} saved as draft`);
         navigate(`${ROUTES.BILLING_INVOICES}/${invoice.id}`);
       },
@@ -248,11 +290,7 @@ export const InvoiceListContainer: FC = () => {
         onSortOrderChange={filters.setSortOrder}
         hasActiveFilters={filters.hasActiveFilters}
         onClearFilters={filters.clearFilters}
-        onCreate={() => {
-          setCreateError(null);
-          setCreateFieldErrors({});
-          setCreateOpen(true);
-        }}
+        onCreate={openCreateDrawer}
       />
 
       <InvoiceTable
@@ -281,11 +319,7 @@ export const InvoiceListContainer: FC = () => {
           setDeleteError(null);
           setDeleteTarget(inv);
         }}
-        onCreate={() => {
-          setCreateError(null);
-          setCreateFieldErrors({});
-          setCreateOpen(true);
-        }}
+        onCreate={openCreateDrawer}
         onClearFilters={filters.clearFilters}
         hasActiveFilters={filters.hasActiveFilters}
       />
@@ -314,11 +348,7 @@ export const InvoiceListContainer: FC = () => {
 
       <CreateInvoiceDrawer
         open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setCreateError(null);
-          setCreateFieldErrors({});
-        }}
+        onClose={closeCreateDrawer}
         onSubmit={handleCreate}
         submitting={createMutation.isPending}
         serverErrors={createFieldErrors}

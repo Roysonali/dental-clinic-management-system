@@ -212,6 +212,26 @@ export const RECEIPT_STATUS_VARIANTS: Record<'generated' | 'cancelled', BadgeVar
   cancelled: 'neutral',
 };
 
+/* ── Refund presentation (backend `RefundStatus` enum) ────────────── */
+
+/**
+ * Refund status → BadgeVariant map.
+ *
+ * pending → warning, approved → info (still needs completion),
+ * rejected → danger (terminal), completed → success (terminal).
+ */
+export const REFUND_STATUS_VARIANTS: Record<'pending' | 'approved' | 'rejected' | 'completed', BadgeVariant> = {
+  pending: 'warning',
+  approved: 'info',
+  rejected: 'danger',
+  completed: 'success',
+};
+
+/** `RefundCreateRequest.reason` max length (backend schema — 1000). */
+export const REFUND_REASON_MAX_LENGTH = 1000;
+/** `RefundWorkflowRequest.reason` max length (backend schema — 500). */
+export const REFUND_REJECTION_REASON_MAX_LENGTH = 500;
+
 /* ═══════════════════════════════════════════════════════════════════
  * Sprint 14A.4 — Credit Note module
  * ═══════════════════════════════════════════════════════════════════ */

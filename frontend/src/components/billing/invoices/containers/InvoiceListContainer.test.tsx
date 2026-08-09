@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { FC } from 'react';
 import { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
-import { screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { QueryClient } from '@tanstack/react-query';
-import { Routes, Route } from 'react-router-dom';
-import { renderWithProviders } from '../../../../test/testUtils';
+import { screen, fireEvent, waitFor, within, render, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Routes, Route, useLocation, createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { renderWithProviders, createTestQueryClient } from '../../../../test/testUtils';
 import { InvoiceListContainer } from './InvoiceListContainer';
+import { BillingDashboardHeader } from '../../BillingDashboardHeader';
 import { billingService } from '../../../../services/billingService';
 import { doctorService } from '../../../../services/doctorService';
 import { patientService } from '../../../../services/patientService';
@@ -129,6 +131,35 @@ function renderList(route = '/billing/invoices', queryClient?: QueryClient) {
       <Route path="/billing/invoices/:invoiceId" element={<div>Invoice details page</div>} />
     </Routes>,
     { route, queryClient },
+  );
+}
+
+/** Renders the current URL (pathname + query) for create-intent assertions. */
+const LocationDisplay: FC = () => {
+  const location = useLocation();
+  return (
+    <div data-testid="current-location">
+      {location.pathname}
+      {location.search}
+    </div>
+  );
+};
+
+function renderListWithLocation(route: string) {
+  return renderWithProviders(
+    <Routes>
+      <Route
+        path="/billing/invoices"
+        element={
+          <>
+            <InvoiceListContainer />
+            <LocationDisplay />
+          </>
+        }
+      />
+      <Route path="/billing/invoices/:invoiceId" element={<div>Invoice details page</div>} />
+    </Routes>,
+    { route },
   );
 }
 
@@ -338,6 +369,119 @@ describe('InvoiceListContainer', () => {
     await waitFor(() =>
       expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })),
     );
+  });
+
+  /* ── Create-intent handoff (Sprint 14A.2.x) ─────────────────── */
+
+  it('automatically opens the create drawer when mounted with ?create=true (dashboard CTA handoff)', async () => {
+    renderList('/billing/invoices?create=true');
+
+    expect(await screen.findByRole('dialog', { name: 'New invoice' })).toBeInTheDocument();
+  });
+
+  it('does NOT auto-open the create drawer on the plain invoice list route', async () => {
+    renderList();
+    await screen.findByText('INV-01042');
+
+    expect(screen.queryByRole('dialog', { name: 'New invoice' })).not.toBeInTheDocument();
+  });
+
+  it('strips the create query param when the drawer is closed', async () => {
+    renderListWithLocation('/billing/invoices?create=true');
+
+    const dialog = await screen.findByRole('dialog', { name: 'New invoice' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'New invoice' })).not.toBeInTheDocument();
+    });
+    const location = screen.getByTestId('current-location');
+    expect(location).toHaveTextContent('/billing/invoices');
+    expect(location).not.toHaveTextContent('create=true');
+  });
+
+  it('does not re-open the create drawer after saving a draft and navigating back (Back regression guard)', async () => {
+    // Dashboard → New invoice → drawer opens from ?create=true → Save draft
+    // navigates to the new invoice's detail page. Browser Back must return to
+    // a CLEAN list (the intent is stripped on save) — never a stale
+    // ?create=true that re-opens the drawer.
+    createMock.mockResolvedValue({
+      ...invoice,
+      id: 'new-inv',
+      status: 'draft',
+      invoice_number: 'DRAFT-000023',
+    } as never);
+    // The drawer's PatientPicker needs a real patient to search against.
+    patientListMock.mockResolvedValue({
+      items: [patient],
+      total: 1,
+      page: 1,
+      page_size: 10,
+    } as never);
+
+    const router = createMemoryRouter(
+      [
+        { path: '/billing/invoices', element: <InvoiceListContainer /> },
+        { path: '/billing/invoices/:invoiceId', element: <div>Invoice details page</div> },
+      ],
+      { initialEntries: ['/billing/invoices?create=true'], initialIndex: 0 },
+    );
+
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    // Drawer auto-opens from the create intent.
+    const dialog = await screen.findByRole('dialog', { name: 'New invoice' });
+    expect(dialog).toBeInTheDocument();
+
+    // Fill the minimal create form and save (same flow as the happy path).
+    fireEvent.change(within(dialog).getByPlaceholderText('Search patient by name or code…'), {
+      target: { value: 'marcus' },
+    });
+    const option = await screen.findByRole('option', { name: /Marcus Delaney/ }, { timeout: 5000 });
+    fireEvent.click(option);
+
+    fireEvent.change(within(dialog).getByLabelText('Item 1 description'), {
+      target: { value: 'Cleaning' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Item 1 unit price'), {
+      target: { value: '100' },
+    });
+
+    const save = within(dialog).getByRole('button', { name: 'Save draft' });
+    await waitFor(() => expect(save).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(save);
+
+    // Success navigates to the new invoice's detail page.
+    expect(await screen.findByText('Invoice details page')).toBeInTheDocument();
+
+    // Back to the list — the intent was stripped on save, so no drawer.
+    // (Data-router navigation is async, so the act must await it.)
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await screen.findByText('INV-01042');
+    expect(screen.queryByRole('dialog', { name: 'New invoice' })).not.toBeInTheDocument();
+  });
+
+  it('opens the create drawer automatically when launched from the dashboard New invoice CTA', async () => {
+    // End-to-end flow: Dashboard → New invoice (ONE click) → invoice list
+    // mounts with the create intent → the existing CreateInvoiceDrawer opens.
+    renderWithProviders(
+      <Routes>
+        <Route path="/billing" element={<BillingDashboardHeader />} />
+        <Route path="/billing/invoices" element={<InvoiceListContainer />} />
+        <Route path="/billing/invoices/:invoiceId" element={<div>Invoice details page</div>} />
+      </Routes>,
+      { route: '/billing' },
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'New invoice' }));
+
+    expect(await screen.findByRole('dialog', { name: 'New invoice' })).toBeInTheDocument();
   });
 
   it('renders the list root width-constrained (horizontal-overflow regression guard)', async () => {

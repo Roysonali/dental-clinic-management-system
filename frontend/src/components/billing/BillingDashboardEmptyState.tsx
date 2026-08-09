@@ -4,7 +4,7 @@ import { Receipt, CreditCard, PlusCircle } from 'lucide-react';
 import { EmptyState } from '../common/EmptyState/EmptyState';
 import { Button } from '../common/Button/Button';
 import { Icon } from '../common/Icon/Icon';
-import { ROUTES } from '../../routes/routes';
+import { ROUTES, INVOICE_CREATE_QUERY_PARAM } from '../../routes/routes';
 
 /**
  * BillingDashboardEmptyState — centered empty state when there is no billing
@@ -12,9 +12,10 @@ import { ROUTES } from '../../routes/routes';
  * backend's own count totals, never from fake data).
  *
  * KPI cards above still show zero values. "New invoice" navigates to the
- * Invoice List route (Phase 2, Sprint 14A.2) and "Record payment" navigates
- * to the Payment List route (Phase 3, Sprint 14A.3) — each list's own header
- * opens its create drawer.
+ * Invoice List route (Phase 2, Sprint 14A.2) WITH the create intent
+ * (`?create=true`) so the list auto-opens its create drawer — the dashboard
+ * CTA carries the user's intent through. "Record payment" navigates to the
+ * Payment List route (Phase 3, Sprint 14A.3).
  */
 export const BillingDashboardEmptyState: FC = () => {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ export const BillingDashboardEmptyState: FC = () => {
         primaryAction={
           <Button
             variant="primary"
-            onClick={() => navigate(ROUTES.BILLING_INVOICES)}
+            onClick={() => navigate(`${ROUTES.BILLING_INVOICES}?${INVOICE_CREATE_QUERY_PARAM}=true`)}
             leftIcon={<Icon icon={PlusCircle} size="sm" />}
           >
             New invoice

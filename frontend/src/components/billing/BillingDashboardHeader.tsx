@@ -4,14 +4,16 @@ import { PlusCircle, CreditCard } from 'lucide-react';
 import { PageHeader } from '../common/PageHeader/PageHeader';
 import { Button } from '../common/Button/Button';
 import { Icon } from '../common/Icon/Icon';
-import { ROUTES } from '../../routes/routes';
+import { ROUTES, INVOICE_CREATE_QUERY_PARAM } from '../../routes/routes';
 
 /**
  * BillingDashboardHeader — page header for the Billing Dashboard.
  *
  * Quick actions are dashboard shortcuts ONLY:
  * - "New invoice" navigates to the Invoice List route (Phase 2, Sprint
- *   14A.2) — the list's own toolbar opens the create drawer.
+ *   14A.2) WITH the create intent (`?create=true`) — the list detects it and
+ *   opens its own create drawer automatically, so the user never clicks
+ *   "New invoice" twice.
  * - "Record payment" navigates to the Payment List route now that Phase 3
  *   (Sprint 14A.3) ships it — the list's own page header opens the Record
  *   Payment drawer.
@@ -37,7 +39,7 @@ export const BillingDashboardHeader: FC = () => {
           </Button>
           <Button
             variant="primary"
-            onClick={() => navigate(ROUTES.BILLING_INVOICES)}
+            onClick={() => navigate(`${ROUTES.BILLING_INVOICES}?${INVOICE_CREATE_QUERY_PARAM}=true`)}
             leftIcon={<Icon icon={PlusCircle} size="sm" />}
           >
             New invoice
