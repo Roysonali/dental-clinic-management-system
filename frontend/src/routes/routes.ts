@@ -37,14 +37,24 @@ export const ROUTES = {
 } as const;
 
 /**
- * Query param name that asks the invoice list to auto-open the create drawer.
+ * Query param name that asks a list page to auto-open its create drawer.
  *
- * The Billing Dashboard's "New invoice" CTA navigates to
- * `/billing/invoices?create=true` so the user lands directly on the invoice
- * creation form — no second click. The invoice list consumes the intent on
- * mount and strips it again when the drawer closes.
+ * Dashboard quick-action CTAs ("New Patient", "Schedule Appointment",
+ * "Create Invoice") navigate to the target list with `?create=true` so the
+ * user lands directly on the creation form — no second click. The list
+ * containers consume the intent on mount and strip it again when the
+ * drawer closes. `INVOICE_CREATE_QUERY_PARAM` is the original billing-only
+ * export kept for backward compatibility — it is the same value.
  */
-export const INVOICE_CREATE_QUERY_PARAM = 'create';
+export const CREATE_QUERY_PARAM = 'create';
+
+/**
+ * Backward-compatible alias for {@link CREATE_QUERY_PARAM} — same value.
+ *
+ * Kept for the billing module (InvoiceListContainer + its tests), which
+ * predates the generic constant and documents the invoice create handoff.
+ */
+export const INVOICE_CREATE_QUERY_PARAM = CREATE_QUERY_PARAM;
 
 /**
  * List routes that render their own compact mobile header (hamburger +

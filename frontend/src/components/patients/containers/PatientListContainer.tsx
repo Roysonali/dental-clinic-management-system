@@ -1,5 +1,5 @@
 import { useState, type FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PatientTable } from '../PatientTable';
 import { Pagination } from '../../common/Pagination/Pagination';
 import { PatientFormContainer } from './PatientFormContainer';
@@ -15,6 +15,7 @@ import { useActivatePatient, useDeactivatePatient } from '../../../hooks/patient
 import { usePermission } from '../../../hooks/rbac/usePermission';
 import { ADMIN_ROLES } from '../../../constants/roles';
 import { parseApiError } from '../../../services/apiError';
+import { CREATE_QUERY_PARAM } from '../../../routes/routes';
 import type { PatientListItem } from '../../../types/patient';
 import type { RowKey } from '../../common/DataTable';
 
@@ -30,6 +31,7 @@ type StatusState = { patient: PatientListItem; intent: PatientStatusIntent } | n
  */
 export const PatientListContainer: FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobileViewport();
 
   const filters = usePatientFilters();
@@ -63,9 +65,22 @@ export const PatientListContainer: FC = () => {
     filters.setPage(1);
   };
 
+  // Dashboard "New Patient" CTA deep-links to /patients?create=true so the
+  // create drawer opens on the first render (mirrors the invoice list's
+  // create-intent handoff). The intent is stripped with `replace` when the
+  // form closes so the URL never re-opens the drawer.
+  const createRequested = searchParams.get(CREATE_QUERY_PARAM) === 'true';
+
   const openCreate = () => setFormState({ mode: 'create' });
   const openEdit = (patient: PatientListItem) => setFormState({ mode: 'edit', patient });
-  const closeForm = () => setFormState(null);
+  const closeForm = () => {
+    setFormState(null);
+    if (createRequested) {
+      const next = new URLSearchParams(searchParams);
+      next.delete(CREATE_QUERY_PARAM);
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   const handleStatusConfirm = () => {
     if (!statusState) return;
@@ -143,7 +158,7 @@ export const PatientListContainer: FC = () => {
 
       <PatientFormContainer
         key={formState?.mode === 'edit' ? formState.patient.id : 'create'}
-        open={formState !== null}
+        open={createRequested || formState !== null}
         mode={formState?.mode ?? 'create'}
         patientId={formState?.mode === 'edit' ? formState.patient.id : null}
         onClose={closeForm}
