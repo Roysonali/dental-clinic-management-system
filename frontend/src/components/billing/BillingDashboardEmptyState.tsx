@@ -4,20 +4,28 @@ import { Receipt, CreditCard, PlusCircle } from 'lucide-react';
 import { EmptyState } from '../common/EmptyState/EmptyState';
 import { Button } from '../common/Button/Button';
 import { Icon } from '../common/Icon/Icon';
-import { ROUTES, INVOICE_CREATE_QUERY_PARAM } from '../../routes/routes';
+import { ROUTES } from '../../routes/routes';
+
+interface BillingDashboardEmptyStateProps {
+  /**
+   * Opens the create-invoice drawer ON the dashboard (the page owns the
+   * open state) — the "New invoice" CTA never routes through the Invoice
+   * List page.
+   */
+  onNewInvoice: () => void;
+}
 
 /**
  * BillingDashboardEmptyState — centered empty state when there is no billing
  * activity (no invoices, payments or credit notes — derived from the
  * backend's own count totals, never from fake data).
  *
- * KPI cards above still show zero values. "New invoice" navigates to the
- * Invoice List route (Phase 2, Sprint 14A.2) WITH the create intent
- * (`?create=true`) so the list auto-opens its create drawer — the dashboard
- * CTA carries the user's intent through. "Record payment" navigates to the
- * Payment List route (Phase 3, Sprint 14A.3).
+ * KPI cards above still show zero values. "New invoice" delegates to
+ * `onNewInvoice` (the dashboard opens its own create drawer directly).
+ * "Record payment" navigates to the Payment List route (Phase 3, Sprint
+ * 14A.3) — its page header opens the Record Payment drawer.
  */
-export const BillingDashboardEmptyState: FC = () => {
+export const BillingDashboardEmptyState: FC<BillingDashboardEmptyStateProps> = ({ onNewInvoice }) => {
   const navigate = useNavigate();
 
   return (
@@ -29,7 +37,7 @@ export const BillingDashboardEmptyState: FC = () => {
         primaryAction={
           <Button
             variant="primary"
-            onClick={() => navigate(`${ROUTES.BILLING_INVOICES}?${INVOICE_CREATE_QUERY_PARAM}=true`)}
+            onClick={onNewInvoice}
             leftIcon={<Icon icon={PlusCircle} size="sm" />}
           >
             New invoice

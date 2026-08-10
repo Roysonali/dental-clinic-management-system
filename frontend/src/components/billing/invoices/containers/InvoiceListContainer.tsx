@@ -19,16 +19,16 @@ import { useInvoices } from '../../../../hooks/billing/useInvoices';
 import { useInvoiceFilters } from '../../../../hooks/billing/useInvoiceFilters';
 import { useInvoice } from '../../../../hooks/billing/useInvoice';
 import {
-  useCreateInvoice,
   useUpdateDraftInvoice,
   useIssueInvoice,
   useCancelInvoice,
   useDeleteInvoice,
 } from '../../../../hooks/billing/useInvoiceMutations';
+import { useInvoiceCreateFlow } from '../../../../hooks/billing/useInvoiceCreateFlow';
 import { useDoctors } from '../../../../hooks/doctors/useDoctors';
 import { parseApiError } from '../../../../services/apiError';
 import { ROUTES, INVOICE_CREATE_QUERY_PARAM } from '../../../../routes/routes';
-import { invoiceFormValuesToCreatePayload, editFormValuesToUpdatePayload } from '../../../../utils/invoiceFormUtils';
+import { editFormValuesToUpdatePayload } from '../../../../utils/invoiceFormUtils';
 import type { SortState } from '../../../common/DataTable';
 import type { InvoiceEditFormValues, InvoiceCreateFormValues } from '../../../../utils/invoiceFormSchema';
 import type { InvoiceListItem, InvoiceSortField } from '../../../../types/billing';
@@ -99,8 +99,6 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
   const createRequested = searchParams.get(INVOICE_CREATE_QUERY_PARAM) === 'true';
   const [createOpenLocal, setCreateOpenLocal] = useState(false);
   const createOpen = createRequested || createOpenProp || createOpenLocal;
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({});
 
   const [issueTarget, setIssueTarget] = useState<InvoiceListItem | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
@@ -116,7 +114,7 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   /* ── Mutations ───────────────────────────────────────────────── */
-  const createMutation = useCreateInvoice();
+  const createFlow = useInvoiceCreateFlow();
   const issueMutation = useIssueInvoice();
   const editMutation = useUpdateDraftInvoice();
   const cancelMutation = useCancelInvoice();
@@ -147,6 +145,14 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
   const showToast = (variant: Toast['variant'], title: string, description?: string) => {
     setToast({ id: `inv-${Date.now()}`, variant, title, description });
   };
+
+  // The local toast renders the list mutations (issue/edit/cancel/delete);
+  // the create flow's success toast (shared useInvoiceCreateFlow) joins the
+  // same stack so there is never more than one notification surface.
+  const toasts = useMemo(
+    () => [toast, createFlow.toast].filter((t): t is Toast => t !== null),
+    [toast, createFlow.toast],
+  );
 
   /* ── 403 → permission state (never auto-retried) ─────────────── */
   if (invoicesQuery.isError) {
@@ -193,40 +199,29 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
   };
 
   const requestCreate = () => {
-    setCreateError(null);
-    setCreateFieldErrors({});
+    createFlow.resetErrors();
     setCreateOpenLocal(true);
     onRequestCreate();
   };
 
   const closeCreateDrawer = () => {
     setCreateOpenLocal(false);
-    setCreateError(null);
-    setCreateFieldErrors({});
+    createFlow.resetErrors();
     clearCreateIntent();
     onCreateClose();
   };
 
   const handleCreate = (values: InvoiceCreateFormValues) => {
-    setCreateError(null);
-    setCreateFieldErrors({});
-    createMutation.mutate(invoiceFormValuesToCreatePayload(values), {
-      onSuccess: (invoice) => {
-        // Strip the intent BEFORE navigating so a later Back from the new
-        // invoice's detail page returns to a clean list (no form re-open).
+    // The shared flow owns the mutation, error mapping, success toast and
+    // post-save navigation. The list's onSuccess only closes its own form
+    // state and strips the URL create intent BEFORE the navigation fires, so
+    // a later Back from the new invoice's detail page returns to a clean
+    // list (no form re-open).
+    createFlow.submit(values, {
+      onSuccess: () => {
         setCreateOpenLocal(false);
         clearCreateIntent();
         onCreateClose();
-        showToast('success', `${invoice.invoice_number} saved as draft`);
-        navigate(`${ROUTES.BILLING_INVOICES}/${invoice.id}`);
-      },
-      onError: (error) => {
-        const info = parseApiError(error);
-        if (info.kind === 'validation' && Object.keys(info.fieldErrors).length > 0) {
-          setCreateFieldErrors(info.fieldErrors);
-        } else {
-          setCreateError(info.message);
-        }
       },
     });
   };
@@ -297,9 +292,9 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
     open: createOpen,
     onClose: closeCreateDrawer,
     onSubmit: handleCreate,
-    submitting: createMutation.isPending,
-    serverErrors: createFieldErrors,
-    serverMessage: createError,
+    submitting: createFlow.submitting,
+    serverErrors: createFlow.serverErrors,
+    serverMessage: createFlow.serverMessage,
   };
 
   return (
@@ -488,8 +483,15 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
         }}
       />
 
-      {toast && (
-        <ToastContainer toasts={[toast]} position="top-right" onDismiss={() => setToast(null)} />
+      {toasts.length > 0 && (
+        <ToastContainer
+          toasts={toasts}
+          position="top-right"
+          onDismiss={(id) => {
+            if (toast?.id === id) setToast(null);
+            if (createFlow.toast?.id === id) createFlow.dismissToast();
+          }}
+        />
       )}
     </div>
   );

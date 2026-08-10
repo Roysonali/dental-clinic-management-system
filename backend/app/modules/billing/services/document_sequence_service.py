@@ -30,7 +30,6 @@ Ownership boundaries
 from __future__ import annotations
 
 import logging
-from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -82,7 +81,7 @@ class DocumentSequenceService(BaseService):
     def reserve_next_number(
         self,
         document_type: str | DocumentType,
-        reserved_by: UUID,
+        reserved_by: int,
     ) -> str:
         """Reserve the next available number for a document type.
 
@@ -99,7 +98,9 @@ class DocumentSequenceService(BaseService):
         Args:
             document_type: The document type key (e.g. ``"invoice"`` or
                 ``DocumentType.INVOICE``).
-            reserved_by: UUID of the user reserving the number.
+            reserved_by: Integer ID of the user reserving the number
+                (``auth.users.id``; persisted as
+                ``SequenceConsumptionLog.reserved_by``).
 
         Returns:
             The formatted document number string (e.g. ``"INV-00001"``).

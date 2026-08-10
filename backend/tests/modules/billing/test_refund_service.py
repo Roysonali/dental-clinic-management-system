@@ -33,6 +33,13 @@ from app.modules.billing.exceptions import (
 from app.modules.billing.models import PaymentAllocation, Refund
 
 
+# auth.users.id is INTEGER — every billing actor/FK column (created_by,
+# reviewed_by, updated_by, changed_by, ...) is Integer. The conftest seeds a
+# stub user with id=1, so all actor IDs MUST be that integer, never a UUID
+# (binding a UUID into an Integer column fails on SQLite and PostgreSQL).
+_STUB_USER_ID = 1
+
+
 # ======================================================================
 # Fixtures
 # ======================================================================
@@ -58,7 +65,7 @@ class TestCreateRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Patient requested refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         assert refund.id is not None
@@ -76,7 +83,7 @@ class TestCreateRefund:
                 payment_id=UUID("00000000-0000-0000-0000-ffffffffffff"),
                 amount=Decimal("50.00"),
                 reason="Test refund",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_create_refund_invalid_payment_status(self, refund_service, payment):
@@ -86,7 +93,7 @@ class TestCreateRefund:
                 payment_id=payment.id,
                 amount=Decimal("50.00"),
                 reason="Test refund",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_create_refund_exceeds_payment(self, refund_service, refund_payment):
@@ -96,7 +103,7 @@ class TestCreateRefund:
                 payment_id=refund_payment.id,
                 amount=Decimal("999999.00"),
                 reason="Over refund",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_create_refund_negative_amount(self, refund_service, refund_payment):
@@ -107,7 +114,7 @@ class TestCreateRefund:
                 payment_id=refund_payment.id,
                 amount=Decimal("-50.00"),
                 reason="Negative refund",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_create_refund_creates_audit(self, refund_service, refund_payment):
@@ -116,7 +123,7 @@ class TestCreateRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Audit test",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         from app.modules.billing.models import BillingAuditLog
@@ -132,7 +139,7 @@ class TestCreateRefund:
             .first()
         )
         assert audit is not None
-        assert audit.changed_by == UUID("00000000-0000-0000-0000-000000000000")
+        assert audit.changed_by == _STUB_USER_ID
 
     def test_create_refund_rollback_on_failure(self, refund_service, refund_payment):
         """Refund creation rolls back on validation failure."""
@@ -145,7 +152,7 @@ class TestCreateRefund:
                 payment_id=refund_payment.id,
                 amount=Decimal("999999.00"),
                 reason="Over refund - should rollback",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
         except RefundExceedsPayment:
             pass
@@ -167,16 +174,16 @@ class TestApproveRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Test refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         approved = refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
 
         assert approved.status == RefundStatus.APPROVED
-        assert approved.reviewed_by == UUID("00000000-0000-0000-0000-000000000001")
+        assert approved.reviewed_by == _STUB_USER_ID
         assert approved.reviewed_at is not None
 
     def test_approve_refund_not_found(self, refund_service):
@@ -184,7 +191,7 @@ class TestApproveRefund:
         with pytest.raises(RefundNotFound):
             refund_service.approve_refund(
                 refund_id=UUID("00000000-0000-0000-0000-ffffffffffff"),
-                approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+                approved_by=_STUB_USER_ID,
             )
 
     def test_approve_refund_invalid_transition(self, refund_service, refund_payment):
@@ -193,21 +200,21 @@ class TestApproveRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Test refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
         refund_service.complete_refund(
             refund_id=refund.id,
-            completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+            completed_by=_STUB_USER_ID,
         )
 
         with pytest.raises(InvalidRefundStatusTransition):
             refund_service.approve_refund(
                 refund_id=refund.id,
-                approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+                approved_by=_STUB_USER_ID,
             )
 
     def test_approve_refund_creates_audit(self, refund_service, refund_payment):
@@ -219,12 +226,12 @@ class TestApproveRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Audit test",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
 
         audit = (
@@ -252,18 +259,18 @@ class TestRejectRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Test refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         rejected = refund_service.reject_refund(
             refund_id=refund.id,
-            rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+            rejected_by=_STUB_USER_ID,
             reason="Policy violation",
         )
 
         assert rejected.status == RefundStatus.REJECTED
         assert rejected.rejection_reason == "Policy violation"
-        assert rejected.reviewed_by == UUID("00000000-0000-0000-0000-000000000001")
+        assert rejected.reviewed_by == _STUB_USER_ID
 
     def test_reject_refund_missing_reason(self, refund_service, refund_payment):
         """Rejecting a refund without a reason raises."""
@@ -271,13 +278,13 @@ class TestRejectRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Test refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         with pytest.raises(RefundValidationFailed):
             refund_service.reject_refund(
                 refund_id=refund.id,
-                rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+                rejected_by=_STUB_USER_ID,
                 reason=None,
             )
 
@@ -290,12 +297,12 @@ class TestRejectRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Audit test",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         refund_service.reject_refund(
             refund_id=refund.id,
-            rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+            rejected_by=_STUB_USER_ID,
             reason="Policy violation",
         )
 
@@ -315,7 +322,7 @@ class TestRejectRefund:
         with pytest.raises(RefundNotFound):
             refund_service.reject_refund(
                 refund_id=UUID("00000000-0000-0000-0000-ffffffffffff"),
-                rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+                rejected_by=_STUB_USER_ID,
                 reason="Not found",
             )
 
@@ -333,16 +340,16 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Test refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
 
         completed = refund_service.complete_refund(
             refund_id=refund.id,
-            completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+            completed_by=_STUB_USER_ID,
         )
 
         assert completed.status == RefundStatus.COMPLETED
@@ -353,15 +360,15 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Test create allocation",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
         refund_service.complete_refund(
             refund_id=refund.id,
-            completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+            completed_by=_STUB_USER_ID,
         )
 
         allocation = (
@@ -382,15 +389,15 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Partial refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
         refund_service.complete_refund(
             refund_id=refund.id,
-            completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+            completed_by=_STUB_USER_ID,
         )
 
         from app.modules.billing.models import Payment
@@ -403,15 +410,15 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("200.00"),
             reason="Full refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
         refund_service.complete_refund(
             refund_id=refund.id,
-            completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+            completed_by=_STUB_USER_ID,
         )
 
         from app.modules.billing.models import Payment
@@ -425,20 +432,20 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("80.00"),
             reason="First partial refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
-        refund_service.approve_refund(refund_id=refund1.id, approved_by=UUID("00000000-0000-0000-0000-000000000001"))
-        refund_service.complete_refund(refund_id=refund1.id, completed_by=UUID("00000000-0000-0000-0000-000000000002"))
+        refund_service.approve_refund(refund_id=refund1.id, approved_by=_STUB_USER_ID)
+        refund_service.complete_refund(refund_id=refund1.id, completed_by=_STUB_USER_ID)
 
         # Second refund for the remainder
         refund2 = refund_service.create_refund(
             payment_id=refund_payment.id,
             amount=Decimal("120.00"),
             reason="Second partial refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
-        refund_service.approve_refund(refund_id=refund2.id, approved_by=UUID("00000000-0000-0000-0000-000000000001"))
-        refund_service.complete_refund(refund_id=refund2.id, completed_by=UUID("00000000-0000-0000-0000-000000000002"))
+        refund_service.approve_refund(refund_id=refund2.id, approved_by=_STUB_USER_ID)
+        refund_service.complete_refund(refund_id=refund2.id, completed_by=_STUB_USER_ID)
 
         from app.modules.billing.models import Payment
         payment = refund_service._db.query(Payment).filter(Payment.id == refund_payment.id).first()
@@ -450,17 +457,17 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("150.00"),
             reason="First refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
-        refund_service.approve_refund(refund_id=refund1.id, approved_by=UUID("00000000-0000-0000-0000-000000000001"))
-        refund_service.complete_refund(refund_id=refund1.id, completed_by=UUID("00000000-0000-0000-0000-000000000002"))
+        refund_service.approve_refund(refund_id=refund1.id, approved_by=_STUB_USER_ID)
+        refund_service.complete_refund(refund_id=refund1.id, completed_by=_STUB_USER_ID)
 
         with pytest.raises(RefundExceedsPayment):
             refund_service.create_refund(
                 payment_id=refund_payment.id,
                 amount=Decimal("100.00"),
                 reason="Over refund",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_complete_refund_not_found(self, refund_service):
@@ -468,7 +475,7 @@ class TestCompleteRefund:
         with pytest.raises(RefundNotFound):
             refund_service.complete_refund(
                 refund_id=UUID("00000000-0000-0000-0000-ffffffffffff"),
-                completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+                completed_by=_STUB_USER_ID,
             )
 
     def test_complete_refund_not_approved(self, refund_service, refund_payment):
@@ -477,13 +484,13 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Skip approval",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
 
         with pytest.raises(InvalidRefundStatusTransition):
             refund_service.complete_refund(
                 refund_id=refund.id,
-                completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+                completed_by=_STUB_USER_ID,
             )
 
     def test_complete_refund_creates_audit(self, refund_service, refund_payment):
@@ -495,10 +502,10 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Audit test",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
-        refund_service.approve_refund(refund_id=refund.id, approved_by=UUID("00000000-0000-0000-0000-000000000001"))
-        refund_service.complete_refund(refund_id=refund.id, completed_by=UUID("00000000-0000-0000-0000-000000000002"))
+        refund_service.approve_refund(refund_id=refund.id, approved_by=_STUB_USER_ID)
+        refund_service.complete_refund(refund_id=refund.id, completed_by=_STUB_USER_ID)
 
         audit = (
             refund_service._db.query(BillingAuditLog)
@@ -519,9 +526,9 @@ class TestCompleteRefund:
             payment_id=refund_payment.id,
             amount=Decimal("50.00"),
             reason="Rollback test",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
-        refund_service.approve_refund(refund_id=refund.id, approved_by=UUID("00000000-0000-0000-0000-000000000001"))
+        refund_service.approve_refund(refund_id=refund.id, approved_by=_STUB_USER_ID)
 
         # Commit the approve so the refund state is persisted
         db.commit()
@@ -537,7 +544,7 @@ class TestCompleteRefund:
             with pytest.raises(RefundCreationFailed):
                 refund_service.complete_refund(
                     refund_id=refund.id,
-                    completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+                    completed_by=_STUB_USER_ID,
                 )
 
         # Rollback the failed transaction so we can read state
@@ -561,7 +568,7 @@ class TestOverRefundPrevention:
             payment_id=refund_payment.id,
             amount=Decimal("120.00"),
             reason="First refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         assert refund1.status == RefundStatus.PENDING
 
@@ -571,7 +578,7 @@ class TestOverRefundPrevention:
                 payment_id=refund_payment.id,
                 amount=Decimal("120.00"),
                 reason="Second refund - should be blocked",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_approved_refund_counts_toward_outstanding(self, refund_service, refund_payment):
@@ -580,11 +587,11 @@ class TestOverRefundPrevention:
             payment_id=refund_payment.id,
             amount=Decimal("150.00"),
             reason="First refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.approve_refund(
             refund_id=refund1.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
 
         # Second refund for 100 would bring outstanding to 250 > 200
@@ -593,7 +600,7 @@ class TestOverRefundPrevention:
                 payment_id=refund_payment.id,
                 amount=Decimal("100.00"),
                 reason="Second refund - should be blocked",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_rejected_refund_does_not_count_toward_outstanding(self, refund_service, refund_payment):
@@ -602,11 +609,11 @@ class TestOverRefundPrevention:
             payment_id=refund_payment.id,
             amount=Decimal("150.00"),
             reason="First refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.reject_refund(
             refund_id=refund1.id,
-            rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+            rejected_by=_STUB_USER_ID,
             reason="Policy violation",
         )
 
@@ -615,7 +622,7 @@ class TestOverRefundPrevention:
             payment_id=refund_payment.id,
             amount=Decimal("150.00"),
             reason="Second refund - should work",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         assert refund2.status == RefundStatus.PENDING
 
@@ -626,17 +633,17 @@ class TestOverRefundPrevention:
             payment_id=refund_payment.id,
             amount=Decimal("80.00"),
             reason="First refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
-        refund_service.approve_refund(refund_id=refund1.id, approved_by=UUID("00000000-0000-0000-0000-000000000001"))
-        refund_service.complete_refund(refund_id=refund1.id, completed_by=UUID("00000000-0000-0000-0000-000000000002"))
+        refund_service.approve_refund(refund_id=refund1.id, approved_by=_STUB_USER_ID)
+        refund_service.complete_refund(refund_id=refund1.id, completed_by=_STUB_USER_ID)
 
         # Create a pending refund for 100 (total outstanding = 180, ok)
         refund2 = refund_service.create_refund(
             payment_id=refund_payment.id,
             amount=Decimal("100.00"),
             reason="Second refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         assert refund2.status == RefundStatus.PENDING
 
@@ -646,7 +653,7 @@ class TestOverRefundPrevention:
                 payment_id=refund_payment.id,
                 amount=Decimal("50.00"),
                 reason="Third refund - should be blocked",
-                created_by=UUID("00000000-0000-0000-0000-000000000000"),
+                created_by=_STUB_USER_ID,
             )
 
     def test_complete_refund_guards_against_over_allocation(self, refund_service, refund_payment):
@@ -656,10 +663,10 @@ class TestOverRefundPrevention:
             payment_id=refund_payment.id,
             amount=Decimal("200.00"),
             reason="Full refund",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
-        refund_service.approve_refund(refund_id=refund.id, approved_by=UUID("00000000-0000-0000-0000-000000000001"))
-        refund_service.complete_refund(refund_id=refund.id, completed_by=UUID("00000000-0000-0000-0000-000000000002"))
+        refund_service.approve_refund(refund_id=refund.id, approved_by=_STUB_USER_ID)
+        refund_service.complete_refund(refund_id=refund.id, completed_by=_STUB_USER_ID)
 
         # Payment should now be fully refunded
         from app.modules.billing.models import Payment
@@ -684,19 +691,19 @@ class TestRefundLifecycle:
             payment_id=refund_payment.id,
             amount=Decimal("100.00"),
             reason="Full lifecycle test",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         assert refund.status == RefundStatus.PENDING
 
         refund = refund_service.approve_refund(
             refund_id=refund.id,
-            approved_by=UUID("00000000-0000-0000-0000-000000000001"),
+            approved_by=_STUB_USER_ID,
         )
         assert refund.status == RefundStatus.APPROVED
 
         refund = refund_service.complete_refund(
             refund_id=refund.id,
-            completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+            completed_by=_STUB_USER_ID,
         )
         assert refund.status == RefundStatus.COMPLETED
 
@@ -706,13 +713,13 @@ class TestRefundLifecycle:
             payment_id=refund_payment.id,
             amount=Decimal("100.00"),
             reason="Rejection lifecycle test",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         assert refund.status == RefundStatus.PENDING
 
         refund = refund_service.reject_refund(
             refund_id=refund.id,
-            rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+            rejected_by=_STUB_USER_ID,
             reason="Not eligible",
         )
         assert refund.status == RefundStatus.REJECTED
@@ -723,11 +730,11 @@ class TestRefundLifecycle:
             payment_id=refund_payment.id,
             amount=Decimal("100.00"),
             reason="Already rejected",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.reject_refund(
             refund_id=refund.id,
-            rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+            rejected_by=_STUB_USER_ID,
             reason="Not eligible",
         )
 
@@ -743,16 +750,16 @@ class TestRefundLifecycle:
             payment_id=refund_payment.id,
             amount=Decimal("100.00"),
             reason="Already rejected",
-            created_by=UUID("00000000-0000-0000-0000-000000000000"),
+            created_by=_STUB_USER_ID,
         )
         refund_service.reject_refund(
             refund_id=refund.id,
-            rejected_by=UUID("00000000-0000-0000-0000-000000000001"),
+            rejected_by=_STUB_USER_ID,
             reason="Not eligible",
         )
 
         with pytest.raises(InvalidRefundStatusTransition):
             refund_service.complete_refund(
                 refund_id=refund.id,
-                completed_by=UUID("00000000-0000-0000-0000-000000000002"),
+                completed_by=_STUB_USER_ID,
             )

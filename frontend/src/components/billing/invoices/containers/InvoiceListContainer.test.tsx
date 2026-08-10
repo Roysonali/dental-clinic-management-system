@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Routes, Route, useLocation, createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { renderWithProviders, createTestQueryClient } from '../../../../test/testUtils';
 import { InvoiceListContainer } from './InvoiceListContainer';
-import { BillingDashboardHeader } from '../../BillingDashboardHeader';
 import { billingService } from '../../../../services/billingService';
 import { doctorService } from '../../../../services/doctorService';
 import { patientService } from '../../../../services/patientService';
@@ -467,22 +466,10 @@ describe('InvoiceListContainer', () => {
     expect(screen.queryByRole('dialog', { name: 'New invoice' })).not.toBeInTheDocument();
   });
 
-  it('opens the create drawer automatically when launched from the dashboard New invoice CTA', async () => {
-    // End-to-end flow: Dashboard → New invoice (ONE click) → invoice list
-    // mounts with the create intent → the existing CreateInvoiceDrawer opens.
-    renderWithProviders(
-      <Routes>
-        <Route path="/billing" element={<BillingDashboardHeader />} />
-        <Route path="/billing/invoices" element={<InvoiceListContainer />} />
-        <Route path="/billing/invoices/:invoiceId" element={<div>Invoice details page</div>} />
-      </Routes>,
-      { route: '/billing' },
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'New invoice' }));
-
-    expect(await screen.findByRole('dialog', { name: 'New invoice' })).toBeInTheDocument();
-  });
+  // NOTE: the dashboard "New invoice" CTA no longer navigates here — it opens
+  // its own create drawer on the dashboard (see BillingDashboardPage.test.tsx).
+  // The list still honors the URL create intent (?create=true) for deep
+  // links/back-nav — covered by the Sprint 14A.2.x tests above.
 
   it('renders the list root width-constrained (horizontal-overflow regression guard)', async () => {
     // Sprint 14A.2 remediation: the container root must stretch to the

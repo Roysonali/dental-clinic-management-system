@@ -48,7 +48,8 @@ DASHBOARD_URL = "/billing/dashboard"
 SUMMARY_URL = "/billing/summary"
 
 STUB_PATIENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-STUB_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
+# auth.users.id is INTEGER — billing actor IDs must be integers, never UUIDs.
+STUB_USER_ID = 1
 
 
 # ======================================================================

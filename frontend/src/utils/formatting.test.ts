@@ -52,8 +52,8 @@ describe('formatCurrency', () => {
     expect(formatCurrency('5000.00', 'INR')).toBe('₹5,000.00');
   });
 
-  it('defaults to USD when no currency code is supplied (backend default invoice currency)', () => {
-    expect(formatCurrency('4210.00')).toBe('$4,210.00');
+  it('defaults to INR when no currency code is supplied (Billing presentation currency)', () => {
+    expect(formatCurrency('4210.00')).toBe('₹4,210.00');
   });
 
   it('falls back to a code-prefixed display for unknown currency codes', () => {

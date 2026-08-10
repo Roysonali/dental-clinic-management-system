@@ -138,13 +138,18 @@ export const CURRENCY_OPTIONS: readonly { value: CurrencyCode; label: string }[]
   { value: 'INR', label: 'INR — Indian Rupee' },
 ];
 
-/** Line-item discount types (backend `InvoiceItemBase.discount_type`). */
+/**
+ * Line-item discount types (backend `InvoiceItemBase.discount_type`).
+ *
+ * The fixed-amount label uses the Billing INR presentation symbol (₹) — the
+ * module never presents amounts in USD (see PAYMENT_CURRENCY_CODE).
+ */
 export const INVOICE_DISCOUNT_TYPE_OPTIONS: readonly {
   value: InvoiceDiscountType;
   label: string;
 }[] = [
   { value: 'PERCENTAGE', label: 'Percentage (%)' },
-  { value: 'FIXED_AMOUNT', label: 'Fixed amount ($)' },
+  { value: 'FIXED_AMOUNT', label: 'Fixed amount (₹)' },
 ];
 
 /* ── Field length limits mirrored from backend constants.py ───────── */

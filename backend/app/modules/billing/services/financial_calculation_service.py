@@ -47,6 +47,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Sequence
 from uuid import UUID
 
 from app.modules.billing.constants import MONEY_QUANTIZE_EXPONENT, ZERO_MONEY
@@ -262,6 +263,58 @@ class FinancialCalculationService:
         refunded = self.calculate_invoice_refunded_amount(invoice_id)
         balance = (grand_total - paid + refunded).quantize(MONEY_QUANTIZE_EXPONENT)
         return balance if balance >= ZERO_MONEY else ZERO_MONEY
+
+    def calculate_invoice_balance_totals(
+        self,
+        invoice_ids: Sequence[UUID],
+    ) -> dict[UUID, dict[str, Decimal]]:
+        """Compute balance components for many invoices in one pass.
+
+        Bulk counterpart of :meth:`calculate_invoice_balance_summary` —
+        avoids an N+1 query pattern when read paths return many invoices
+        (e.g. ``GET /billing/invoices``). Uses two repository aggregate
+        queries (grand totals, allocation totals) so the cost is bounded
+        regardless of page size.
+
+        Args:
+            invoice_ids: The invoice UUIDs to compute.
+
+        Returns:
+            A mapping ``{invoice_id: {"grand_total", "paid", "refunded",
+            "outstanding"}}``. Invoices with no line items / allocations
+            resolve to zero values. Duplicate ids are de-duplicated.
+        """
+        unique_ids = list(dict.fromkeys(invoice_ids))
+        if not unique_ids:
+            return {}
+
+        grand_totals = self._invoice_repo.get_grand_totals_for_invoices(unique_ids)
+        allocation_totals = self._invoice_repo.get_allocation_totals_for_invoices(
+            unique_ids
+        )
+
+        result: dict[UUID, dict[str, Decimal]] = {}
+        for invoice_id in unique_ids:
+            grand_total = grand_totals.get(invoice_id, ZERO_MONEY).quantize(
+                MONEY_QUANTIZE_EXPONENT
+            )
+            paid, refunded = allocation_totals.get(
+                invoice_id, (ZERO_MONEY, ZERO_MONEY)
+            )
+            paid = paid.quantize(MONEY_QUANTIZE_EXPONENT)
+            refunded = refunded.quantize(MONEY_QUANTIZE_EXPONENT)
+            outstanding = (grand_total - paid + refunded).quantize(
+                MONEY_QUANTIZE_EXPONENT
+            )
+            if outstanding < ZERO_MONEY:
+                outstanding = ZERO_MONEY
+            result[invoice_id] = {
+                "grand_total": grand_total,
+                "paid": paid,
+                "refunded": refunded,
+                "outstanding": outstanding,
+            }
+        return result
 
     def calculate_invoice_balance_summary(
         self, invoice_id: UUID

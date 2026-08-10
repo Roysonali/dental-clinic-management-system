@@ -10,6 +10,15 @@ import { BillingDashboardLoading } from '../BillingDashboardLoading';
 import { BillingDashboardError } from '../BillingDashboardError';
 import { BillingDashboardPermission } from '../BillingDashboardPermission';
 
+interface BillingDashboardContainerProps {
+  /**
+   * Requests the create-invoice drawer (owned by the page) — wired to the
+   * empty state's "New invoice" CTA so it opens the drawer on the dashboard
+   * directly instead of routing through the Invoice List page.
+   */
+  onRequestCreate?: () => void;
+}
+
 /**
  * BillingDashboardContainer — orchestration for the Billing Dashboard.
  *
@@ -26,7 +35,9 @@ import { BillingDashboardPermission } from '../BillingDashboardPermission';
  *              credit notes — derived from the backend's own count totals)
  * - Populated→ KPI grid, patient summary, recent invoices & payments
  */
-export const BillingDashboardContainer: FC = () => {
+export const BillingDashboardContainer: FC<BillingDashboardContainerProps> = ({
+  onRequestCreate = () => undefined,
+}) => {
   // '' = system-wide dashboard (no patient filter).
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const dashboardQuery = useBillingDashboard(selectedPatientId || undefined);
@@ -66,7 +77,7 @@ export const BillingDashboardContainer: FC = () => {
       <BillingKpiGrid totals={data.totals} />
 
       {isEmpty ? (
-        <BillingDashboardEmptyState />
+        <BillingDashboardEmptyState onNewInvoice={onRequestCreate} />
       ) : (
         <>
           <PatientFinancialSummary

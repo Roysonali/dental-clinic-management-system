@@ -158,6 +158,17 @@ def get_invoice_service(
     )
     audit_repo = AuditRepository(db)
 
+    # Read-time invoice financials (paid / outstanding) are computed by the
+    # authoritative FinancialCalculationService so GET list/detail return
+    # financially correct values without the mapper touching the database.
+    financial_calc_service = FinancialCalculationService(
+        invoice_repo=invoice_repo,
+        payment_repo=PaymentRepository(db),
+        refund_repo=RefundRepository(db),
+        credit_note_repo=CreditNoteRepository(db),
+        financial_validator=financial_validator,
+    )
+
     return InvoiceService(
         db=db,
         invoice_repo=invoice_repo,
@@ -165,6 +176,7 @@ def get_invoice_service(
         financial_validator=financial_validator,
         document_sequence_service=document_sequence_service,
         audit_repo=audit_repo,
+        financial_calc_service=financial_calc_service,
     )
 
 
@@ -471,6 +483,15 @@ def get_billing_orchestration_service(
         sequence_validator=sequence_validator,
     )
 
+    # ── Financial Calculation Service (read-only) ─────────────────────
+    financial_calc_service = FinancialCalculationService(
+        invoice_repo=invoice_repo,
+        payment_repo=payment_repo,
+        refund_repo=refund_repo,
+        credit_note_repo=credit_note_repo,
+        financial_validator=financial_validator,
+    )
+
     # ── Domain services ───────────────────────────────────────────────
     invoice_service = InvoiceService(
         db=db,
@@ -479,6 +500,7 @@ def get_billing_orchestration_service(
         financial_validator=financial_validator,
         document_sequence_service=document_sequence_service,
         audit_repo=audit_repo,
+        financial_calc_service=financial_calc_service,
     )
 
     payment_service = PaymentService(
@@ -519,15 +541,6 @@ def get_billing_orchestration_service(
         financial_validator=financial_validator,
         document_sequence_service=document_sequence_service,
         audit_repo=audit_repo,
-    )
-
-    # ── Financial Calculation Service (read-only) ─────────────────────
-    financial_calc_service = FinancialCalculationService(
-        invoice_repo=invoice_repo,
-        payment_repo=payment_repo,
-        refund_repo=refund_repo,
-        credit_note_repo=credit_note_repo,
-        financial_validator=financial_validator,
     )
 
     # ── Orchestration Service ─────────────────────────────────────────

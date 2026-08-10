@@ -42,7 +42,10 @@ from app.modules.billing.models import BillingAuditLog, CreditNote
 # ======================================================================
 
 _STUB_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
-_STUB_USER_ID = UUID("00000000-0000-0000-0000-000000000000")
+# auth.users.id is INTEGER — every billing actor/FK column (created_by,
+# issued_by, applied_by, changed_by, ...) is Integer. The conftest seeds a
+# stub user with id=1, so all actor IDs MUST be that integer, never a UUID.
+_STUB_USER_ID = 1
 
 
 # ======================================================================
