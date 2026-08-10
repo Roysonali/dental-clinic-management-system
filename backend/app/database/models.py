@@ -1,5 +1,5 @@
 # Authentication
-from app.modules.auth.models import User, Role
+from app.modules.auth.models import User, Role, PasswordResetToken
 
 # Patients
 from app.modules.patients.models import Patient

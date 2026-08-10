@@ -7,6 +7,42 @@ from pydantic import Field
 from pydantic import field_validator
 
 
+def validate_password_complexity(value: str) -> str:
+    """Enforce the project-wide password policy.
+
+    Applies to every endpoint that sets a password (registration and
+    password reset) so the policy is enforced identically everywhere:
+    8–128 characters plus at least one uppercase letter, one lowercase
+    letter, one digit, and one special (non-alphanumeric) character.
+
+    Args:
+        value: The plain-text password.
+
+    Returns:
+        The validated password unchanged.
+
+    Raises:
+        ValueError: If any policy requirement is not met.
+    """
+    if not re.search(r"[A-Z]", value):
+        raise ValueError(
+            "Password must contain at least one uppercase letter"
+        )
+    if not re.search(r"[a-z]", value):
+        raise ValueError(
+            "Password must contain at least one lowercase letter"
+        )
+    if not re.search(r"\d", value):
+        raise ValueError(
+            "Password must contain at least one digit"
+        )
+    if not re.search(r"[^a-zA-Z0-9]", value):
+        raise ValueError(
+            "Password must contain at least one special character"
+        )
+    return value
+
+
 class UserRegister(BaseModel):
     """Request schema for new user registration."""
 
@@ -56,25 +92,9 @@ class UserRegister(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def validate_password_complexity(cls, value: str) -> str:
+    def validate_password_complexity_field(cls, value: str) -> str:
         """Enforce password strength: upper, lower, digit, and special char."""
-        if not re.search(r"[A-Z]", value):
-            raise ValueError(
-                "Password must contain at least one uppercase letter"
-            )
-        if not re.search(r"[a-z]", value):
-            raise ValueError(
-                "Password must contain at least one lowercase letter"
-            )
-        if not re.search(r"\d", value):
-            raise ValueError(
-                "Password must contain at least one digit"
-            )
-        if not re.search(r"[^a-zA-Z0-9]", value):
-            raise ValueError(
-                "Password must contain at least one special character"
-            )
-        return value
+        return validate_password_complexity(value)
 
 
 class RegisterResponse(BaseModel):
@@ -148,6 +168,98 @@ class PendingUserResponse(BaseModel):
         title="Account Status",
         description="Current account lifecycle status.",
         examples=["pending"],
+    )
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request schema for requesting a password reset."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    email: EmailStr = Field(
+        ...,
+        max_length=255,
+        title="Email Address",
+        description="Registered email address to send reset instructions to.",
+        examples=["juan@example.com"],
+    )
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        """Normalize email to lowercase and strip surrounding whitespace."""
+        return value.strip().lower()
+
+
+class ForgotPasswordResponse(BaseModel):
+    """Generic response for a password-reset request.
+
+    Deliberately identical whether or not the account exists — the API must
+    not reveal account existence (anti-enumeration).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    message: str = Field(
+        ...,
+        title="Response Message",
+        description=(
+            "Generic confirmation message that does not reveal whether "
+            "the account exists."
+        ),
+        examples=[
+            "If an account exists for this email address, you will receive password reset instructions."
+        ],
+    )
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request schema for completing a password reset."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    token: str = Field(
+        ...,
+        min_length=16,
+        max_length=256,
+        title="Reset Token",
+        description="The secure reset token received in the reset email.",
+        examples=["abc123..."],
+    )
+
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        title="New Password",
+        description=(
+            "8–128 characters. Must contain at least one uppercase letter, "
+            "one lowercase letter, one digit, and one special character."
+        ),
+        examples=["Secure@Pass1"],
+    )
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_complexity(cls, value: str) -> str:
+        """Enforce the same password policy as registration."""
+        return validate_password_complexity(value)
+
+
+class ResetPasswordResponse(BaseModel):
+    """Response returned after a successful password reset."""
+
+    model_config = ConfigDict(frozen=True)
+
+    message: str = Field(
+        ...,
+        title="Response Message",
+        description="Human-readable confirmation message.",
+        examples=["Your password has been reset successfully."],
     )
 
 

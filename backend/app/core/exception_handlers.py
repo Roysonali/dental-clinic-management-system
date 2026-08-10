@@ -13,6 +13,9 @@ from app.modules.auth.exceptions import (
     EmailAlreadyRegistered,
     InactiveAccount,
     InvalidCredentials,
+    InvalidResetToken,
+    PasswordResetFailed,
+    PasswordResetRequestFailed,
     RegistrationFailed,
     RoleNotFound,
     UserAlreadyActive,
@@ -123,9 +126,12 @@ _AUTH_EXCEPTION_MAP: dict[type[AuthException], int] = {
     UserAlreadyActive: status.HTTP_400_BAD_REQUEST,
     UserAlreadyInactive: status.HTTP_400_BAD_REQUEST,
     RoleNotFound: status.HTTP_404_NOT_FOUND,
+    InvalidResetToken: status.HTTP_400_BAD_REQUEST,
     RegistrationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ApprovalFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
     DeactivationFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    PasswordResetRequestFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    PasswordResetFailed: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
 _USER_EXCEPTION_MAP: dict[type[UserException], int] = {

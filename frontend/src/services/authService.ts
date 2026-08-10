@@ -1,10 +1,14 @@
 import { api } from './api';
 import type {
   CurrentUserResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   LoginResponse,
   PendingUserResponse,
   RegisterRequest,
   RegisterResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
   UserApprovalRequest,
   UserApprovalResponse,
 } from '../types/auth';
@@ -15,6 +19,8 @@ import type {
  * Endpoints mirror the backend `app/modules/auth/routes.py` exactly:
  * - POST   /auth/register              → 201 { message }                    (public)
  * - POST   /auth/login                 → 200 { access_token, token_type }   (public, form-encoded)
+ * - POST   /auth/forgot-password       → 200 { message }                    (public)
+ * - POST   /auth/reset-password        → 200 { message }                    (public)
  * - GET    /auth/me                    → 200 current user profile           (Bearer)
  * - GET    /auth/users/pending         → 200 pending users                  (admin)
  * - PATCH  /auth/users/{id}/approve    → 200 { message }                    (admin)
@@ -43,6 +49,43 @@ export const authService = {
   /** POST /auth/register — JSON (201). */
   async register(payload: RegisterRequest): Promise<RegisterResponse> {
     const { data } = await api.post<RegisterResponse>('/auth/register', payload);
+    return data;
+  },
+
+  /**
+   * POST /auth/forgot-password — public, JSON.
+   *
+   * The backend always returns the same generic message whether or not the
+   * account exists (anti-enumeration), so the UI must never branch on this
+   * response to reveal account existence.
+   */
+  async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
+    const payload: ForgotPasswordRequest = { email };
+    const { data } = await api.post<ForgotPasswordResponse>(
+      '/auth/forgot-password',
+      payload,
+    );
+    return data;
+  },
+
+  /**
+   * POST /auth/reset-password — public, JSON.
+   *
+   * The secure token is the credential; a 400 means the link is invalid,
+   * expired, already used, or revoked.
+   */
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<ResetPasswordResponse> {
+    const payload: ResetPasswordRequest = {
+      token,
+      new_password: newPassword,
+    };
+    const { data } = await api.post<ResetPasswordResponse>(
+      '/auth/reset-password',
+      payload,
+    );
     return data;
   },
 

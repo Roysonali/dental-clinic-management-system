@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import uuid
 
 from datetime import datetime
@@ -48,6 +50,37 @@ def verify_password(
         ``True`` if the password matches the hash, ``False`` otherwise.
     """
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def generate_password_reset_token() -> str:
+    """Generate a cryptographically secure password-reset token.
+
+    Uses :func:`secrets.token_urlsafe`, which draws from the operating
+    system's CSPRNG. 32 bytes of entropy yields a 43-character URL-safe
+    string — not a predictable ID, timestamp, user ID, or JWT access
+    token. Password-reset credentials must never reuse the login JWT
+    mechanism because their security semantics differ.
+
+    Returns:
+        The raw URL-safe token string.
+    """
+    return secrets.token_urlsafe(32)
+
+
+def hash_password_reset_token(token: str) -> str:
+    """Return a SHA-256 hex digest of a password-reset token.
+
+    The raw token is stored nowhere: only this digest is persisted so a
+    database leak does not expose usable reset credentials. The lookup is
+    performed by re-hashing the presented token and comparing digests.
+
+    Args:
+        token: The raw reset token.
+
+    Returns:
+        64-character lowercase hex digest of ``token``.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def create_access_token(

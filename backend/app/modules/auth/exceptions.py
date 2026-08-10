@@ -123,3 +123,42 @@ class DeactivationFailed(AuthException):
             code="DEACTIVATION_FAILED",
             message="Deactivation failed. Please try again later.",
         )
+
+
+class InvalidResetToken(AuthException):
+    """Raised when a password-reset token is missing, malformed, expired,
+    already used, revoked, or otherwise unusable.
+
+    The message is intentionally generic — it must never reveal whether the
+    token existed, which account it belonged to, or why it was rejected.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            code="INVALID_RESET_TOKEN",
+            message="This password reset link is invalid or has expired.",
+        )
+
+
+class PasswordResetRequestFailed(AuthException):
+    """Raised when an unexpected error occurs while requesting a reset.
+
+    Surfaced as a generic 500; the forgot-password endpoint must keep its
+    generic response to avoid account enumeration.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            code="PASSWORD_RESET_REQUEST_FAILED",
+            message="Unable to process the request. Please try again later.",
+        )
+
+
+class PasswordResetFailed(AuthException):
+    """Raised when an unexpected error occurs while resetting a password."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            code="PASSWORD_RESET_FAILED",
+            message="Password reset failed. Please try again later.",
+        )

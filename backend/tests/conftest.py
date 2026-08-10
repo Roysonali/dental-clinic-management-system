@@ -27,7 +27,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database.session import get_db
 from app.modules.auth.routes import router as auth_router
-from app.modules.auth.models import User, Role
+from app.modules.auth.models import User, Role, PasswordResetToken
 from app.core.constants import USER_STATUS_ACTIVE, USER_STATUS_INACTIVE, USER_STATUS_PENDING, ROLE_ADMIN
 from app.core.security import hash_password, create_access_token
 from app.core.exception_handlers import register_exception_handlers
@@ -45,28 +45,12 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 
 @pytest.fixture(scope="function")
-def db():
-    """Create a fresh database with only auth tables for each test."""
-    # Create ONLY the User and Role tables (not patients/appointments which have
-    # PostgreSQL-specific types that don't work with SQLite)
-    User.__table__.create(bind=engine, checkfirst=True)
-    Role.__table__.create(bind=engine, checkfirst=True)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.rollback()
-        session.close()
-        User.__table__.drop(bind=engine, checkfirst=True)
-        Role.__table__.drop(bind=engine, checkfirst=True)
-
-
-@pytest.fixture(scope="function")
 def app():
     """Create a FastAPI app with the auth router and fresh DB per test."""
     # Create tables in a new session for each app instantiation
     User.__table__.create(bind=engine, checkfirst=True)
     Role.__table__.create(bind=engine, checkfirst=True)
+    PasswordResetToken.__table__.create(bind=engine, checkfirst=True)
 
     application = FastAPI(title="DensCare Test")
     application.include_router(auth_router)
@@ -87,17 +71,19 @@ def app():
 def db():
     """Provide a DB session for direct queries in tests.
 
-    Creates the User and Role tables fresh, yields a session,
-    then tears down the tables so each test starts clean.
+    Creates the User, Role, and PasswordResetToken tables fresh, yields a
+    session, then tears down the tables so each test starts clean.
     """
     User.__table__.create(bind=engine, checkfirst=True)
     Role.__table__.create(bind=engine, checkfirst=True)
+    PasswordResetToken.__table__.create(bind=engine, checkfirst=True)
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.rollback()
         session.close()
+        PasswordResetToken.__table__.drop(bind=engine, checkfirst=True)
         User.__table__.drop(bind=engine, checkfirst=True)
         Role.__table__.drop(bind=engine, checkfirst=True)
 
