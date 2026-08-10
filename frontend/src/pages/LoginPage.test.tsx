@@ -67,6 +67,27 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Dashboard')).toBeInTheDocument();
   });
 
+  it('passes remember_me=true to login when "Keep me signed in" is checked', async () => {
+    renderLoginPage();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/Email address/), 'juan@example.com');
+    await user.type(screen.getByLabelText(/Password/), 'Secret@1');
+    await user.click(
+      screen.getByRole('checkbox', { name: /keep me signed in/i }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() =>
+      expect(mockAuth.login).toHaveBeenCalledWith(
+        'juan@example.com',
+        'Secret@1',
+        true,
+      ),
+    );
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+  });
+
   it('surfaces backend error messages when login fails', async () => {
     mockAuth.login.mockRejectedValue(new Error('Invalid email or password'));
     renderLoginPage();
