@@ -13,9 +13,11 @@ import { Icon } from '../../components/common/Icon/Icon';
 import { PageWrapper } from '../../layouts/components/PageWrapper';
 import { ContentContainer } from '../../layouts/components/ContentContainer';
 import { PageHeader } from '../../components/common/PageHeader/PageHeader';
+import { MobileBottomNav } from '../../layouts/components/mobile/MobileBottomNav';
+import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
 import { Badge } from '../../components/common/Badge/Badge';
 import { DashboardStatCard } from './DashboardStatCard';
-import { SectionHeader } from './SectionHeader';
+import { SectionHeader } from '../../components/common/SectionHeader';
 import { QuickActionCard } from './QuickActionCard';
 import { ActivityItem } from './ActivityItem';
 import { UpcomingAppointments } from '../../components/appointments/UpcomingAppointments';
@@ -37,6 +39,7 @@ import { ActiveTreatmentPlansCard } from '../../components/treatmentPlans/Active
  * - Upcoming appointments (live list)
  */
 export const DashboardPage: FC = () => {
+  const isMobile = useIsMobileViewport();
   return (
     <ContentContainer width="wide">
       <PageWrapper>
@@ -65,7 +68,7 @@ export const DashboardPage: FC = () => {
             <DashboardStatCard
               icon={<Icon icon={DollarSign} size="lg" className="text-emerald-500" />}
               label="Revenue Today"
-              value="$4,250"
+              value="₹4,250"
               trend={{ value: "+8%", positive: true }}
             />
             <DashboardStatCard
@@ -133,7 +136,7 @@ export const DashboardPage: FC = () => {
                   icon={Receipt}
                   iconColor="text-amber-500"
                   title="Invoice paid"
-                  description="INV-00123 — $150.00"
+                  description="INV-00123 — ₹150.00"
                   timestamp="1 hour ago"
                 />
                 <ActivityItem
@@ -169,6 +172,9 @@ export const DashboardPage: FC = () => {
           </section>
         </div>
       </PageWrapper>
+
+      {/* Consistent mobile bottom navigation (phone breakpoint only) */}
+      {isMobile && <MobileBottomNav />}
     </ContentContainer>
   );
 };

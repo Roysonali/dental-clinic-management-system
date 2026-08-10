@@ -39,9 +39,11 @@ export interface HeaderProps {
   onOpenCommandPalette?: () => void;
   /** Dynamic page title derived from the current route */
   pageTitle?: string;
+  /** Mobile navigation drawer open state (drives hamburger aria-expanded) */
+  mobileDrawerOpen?: boolean;
 }
 
-export const Header: FC<HeaderProps> = ({ onToggleSidebar, onOpenCommandPalette, pageTitle }) => {
+export const Header: FC<HeaderProps> = ({ onToggleSidebar, onOpenCommandPalette, pageTitle, mobileDrawerOpen }) => {
   return (
     <header
       className="flex h-[var(--header-height)] shrink-0 items-center border-b border-neutral-200 bg-white px-4 sm:px-6"
@@ -49,7 +51,7 @@ export const Header: FC<HeaderProps> = ({ onToggleSidebar, onOpenCommandPalette,
     >
       <div className="flex w-full items-center gap-4">
         {/* ── Left Section ─────────────────────────────── */}
-        <HeaderLeft onToggleSidebar={onToggleSidebar} pageTitle={pageTitle} />
+        <HeaderLeft onToggleSidebar={onToggleSidebar} pageTitle={pageTitle} mobileDrawerOpen={mobileDrawerOpen} />
 
         {/* ── Center Section (pushes right on mobile) ──── */}
         <div className="ml-auto sm:ml-0">

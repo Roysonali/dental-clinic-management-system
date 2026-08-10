@@ -5,6 +5,10 @@ import { DoctorStatsCards, type DoctorStats } from '../DoctorStatsCards';
 import { Pagination } from '../../common/Pagination/Pagination';
 import { PageHeader } from '../../common/PageHeader/PageHeader';
 import type { ColumnVisibility } from '../../common/DataTable';
+import { MobileDoctorList } from '../mobile/MobileDoctorList';
+import { MobilePageHeader } from '../../../layouts/components/mobile/MobilePageHeader';
+import { MobileBottomNav } from '../../../layouts/components/mobile/MobileBottomNav';
+import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { DoctorFormContainer } from './DoctorFormContainer';
 import { DoctorStatusDialog } from '../DoctorStatusDialog';
 import type { DoctorStatusIntent } from '../DoctorStatusDialog';
@@ -45,6 +49,7 @@ function deriveStats(rows: DoctorResponse[] | undefined, total: number | undefin
  * filtering.
  */
 export const DoctorListContainer: FC = () => {
+  const isMobile = useIsMobileViewport();
   const filters = useDoctorFilters();
   const doctorsQuery = useDoctors(filters.params);
   const specializationsQuery = useSpecializations({ page_size: DOCTOR_MAX_PAGE_SIZE });
@@ -78,6 +83,19 @@ export const DoctorListContainer: FC = () => {
 
   const totalPages = Math.max(1, Math.ceil((doctorsQuery.data?.total ?? 0) / filters.pageSize));
 
+  const hasActiveFilters =
+    filters.searchInput.trim() !== '' ||
+    filters.status !== 'all' ||
+    filters.availability !== 'all' ||
+    filters.specializationId !== null;
+  const clearFilters = () => {
+    filters.setSearchInput('');
+    filters.setStatus('all');
+    filters.setAvailability('all');
+    filters.setSpecialization(null);
+    filters.setPage(1);
+  };
+
   const openCreate = () => setFormState({ mode: 'create' });
   const openEdit = (doctor: DoctorResponse) => setFormState({ mode: 'edit', doctor });
   const closeForm = () => setFormState(null);
@@ -95,6 +113,41 @@ export const DoctorListContainer: FC = () => {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
+      {isMobile ? (
+        <>
+          <MobilePageHeader
+            title="Doctors"
+            addLabel="Register doctor"
+            onAdd={openCreate}
+          />
+          <MobileDoctorList
+            doctors={doctorsQuery.data?.items ?? []}
+            loading={doctorsQuery.isLoading}
+            error={queryError}
+            onRetry={() => void doctorsQuery.refetch()}
+            searchValue={filters.searchInput}
+            onSearchChange={filters.setSearchInput}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            availability={filters.availability}
+            onAvailabilityChange={filters.setAvailability}
+            specializations={specializationsQuery.data?.items ?? []}
+            specializationId={filters.specializationId}
+            onSpecializationChange={filters.setSpecialization}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+            onView={openEdit}
+            page={filters.page}
+            totalPages={totalPages}
+            totalCount={doctorsQuery.data?.total}
+            pageSize={filters.pageSize}
+            onPageChange={filters.setPage}
+            onPageSizeChange={filters.setPageSize}
+          />
+          <MobileBottomNav />
+        </>
+      ) : (
+        <>
       <PageHeader
         title="Doctors"
         subtitle="Search, filter and manage doctor records."
@@ -140,6 +193,8 @@ export const DoctorListContainer: FC = () => {
         totalCount={doctorsQuery.data?.total}
         pageSize={filters.pageSize}
       />
+        </>
+      )}
 
       <DoctorFormContainer
         key={formState?.mode === 'edit' ? formState.doctor.id : 'create'}

@@ -5,6 +5,10 @@ import { Pagination } from '../../common/Pagination/Pagination';
 import { PatientFormContainer } from './PatientFormContainer';
 import { PatientStatusDialog } from '../PatientStatusDialog';
 import type { PatientStatusIntent } from '../PatientStatusDialog';
+import { MobilePatientList } from '../mobile/MobilePatientList';
+import { MobilePageHeader } from '../../../layouts/components/mobile/MobilePageHeader';
+import { MobileBottomNav } from '../../../layouts/components/mobile/MobileBottomNav';
+import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { usePatients } from '../../../hooks/patients/usePatients';
 import { usePatientFilters } from '../../../hooks/patients/usePatientFilters';
 import { useActivatePatient, useDeactivatePatient } from '../../../hooks/patients/usePatientMutations';
@@ -26,6 +30,7 @@ type StatusState = { patient: PatientListItem; intent: PatientStatusIntent } | n
  */
 export const PatientListContainer: FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobileViewport();
 
   const filters = usePatientFilters();
   const patientsQuery = usePatients(filters.params);
@@ -50,6 +55,14 @@ export const PatientListContainer: FC = () => {
 
   const totalPages = Math.max(1, Math.ceil((patientsQuery.data?.total ?? 0) / filters.pageSize));
 
+  const hasActiveFilters =
+    filters.searchInput.trim() !== '' || filters.status !== 'all';
+  const clearFilters = () => {
+    filters.setSearchInput('');
+    filters.setStatus('all');
+    filters.setPage(1);
+  };
+
   const openCreate = () => setFormState({ mode: 'create' });
   const openEdit = (patient: PatientListItem) => setFormState({ mode: 'edit', patient });
   const closeForm = () => setFormState(null);
@@ -67,34 +80,66 @@ export const PatientListContainer: FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <PatientTable
-        patients={patientsQuery.data?.items ?? []}
-        loading={patientsQuery.isLoading}
-        error={queryError}
-        onRetry={() => void patientsQuery.refetch()}
-        searchValue={filters.searchInput}
-        onSearchChange={filters.setSearchInput}
-        searchLoading={patientsQuery.isFetching && !patientsQuery.isPlaceholderData}
-        status={filters.status}
-        onStatusChange={filters.setStatus}
-        onRegister={openCreate}
-        selectable
-        selectedKeys={selectedKeys}
-        onSelectionChange={setSelectedKeys}
-        onView={(patient) => navigate(`/patients/${patient.id}`)}
-        onEdit={openEdit}
-        onDeactivate={canManageStatus ? (patient) => setStatusState({ patient, intent: 'deactivate' }) : undefined}
-        onReactivate={canManageStatus ? (patient) => setStatusState({ patient, intent: 'reactivate' }) : undefined}
-        onRowClick={(patient) => navigate(`/patients/${patient.id}`)}
-      />
+      {isMobile ? (
+        <>
+          <MobilePageHeader
+            title="Patients"
+            addLabel="Register patient"
+            onAdd={openCreate}
+          />
+          <MobilePatientList
+            patients={patientsQuery.data?.items ?? []}
+            loading={patientsQuery.isLoading}
+            error={queryError}
+            onRetry={() => void patientsQuery.refetch()}
+            searchValue={filters.searchInput}
+            onSearchChange={filters.setSearchInput}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+            onView={(patient) => navigate(`/patients/${patient.id}`)}
+            page={filters.page}
+            totalPages={totalPages}
+            totalCount={patientsQuery.data?.total}
+            pageSize={filters.pageSize}
+            onPageChange={filters.setPage}
+            onPageSizeChange={filters.setPageSize}
+          />
+          <MobileBottomNav />
+        </>
+      ) : (
+        <PatientTable
+          patients={patientsQuery.data?.items ?? []}
+          loading={patientsQuery.isLoading}
+          error={queryError}
+          onRetry={() => void patientsQuery.refetch()}
+          searchValue={filters.searchInput}
+          onSearchChange={filters.setSearchInput}
+          searchLoading={patientsQuery.isFetching && !patientsQuery.isPlaceholderData}
+          status={filters.status}
+          onStatusChange={filters.setStatus}
+          onRegister={openCreate}
+          selectable
+          selectedKeys={selectedKeys}
+          onSelectionChange={setSelectedKeys}
+          onView={(patient) => navigate(`/patients/${patient.id}`)}
+          onEdit={openEdit}
+          onDeactivate={canManageStatus ? (patient) => setStatusState({ patient, intent: 'deactivate' }) : undefined}
+          onReactivate={canManageStatus ? (patient) => setStatusState({ patient, intent: 'reactivate' }) : undefined}
+          onRowClick={(patient) => navigate(`/patients/${patient.id}`)}
+        />
+      )}
 
-      <Pagination
-        currentPage={filters.page}
-        totalPages={totalPages}
-        onPageChange={filters.setPage}
-        totalCount={patientsQuery.data?.total}
-        pageSize={filters.pageSize}
-      />
+      {!isMobile && (
+        <Pagination
+          currentPage={filters.page}
+          totalPages={totalPages}
+          onPageChange={filters.setPage}
+          totalCount={patientsQuery.data?.total}
+          pageSize={filters.pageSize}
+        />
+      )}
 
       <PatientFormContainer
         key={formState?.mode === 'edit' ? formState.patient.id : 'create'}

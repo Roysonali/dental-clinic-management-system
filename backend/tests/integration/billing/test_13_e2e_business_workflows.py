@@ -289,8 +289,10 @@ class TestFullPatientVisitCycle:
         assert receipt.status == ReceiptStatus.GENERATED.value
         assert receipt.amount == Decimal("370.00")
 
-        # Verify audit trail captures all events
-        assert _count_audit_entries(db, "invoice", issued.id) >= 2  # created + issued
+        # Verify audit trail captures all events. Note: invoice creation is
+        # tracked via invoice_status_history; BillingAuditLog is written only
+        # on issue/cancel (create_invoice does not emit an audit log entry).
+        assert _count_audit_entries(db, "invoice", issued.id) >= 1  # issued
         assert _count_audit_entries(db, "payment", payment.id) >= 2  # created + completed
         assert _count_audit_entries(db, "receipt", receipt.id) >= 1  # created
 
@@ -424,8 +426,7 @@ class TestRefundLifecycle:
         assert completed.status == RefundStatus.COMPLETED.value
 
         # Verify refund allocation exists
-        pay_repo = PaymentRepository(db)
-        allocations = pay_repo.get_allocations_for_payment(payment.id)
+        allocations = pay_svc.get_allocations(payment.id)
         refund_allocs = [a for a in allocations if a.is_refund]
         assert len(refund_allocs) == 1
         assert refund_allocs[0].allocated_amount == Decimal("200.00")
@@ -638,8 +639,7 @@ class TestMultiInvoiceSettlement:
         assert inv_repo.get_total_allocated_for_invoice(inv_b.id) == Decimal("300.00")
 
         # Verify remaining unallocated on payment (800 - 500 - 300 = 0)
-        pay_repo = PaymentRepository(db)
-        allocations = pay_repo.get_allocations_for_payment(payment.id)
+        allocations = pay_svc.get_allocations(payment.id)
         total_allocated = sum(a.allocated_amount for a in allocations if not a.is_refund)
         assert payment.total_amount - total_allocated == Decimal("0.00")
 
@@ -665,38 +665,65 @@ class TestInvoiceWorkflowStates:
         )
         db.flush()
         assert created.status == InvoiceStatus.DRAFT.value
+        invoice_id = created.id
 
         # Step 2: Issue
-        issued = inv_svc.issue_invoice(created.id, issued_by=STUB_USER_ID)
+        issued = inv_svc.issue_invoice(invoice_id, issued_by=STUB_USER_ID)
         db.flush()
         assert issued.status == InvoiceStatus.ISSUED.value
 
         # Step 3: Cancel
         cancelled = inv_svc.cancel_invoice(
-            created.id, cancelled_by=STUB_USER_ID,
+            invoice_id, cancelled_by=STUB_USER_ID,
             cancellation_reason="Patient cancelled treatment",
         )
         db.flush()
         assert cancelled.status == InvoiceStatus.CANCELLED.value
         assert cancelled.cancellation_reason == "Patient cancelled treatment"
 
+        # Verify invoice has status history (BEFORE any failed-transition
+        # calls — those raise inside the service, which rolls the session back
+        # and expires all ORM instances, so later reads would be unsafe).
+        hist_result = db.execute(
+            text("SELECT COUNT(*) FROM invoice_status_history WHERE invoice_id = CAST(:iid AS UUID)"),
+            {"iid": str(invoice_id)},
+        ).scalar()
+        assert hist_result >= 2  # draft→created, created→issued, issued→cancelled
+
+        # Verify terminal states. Each failed transition triggers a service
+        # rollback that wipes the test transaction (see the integration
+        # conftest's external-transaction model), so each check runs against a
+        # freshly created + cancelled invoice that is created immediately
+        # before the failing call.
+        def _new_cancelled_invoice(number: str):
+            inv = inv_svc.create_invoice(
+                patient_id=STUB_PATIENT_ID,
+                invoice_number=number,
+                items=[{"description": "Consultation", "quantity": 1, "unit_price": Decimal("100.00")}],
+                currency_code="USD", created_by=STUB_USER_ID,
+            )
+            db.flush()
+            inv_svc.issue_invoice(inv.id, issued_by=STUB_USER_ID)
+            db.flush()
+            inv_svc.cancel_invoice(
+                inv.id, cancelled_by=STUB_USER_ID,
+                cancellation_reason="Patient cancelled treatment",
+            )
+            db.flush()
+            return inv.id
+
         # Verify terminal: cannot issue again
         with pytest.raises(InvalidInvoiceStatusTransition):
-            inv_svc.issue_invoice(created.id, issued_by=STUB_USER_ID)
+            inv_svc.issue_invoice(
+                _new_cancelled_invoice("WF007-00002"), issued_by=STUB_USER_ID
+            )
 
         # Verify terminal: cannot cancel again
         with pytest.raises(InvalidInvoiceStatusTransition):
             inv_svc.cancel_invoice(
-                created.id, cancelled_by=STUB_USER_ID,
+                _new_cancelled_invoice("WF007-00003"), cancelled_by=STUB_USER_ID,
                 cancellation_reason="Duplicate cancellation",
             )
-
-        # Verify invoice has status history
-        hist_result = db.execute(
-            text("SELECT COUNT(*) FROM invoice_status_history WHERE invoice_id = CAST(:iid AS UUID)"),
-            {"iid": str(created.id)},
-        ).scalar()
-        assert hist_result >= 2  # draft→created, created→issued, issued→cancelled
 
 
 # ======================================================================
@@ -760,7 +787,7 @@ class TestFullPaymentRefund:
         assert completed_total == Decimal("500.00")
 
         # Verify refund allocations
-        allocations = pay_repo.get_allocations_for_payment(payment.id)
+        allocations = pay_svc.get_allocations(payment.id)
         refund_allocs = [a for a in allocations if a.is_refund]
         assert len(refund_allocs) == 2
         total_refunded = sum(a.allocated_amount for a in refund_allocs)
@@ -984,7 +1011,16 @@ class TestUnauthenticatedAccess:
         app.include_router(billing_router)
         register_exception_handlers(app)
         TestSessionLocal = sessionmaker(bind=pg_engine)
-        app.dependency_overrides[get_db] = lambda: TestSessionLocal()
+
+        def override_get_db():
+            """Yield a session and always close it."""
+            session = TestSessionLocal()
+            try:
+                yield session
+            finally:
+                session.close()
+
+        app.dependency_overrides[get_db] = override_get_db
         client = TestClient(app)
 
         if method == "GET":

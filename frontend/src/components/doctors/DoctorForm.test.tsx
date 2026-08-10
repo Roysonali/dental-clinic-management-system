@@ -159,8 +159,10 @@ describe('DoctorForm', () => {
 
     // Match by visible text — the option button's accessible name is computed
     // from the avatar (aria-label) + name + email + role, so a plain role+name
-    // query is brittle; assert on the row text instead.
-    const option = await screen.findByRole('option', { name: /jose@clinic\.com/i });
+    // query is brittle; assert on the row text instead. Generous timeout: the
+    // search is debounced (350ms) and this file runs under parallel full-suite
+    // load (established DensCare pattern — see invoice drawer tests).
+    const option = await screen.findByRole('option', { name: /jose@clinic\.com/i }, { timeout: 5000 });
     fireEvent.click(option);
 
     fireEvent.change(screen.getByLabelText(/primary phone/i), { target: { value: '+639123456789' } });

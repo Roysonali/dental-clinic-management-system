@@ -5,6 +5,7 @@ import {
   FileText,
   Stethoscope,
   Receipt,
+  CreditCard,
   Package,
   FlaskConical,
   Shield,
@@ -98,9 +99,28 @@ export const NAV_GROUPS: NavGroupConfig[] = [
     items: [
       {
         id: 'billing',
-        label: 'Billing',
+        label: 'Billing Dashboard',
         icon: Receipt,
         route: ROUTES.BILLING,
+        group: 'financial',
+      },
+      {
+        // Invoice list route ships with Phase 2 (Sprint 14A.2); the backend
+        // read/write endpoint set is fully supported, so the item is live.
+        id: 'invoices',
+        label: 'Invoices',
+        icon: FileText,
+        route: ROUTES.BILLING_INVOICES,
+        group: 'financial',
+      },
+      {
+        // Payment list route ships with Phase 3 (Sprint 14A.3); the backend
+        // read/write/workflow endpoint set is fully supported, so the item is
+        // live. No duplicate navigation entries exist.
+        id: 'payments',
+        label: 'Payments',
+        icon: CreditCard,
+        route: ROUTES.BILLING_PAYMENTS,
         group: 'financial',
       },
     ],

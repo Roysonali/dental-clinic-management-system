@@ -22,18 +22,22 @@ interface HeaderPlaceholderProps {
   onOpenCommandPalette?: () => void;
   /** Dynamic page title from route metadata */
   pageTitle?: string;
+  /** Mobile navigation drawer open state (drives hamburger aria-expanded) */
+  mobileDrawerOpen?: boolean;
 }
 
 export const HeaderPlaceholder: FC<HeaderPlaceholderProps> = ({
   onToggleSidebar,
   onOpenCommandPalette,
   pageTitle,
+  mobileDrawerOpen,
 }) => {
   return (
     <Header
       onToggleSidebar={onToggleSidebar}
       onOpenCommandPalette={onOpenCommandPalette}
       pageTitle={pageTitle}
+      mobileDrawerOpen={mobileDrawerOpen}
     />
   );
 };

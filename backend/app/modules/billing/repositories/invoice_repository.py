@@ -573,6 +573,79 @@ class InvoiceRepository:
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def get_grand_totals_for_invoices(
+        self,
+        invoice_ids: Sequence[UUID],
+    ) -> dict[UUID, Decimal]:
+        """Return ``{invoice_id: grand_total}`` for many invoices in one query.
+
+        Persistence-only operation — a single ``SUM(net_amount) GROUP BY``
+        query with no business logic. Invoices without line items (or ids
+        not present in ``invoice_ids``) are omitted from the result.
+        No commit.
+        """
+        if not invoice_ids:
+            return {}
+        stmt = (
+            select(
+                InvoiceItem.invoice_id,
+                func.coalesce(func.sum(InvoiceItem.net_amount), 0),
+            )
+            .where(InvoiceItem.invoice_id.in_(invoice_ids))
+            .group_by(InvoiceItem.invoice_id)
+        )
+        return {
+            row[0]: Decimal(str(row[1]))
+            for row in self.db.execute(stmt).all()
+        }
+
+    def get_allocation_totals_for_invoices(
+        self,
+        invoice_ids: Sequence[UUID],
+    ) -> dict[UUID, tuple[Decimal, Decimal]]:
+        """Return ``{invoice_id: (paid, refunded)}`` for many invoices.
+
+        Persistence-only operation — a single ``GROUP BY`` query computing
+        the sum of non-refund allocations (``paid``) and refund allocations
+        (``refunded``) per invoice. Invoices without allocations are omitted
+        (callers treat a missing key as zero). No commit.
+        """
+        from sqlalchemy import case
+
+        if not invoice_ids:
+            return {}
+        paid_expr = func.coalesce(
+            func.sum(
+                case(
+                    (PaymentAllocation.is_refund == False, PaymentAllocation.allocated_amount),
+                    else_=0,
+                )
+            ),
+            0,
+        )
+        refunded_expr = func.coalesce(
+            func.sum(
+                case(
+                    (PaymentAllocation.is_refund == True, PaymentAllocation.allocated_amount),
+                    else_=0,
+                )
+            ),
+            0,
+        )
+        stmt = (
+            select(
+                PaymentAllocation.invoice_id,
+                paid_expr,
+                refunded_expr,
+            )
+            .where(PaymentAllocation.invoice_id.in_(invoice_ids))
+            .group_by(PaymentAllocation.invoice_id)
+        )
+        return {
+            row[0]: (Decimal(str(row[1])), Decimal(str(row[2])))
+            for row in self.db.execute(stmt).all()
+        }
+
     def get_total_allocated_for_invoice(self, invoice_id: UUID) -> Decimal:
         """Compute the total non-refund amount allocated to an invoice.
 

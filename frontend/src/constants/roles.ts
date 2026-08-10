@@ -53,6 +53,53 @@ export const ADMIN_ROLES: readonly RoleName[] = [
   ROLES.CHIEF_DOCTOR,
 ] as const;
 
+/**
+ * Roles permitted to perform credit note workflow operations
+ * (issue / apply / void).
+ *
+ * Mirrors `_CREDIT_NOTE_WORKFLOW_ROLES` in
+ * `backend/app/modules/billing/routers/credit_note.py` exactly —
+ * ADMIN, RECEPTIONIST, and all doctor roles. DENTAL_ASSISTANT is
+ * intentionally excluded (create is allowed for every role, but
+ * workflow transitions are not).
+ */
+export const CREDIT_NOTE_WORKFLOW_ROLES: readonly RoleName[] = [
+  ROLES.ADMIN,
+  ROLES.RECEPTIONIST,
+  ...DOCTOR_ROLES,
+] as const;
+
+/**
+ * Roles permitted to regenerate receipts.
+ *
+ * Mirrors `_RECEIPT_WORKFLOW_ROLES` in
+ * `backend/app/modules/billing/routers/receipt.py` exactly —
+ * ADMIN, RECEPTIONIST, and all doctor roles. DENTAL_ASSISTANT is
+ * excluded (read + generate are allowed for every role, but
+ * regeneration is a workflow operation).
+ */
+export const RECEIPT_WORKFLOW_ROLES: readonly RoleName[] = [
+  ROLES.ADMIN,
+  ROLES.RECEPTIONIST,
+  ...DOCTOR_ROLES,
+] as const;
+
+/**
+ * Roles permitted to perform refund workflow operations
+ * (approve / reject / complete).
+ *
+ * Mirrors `_REFUND_WORKFLOW_ROLES` in
+ * `backend/app/modules/billing/routers/refund.py` exactly —
+ * ADMIN, RECEPTIONIST, and all doctor roles. DENTAL_ASSISTANT is
+ * excluded (create is allowed for every role, but workflow
+ * transitions are not).
+ */
+export const REFUND_WORKFLOW_ROLES: readonly RoleName[] = [
+  ROLES.ADMIN,
+  ROLES.RECEPTIONIST,
+  ...DOCTOR_ROLES,
+] as const;
+
 /** Check if a role is admin-level (ADMIN or CHIEF_DOCTOR). */
 export const isAdminRole = (role: RoleName): boolean =>
   ADMIN_ROLES.includes(role);

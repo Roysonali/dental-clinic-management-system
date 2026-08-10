@@ -43,7 +43,7 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, Sequence
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -79,6 +79,9 @@ from app.modules.billing.services.base import BaseService
 from app.modules.billing.services.document_sequence_service import (
     DocumentSequenceService,
 )
+from app.modules.billing.services.financial_calculation_service import (
+    FinancialCalculationService,
+)
 from app.modules.billing.validators import (
     FinancialValidator,
     InvoiceValidator,
@@ -109,6 +112,7 @@ class InvoiceService(BaseService):
         financial_validator: FinancialValidator,
         document_sequence_service: DocumentSequenceService,
         audit_repo: AuditRepository,
+        financial_calc_service: FinancialCalculationService | None = None,
     ) -> None:
         super().__init__(db)
         self._invoice_repo = invoice_repo
@@ -116,6 +120,11 @@ class InvoiceService(BaseService):
         self._financial = financial_validator
         self._document_sequence_service = document_sequence_service
         self._audit_repo = audit_repo
+        # Read-time invoice financials (paid / outstanding). When wired, the
+        # service computes these via the authoritative FinancialCalculationService
+        # and attaches them to the ORM aggregate for the mapper to emit — the
+        # mapper never queries the database itself (see InvoiceMapper).
+        self._financial_calc_service = financial_calc_service
 
     # ==================================================================
     # create_invoice
@@ -261,6 +270,9 @@ class InvoiceService(BaseService):
                 str(patient_id),
                 len(invoice.items),
             )
+            # Read-time financials (a fresh draft has no allocations, but the
+            # response must never emit stale zeros by construction).
+            self._attach_financials([invoice])
             return invoice
 
         except (
@@ -387,6 +399,7 @@ class InvoiceService(BaseService):
                 document_number,
                 str(issued_by),
             )
+            self._attach_financials([invoice])
             return invoice
 
         except (
@@ -511,6 +524,9 @@ class InvoiceService(BaseService):
                 invoice.invoice_number,
                 str(cancelled_by),
             )
+            # Cancel can originate from partially-paid/overdue states — the
+            # response must carry the real paid/outstanding amounts.
+            self._attach_financials([invoice])
             return invoice
 
         except (
@@ -609,6 +625,7 @@ class InvoiceService(BaseService):
                 invoice.invoice_number,
                 str(updated_by),
             )
+            self._attach_financials([invoice])
             return invoice
 
         except (
@@ -685,18 +702,24 @@ class InvoiceService(BaseService):
     def get_invoice(self, invoice_id: UUID) -> Invoice:
         """Fetch an invoice by its UUID.
 
-        Read-only operation. No mutation, no commit.
+        Read-only operation. No mutation, no commit. When a
+        ``FinancialCalculationService`` is wired, the invoice's
+        ``paid_amount`` / ``refunded_amount`` / ``outstanding_amount`` are
+        computed and attached to the returned aggregate so the mapper can
+        emit financially correct ``financials``.
 
         Args:
             invoice_id: UUID of the invoice.
 
         Returns:
-            The ``Invoice`` entity.
+            The ``Invoice`` entity (with read-time financials attached when
+            a financial calc service is available).
 
         Raises:
             InvoiceNotFound: If ``invoice_id`` does not resolve.
         """
         invoice = self._invoice_validator.validate_invoice_exists(invoice_id)
+        self._attach_financials([invoice])
         return invoice
 
     # ==================================================================
@@ -735,9 +758,12 @@ class InvoiceService(BaseService):
             sort_order: ``"asc"`` or ``"desc"``.
 
         Returns:
-            A tuple of ``(items, total)``.
+            A tuple of ``(items, total)``. When a ``FinancialCalculationService``
+            is wired, each item carries read-time ``paid_amount`` /
+            ``outstanding_amount`` financials attached by the service (one
+            bulk aggregate query for the whole page — no N+1).
         """
-        return self._invoice_repo.list(
+        items, total = self._invoice_repo.list(
             search=term,
             patient_id=patient_id,
             doctor_id=doctor_id,
@@ -749,10 +775,37 @@ class InvoiceService(BaseService):
             sort_by=sort_by,
             sort_order=sort_order,
         )
+        self._attach_financials(items)
+        return items, total
 
     # ==================================================================
     # Private helpers
     # ==================================================================
+
+    def _attach_financials(self, invoices: Sequence[Invoice]) -> None:
+        """Attach read-time financial values to invoice aggregates.
+
+        Uses the authoritative ``FinancialCalculationService`` bulk method so
+        a page of invoices costs one grand-total query and one allocation
+        query regardless of page size. Values are stored as transient
+        attributes on the ORM instances; the mapper reads them without
+        touching the database.
+
+        Args:
+            invoices: The invoice aggregates to enrich (mutated in place).
+        """
+        if self._financial_calc_service is None or not invoices:
+            return
+        totals = self._financial_calc_service.calculate_invoice_balance_totals(
+            [inv.id for inv in invoices]
+        )
+        for inv in invoices:
+            data = totals.get(inv.id)
+            if data is None:
+                continue
+            inv._billing_paid_amount = data["paid"]
+            inv._billing_refunded_amount = data["refunded"]
+            inv._billing_outstanding_amount = data["outstanding"]
 
     def _validate_and_attach_items(
         self,

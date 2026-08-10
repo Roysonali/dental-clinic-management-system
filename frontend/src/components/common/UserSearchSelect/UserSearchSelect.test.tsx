@@ -80,7 +80,9 @@ describe('UserSearchSelect', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'jose' } });
 
-    const option = await screen.findByRole('option', { name: /Dr\. Jose Rizal/i });
+    // Generous timeout: the search is debounced (350ms) and this file runs
+    // under parallel full-suite load (established DensCare pattern).
+    const option = await screen.findByRole('option', { name: /Dr\. Jose Rizal/i }, { timeout: 5000 });
     fireEvent.click(option);
 
     expect(onChange).toHaveBeenCalledWith('3');

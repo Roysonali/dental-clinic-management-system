@@ -6,6 +6,10 @@ import { TreatmentPlanSummaryCards } from '../TreatmentPlanSummaryCards';
 import { CreatePlanDrawer } from '../dialogs/CreatePlanDrawer';
 import { Pagination } from '../../common/Pagination/Pagination';
 import { ToastContainer, type Toast } from '../../common/Toast';
+import { MobileTreatmentPlanList } from '../mobile/MobileTreatmentPlanList';
+import { MobilePageHeader } from '../../../layouts/components/mobile/MobilePageHeader';
+import { MobileBottomNav } from '../../../layouts/components/mobile/MobileBottomNav';
+import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { useTreatmentPlans } from '../../../hooks/treatmentPlans/useTreatmentPlans';
 import { useTreatmentPlanFilters } from '../../../hooks/treatmentPlans/useTreatmentPlanFilters';
 import { useTreatmentPlanNames } from '../../../hooks/treatmentPlans/useTreatmentPlanNames';
@@ -32,6 +36,7 @@ const TOAST_DURATION_MS = 5000;
  */
 export const TreatmentPlanListContainer: FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobileViewport();
   const filters = useTreatmentPlanFilters();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -113,6 +118,50 @@ export const TreatmentPlanListContainer: FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
+      {isMobile ? (
+        <>
+          <MobilePageHeader
+            title="Treatment Plans"
+            addLabel="New treatment plan"
+            onAdd={() => setCreateOpen(true)}
+          />
+          <MobileTreatmentPlanList
+            plans={enriched}
+            loading={plansQuery.isLoading}
+            error={queryError}
+            onRetry={() => void plansQuery.refetch()}
+            searchValue={filters.searchInput}
+            onSearchChange={filters.setSearchInput}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            active={filters.active}
+            onActiveChange={filters.setActive}
+            doctorId={filters.doctorId}
+            onDoctorChange={filters.setDoctorId}
+            doctorOptions={doctorOptions}
+            doctorsLoading={doctorsQuery.isLoading}
+            dateFrom={filters.dateFrom}
+            onDateFromChange={filters.setDateFrom}
+            dateTo={filters.dateTo}
+            onDateToChange={filters.setDateTo}
+            sortBy={filters.sortBy}
+            onSortByChange={filters.setSortBy}
+            sortOrder={filters.sortOrder}
+            onSortOrderChange={filters.setSortOrder}
+            hasActiveFilters={filters.hasActiveFilters}
+            onClearFilters={filters.clearFilters}
+            onView={(plan) => navigate(`${ROUTES.TREATMENT_PLANS}/${plan.id}`)}
+            page={filters.page}
+            totalPages={totalPages}
+            totalCount={plansQuery.data?.total}
+            pageSize={filters.pageSize}
+            onPageChange={filters.setPage}
+            onPageSizeChange={filters.setPageSize}
+          />
+          <MobileBottomNav />
+        </>
+      ) : (
+        <>
       <TreatmentPlanSummaryCards
         dashboard={dashboardQuery.data}
         loading={dashboardQuery.isLoading}
@@ -173,6 +222,8 @@ export const TreatmentPlanListContainer: FC = () => {
           </select>
         }
       />
+        </>
+      )}
 
       <CreatePlanDrawer
         open={createOpen}

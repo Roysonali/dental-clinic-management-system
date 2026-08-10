@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, type FC, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SidebarPlaceholder } from './SidebarPlaceholder';
 import { HeaderPlaceholder } from './HeaderPlaceholder';
 import { MobileDrawer } from './MobileDrawer';
 import { Workspace } from './Workspace';
+import { MobileNavProvider } from './mobile/MobileNavContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
 import { useGlobalShortcut } from '../../hooks/useGlobalShortcut';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { MOBILE_COMPACT_HEADER_ROUTES } from '../../routes/routes';
 import { CommandPaletteOverlay } from '../../components/common/CommandPalette/CommandPaletteOverlay';
 
 /**
@@ -49,10 +53,20 @@ interface AppShellProps {
 
 export const AppShell: FC<AppShellProps> = ({ children }) => {
   const isMobile = useMediaQuery('(max-width: 1023px)');
+  const isMobileViewport = useIsMobileViewport();
+  const location = useLocation();
   const pageTitle = usePageTitle();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // List pages that render their own compact mobile header (hamburger +
+  // title + add action, reference screens 47/48) hide the global header at
+  // the phone breakpoint. Detail pages and every other route keep the
+  // global header. The compact header's hamburger opens this shell's drawer
+  // via the MobileNavProvider below.
+  const isCompactMobileHeader =
+    isMobileViewport && MOBILE_COMPACT_HEADER_ROUTES.includes(location.pathname);
 
   // ── Global keyboard shortcut: Ctrl/Cmd + K ────────────
   const handleGlobalShortcut = useCallback((e: KeyboardEvent) => {
@@ -80,6 +94,13 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
     }
   }, [isMobile]);
 
+  // While the mobile navigation drawer is open the rest of the app is
+  // made `inert`: pointer interaction, focus and background scrolling of
+  // the main area are all blocked (the drawer panel itself is a sibling
+  // and stays interactive). Backdrop click / Escape close the drawer and
+  // remove `inert`, restoring normal interaction and scroll position.
+  const mainAreaInert = isMobile && mobileDrawerOpen;
+
   const handleCloseMobileDrawer = () => {
     setMobileDrawerOpen(false);
   };
@@ -98,36 +119,46 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
   }, []);
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-white">
-      {/* ── Command Palette Overlay ─────────────────────── */}
-      <CommandPaletteOverlay
-        open={commandPaletteOpen}
-        onClose={handleCloseCommandPalette}
-      />
-
-      {/* ── Mobile Drawer ────────────────────────────────── */}
-      <MobileDrawer
-        open={mobileDrawerOpen}
-        onClose={handleCloseMobileDrawer}
-      />
-
-      {/* ── Desktop Sidebar ──────────────────────────────── */}
-      <SidebarPlaceholder
-        collapsed={sidebarCollapsed}
-        onCollapsedChange={handleSidebarCollapsedChange}
-      />
-
-      {/* ── Main Area ─────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <HeaderPlaceholder
-          pageTitle={pageTitle}
-          onToggleSidebar={handleToggleSidebar}
-          onOpenCommandPalette={handleOpenCommandPalette}
+    <MobileNavProvider
+      value={{ openNav: () => setMobileDrawerOpen(true), isOpen: mobileDrawerOpen }}
+    >
+      <div className="flex h-dvh w-full overflow-hidden bg-white">
+        {/* ── Command Palette Overlay ─────────────────────── */}
+        <CommandPaletteOverlay
+          open={commandPaletteOpen}
+          onClose={handleCloseCommandPalette}
         />
-        <Workspace>
-          {children}
-        </Workspace>
+
+        {/* ── Mobile Drawer ────────────────────────────────── */}
+        <MobileDrawer
+          open={mobileDrawerOpen}
+          onClose={handleCloseMobileDrawer}
+        />
+
+        {/* ── Desktop Sidebar ──────────────────────────────── */}
+        <SidebarPlaceholder
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={handleSidebarCollapsedChange}
+        />
+
+        {/* ── Main Area (inert while the mobile nav drawer is open) ── */}
+        <div
+          className="flex min-w-0 flex-1 flex-col"
+          {...(mainAreaInert ? { inert: true } : {})}
+        >
+          {!isCompactMobileHeader && (
+            <HeaderPlaceholder
+              pageTitle={pageTitle}
+              onToggleSidebar={handleToggleSidebar}
+              onOpenCommandPalette={handleOpenCommandPalette}
+              mobileDrawerOpen={mobileDrawerOpen}
+            />
+          )}
+          <Workspace>
+            {children}
+          </Workspace>
+        </div>
       </div>
-    </div>
+    </MobileNavProvider>
   );
 };

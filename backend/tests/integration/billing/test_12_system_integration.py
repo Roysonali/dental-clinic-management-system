@@ -65,6 +65,7 @@ pytestmark = pytest.mark.postgres
 STUB_TREATMENT_PLAN_ID = uuid.UUID("20000000-0000-0000-0000-000000000001")
 STUB_PLAN_ITEM_ID = uuid.UUID("20000000-0000-0000-0000-000000000002")
 STUB_APPOINTMENT_ID = uuid.UUID("30000000-0000-0000-0000-000000000001")
+STUB_PATIENT_RECORD_ID = uuid.UUID("30000000-0000-0000-0000-000000000002")
 STUB_DIAGNOSIS_ID = uuid.UUID("40000000-0000-0000-0000-000000000001")
 
 
@@ -115,11 +116,13 @@ def cross_module_stubs(db: Session):
     """))
 
     # Treatment Plan (app/modules/treatment/models.py)
+    # NOTE: is_active is NOT NULL (Boolean, default True) — the raw-SQL seed
+    # must supply it explicitly to match the current schema.
     db.execute(text("""
         INSERT INTO treatment_plans (id, plan_code, patient_id, doctor_id, status,
-            current_version, lock_version, created_at, updated_at)
-        VALUES (CAST(:tpid AS UUID), 'TXN-SIT-001', CAST(:pid AS UUID), CAST(:did AS UUID), 'approved',
-            1, 1, NOW(), NOW())
+            current_version, lock_version, is_active, created_at, updated_at)
+        VALUES (CAST(:tpid AS UUID), 'TXN-SIT-001', CAST(:pid AS UUID), CAST(:did AS UUID), 'accepted',
+            1, 1, true, NOW(), NOW())
         ON CONFLICT (id) DO NOTHING
     """), {
         "tpid": str(STUB_TREATMENT_PLAN_ID),
@@ -140,15 +143,30 @@ def cross_module_stubs(db: Session):
         "tpid": str(STUB_TREATMENT_PLAN_ID),
     })
 
-    # Patient Record Diagnosis (app/modules/patient_records/models/diagnosis.py)
+    # Patient Record (app/modules/patient_records/models/patient_record.py)
+    # NOTE: patient_records.appointment_id is UNIQUE and NOT NULL.
     db.execute(text("""
-        INSERT INTO patient_record_diagnoses (id, patient_id, diagnosis_code,
+        INSERT INTO patient_records (id, patient_id, appointment_id, status, chief_complaint,
+            is_finalized, is_deleted)
+        VALUES (CAST(:rid AS UUID), CAST(:pid AS UUID), CAST(:aid AS UUID), 'DRAFT', 'Test complaint',
+            false, false)
+        ON CONFLICT (id) DO NOTHING
+    """), {
+        "rid": str(STUB_PATIENT_RECORD_ID),
+        "pid": str(STUB_PATIENT_ID),
+        "aid": str(STUB_APPOINTMENT_ID),
+    })
+
+    # Patient Record Diagnosis (app/modules/patient_records/models/diagnosis.py)
+    # NOTE: schema is (patient_record_id, diagnosis_type, diagnosis_name, is_deleted)
+    db.execute(text("""
+        INSERT INTO patient_record_diagnoses (id, patient_record_id, diagnosis_type,
             diagnosis_name, is_deleted)
-        VALUES (CAST(:did AS UUID), CAST(:pid AS UUID), 'K04.0', 'Pulpitis', false)
+        VALUES (CAST(:did AS UUID), CAST(:rid AS UUID), 'PROVISIONAL', 'Pulpitis', false)
         ON CONFLICT (id) DO NOTHING
     """), {
         "did": str(STUB_DIAGNOSIS_ID),
-        "pid": str(STUB_PATIENT_ID),
+        "rid": str(STUB_PATIENT_RECORD_ID),
     })
 
     db.flush()
@@ -166,7 +184,17 @@ def _create_sit_app(pg_engine) -> FastAPI:
     app.include_router(billing_router)
     register_exception_handlers(app)
     TestSessionLocal = sessionmaker(bind=pg_engine)
-    app.dependency_overrides[get_db] = lambda: TestSessionLocal()
+
+    def override_get_db():
+        """Yield a session and always close it — prevents leaked connections
+        from blocking the session-scoped drop_all teardown."""
+        session = TestSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
     return app
 
 
@@ -316,12 +344,12 @@ class TestPatientIntegration:
         assert row.patient_code == "P-TEST-001"
 
     def test_patient_filter_on_invoice_search(self, db, cross_module_stubs):
-        """PATIENT-001: InvoiceRepository.search filters by patient_id."""
+        """PATIENT-001: InvoiceRepository.list filters by patient_id."""
         inv = InvoiceFactory.create(db, patient_id=STUB_PATIENT_ID)
         InvoiceItemFactory.create(db, invoice_id=inv.id)
         db.flush()
         repo = InvoiceRepository(db)
-        results, total = repo.search(patient_id=STUB_PATIENT_ID)
+        results, total = repo.find_by_patient(patient_id=STUB_PATIENT_ID)
         assert total >= 1
         assert all(r.patient_id == STUB_PATIENT_ID for r in results)
 
@@ -356,7 +384,7 @@ class TestDoctorIntegration:
             {"iid": str(inv.id)},
         ).fetchone()
         assert row is not None
-        assert row.doctor_code == "D-SIT-001"
+        assert row.doctor_code == "D-TEST-001"  # seeded by integration conftest
 
     def test_doctor_revenue_attribution(self, db, cross_module_stubs):
         """DOCTOR-001: Invoice items aggregated by doctor."""
@@ -367,7 +395,7 @@ class TestDoctorIntegration:
         row = db.execute(
             text("""
                 SELECT COALESCE(SUM(ii.net_amount), 0) as total
-                FROM invoice_items ii JOIN invoices i ON i.id = ii.invoice_id
+                FROM invoice_line_items ii JOIN invoices i ON i.id = ii.invoice_id
                 WHERE i.doctor_id = CAST(:did AS UUID) AND i.status NOT IN ('cancelled', 'void')
             """),
             {"did": str(STUB_DOCTOR_ID)},
@@ -375,12 +403,12 @@ class TestDoctorIntegration:
         assert row.total == Decimal("1500.00")
 
     def test_doctor_filter_on_invoice_search(self, db, cross_module_stubs):
-        """DOCTOR-001: InvoiceRepository.search filters by doctor_id."""
+        """DOCTOR-001: InvoiceRepository.list filters by doctor_id."""
         inv = InvoiceFactory.create(db, patient_id=STUB_PATIENT_ID, doctor_id=STUB_DOCTOR_ID)
         InvoiceItemFactory.create(db, invoice_id=inv.id)
         db.flush()
         repo = InvoiceRepository(db)
-        results, total = repo.search(doctor_id=STUB_DOCTOR_ID)
+        results, total = repo.find_by_doctor(doctor_id=STUB_DOCTOR_ID)
         assert total >= 1
         assert all(r.doctor_id == STUB_DOCTOR_ID for r in results)
 
@@ -446,7 +474,7 @@ class TestTreatmentIntegration:
         row = db.execute(
             text("""
                 SELECT ii.id, p.name as procedure_name
-                FROM invoice_items ii
+                FROM invoice_line_items ii
                 JOIN treatment_plan_items tpi ON tpi.id = ii.plan_item_id
                 JOIN procedures p ON p.id = tpi.procedure_id
                 WHERE ii.id = CAST(:iid AS UUID)
@@ -465,7 +493,7 @@ class TestTreatmentIntegration:
             text("""
                 SELECT i.invoice_number, tp.plan_code, p.name as procedure_name
                 FROM invoices i
-                JOIN invoice_items ii ON ii.invoice_id = i.id
+                JOIN invoice_line_items ii ON ii.invoice_id = i.id
                 LEFT JOIN treatment_plan_items tpi ON tpi.id = ii.plan_item_id
                 LEFT JOIN procedures p ON p.id = tpi.procedure_id
                 LEFT JOIN treatment_plans tp ON tp.id = i.treatment_plan_id
@@ -496,27 +524,27 @@ class TestPatientRecordIntegration:
         item = InvoiceItemFactory.create(db, invoice_id=inv.id, sequence_number=1, diagnosis_id=STUB_DIAGNOSIS_ID)
         db.flush()
         row = db.execute(
-            text("SELECT ii.id, prd.diagnosis_name FROM invoice_items ii JOIN patient_record_diagnoses prd ON prd.id = ii.diagnosis_id WHERE ii.id = CAST(:iid AS UUID)"),
+            text("SELECT ii.id, prd.diagnosis_name FROM invoice_line_items ii JOIN patient_record_diagnoses prd ON prd.id = ii.diagnosis_id WHERE ii.id = CAST(:iid AS UUID)"),
             {"iid": str(item.id)},
         ).fetchone()
         assert row is not None
         assert row.diagnosis_name == "Pulpitis"
 
-    def test_diagnosis_code_traceability(self, db, cross_module_stubs):
-        """PATIENT_RECORD-001: Diagnosis code accessible from invoice context."""
+    def test_diagnosis_type_traceability(self, db, cross_module_stubs):
+        """PATIENT_RECORD-001: Diagnosis type accessible from invoice context."""
         inv = InvoiceFactory.create(db, patient_id=STUB_PATIENT_ID)
         InvoiceItemFactory.create(db, invoice_id=inv.id, sequence_number=1, diagnosis_id=STUB_DIAGNOSIS_ID)
         db.flush()
         row = db.execute(
             text("""
-                SELECT prd.diagnosis_code FROM invoice_items ii
+                SELECT prd.diagnosis_type FROM invoice_line_items ii
                 JOIN patient_record_diagnoses prd ON prd.id = ii.diagnosis_id
                 WHERE ii.invoice_id = CAST(:iid AS UUID)
             """),
             {"iid": str(inv.id)},
         ).fetchone()
         assert row is not None
-        assert row.diagnosis_code == "K04.0"
+        assert row.diagnosis_type == "PROVISIONAL"
 
     def test_nullable_diagnosis(self, db):
         """PATIENT_RECORD-001: Invoice item without diagnosis is valid."""
@@ -603,7 +631,7 @@ class TestCrossEntityFullWorkflow:
             JOIN patients p ON p.id = i.patient_id
             LEFT JOIN doctors d ON d.id = i.doctor_id
             LEFT JOIN treatment_plans tp ON tp.id = i.treatment_plan_id
-            JOIN invoice_items ii ON ii.invoice_id = i.id
+            JOIN invoice_line_items ii ON ii.invoice_id = i.id
             LEFT JOIN treatment_plan_items tpi ON tpi.id = ii.plan_item_id
             JOIN procedures proc ON proc.id = tpi.procedure_id
             LEFT JOIN patient_record_diagnoses prd ON prd.id = ii.diagnosis_id
@@ -614,7 +642,7 @@ class TestCrossEntityFullWorkflow:
 
         assert row is not None
         assert row.patient_code == "P-TEST-001"
-        assert row.doctor_code == "D-SIT-001"
+        assert row.doctor_code == "D-TEST-001"  # seeded by integration conftest
         assert row.plan_code == "TXN-SIT-001"
         assert row.procedure_name == "Root Canal"
         assert row.diagnosis_name == "Pulpitis"
@@ -656,7 +684,7 @@ class TestDashboardIntegration:
     def test_payment_list_by_patient(self, db, cross_module_stubs):
         PaymentFactory.create(db, patient_id=STUB_PATIENT_ID, status="completed", total_amount=Decimal("300.00"))
         db.flush()
-        results, total = PaymentRepository(db).search(patient_id=STUB_PATIENT_ID)
+        results, total = PaymentRepository(db).find_by_patient(patient_id=STUB_PATIENT_ID)
         assert total >= 1
         assert all(p.patient_id == STUB_PATIENT_ID for p in results)
 

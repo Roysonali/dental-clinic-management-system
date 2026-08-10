@@ -10,6 +10,7 @@ const dotColors: Record<BadgeVariant, string> = {
   danger: 'bg-danger',
   info: 'bg-info',
   neutral: 'bg-neutral-400',
+  violet: 'bg-violet-500',
   outline: 'bg-neutral-400',
 };
 

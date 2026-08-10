@@ -469,10 +469,17 @@ class InvoiceMapper:
 
     @staticmethod
     def _compute_financial_summary(invoice: Invoice) -> InvoiceFinancialSummary:
-        """Derive the financial summary from invoice items.
+        """Derive the financial summary from invoice items and allocations.
 
         This is a pure computation — no business rules, no database access.
-        It only transfers existing values.
+        It only transfers existing values. The service layer owns the
+        financial calculation: when ``InvoiceService`` is wired with a
+        ``FinancialCalculationService`` it attaches read-time ``paid`` /
+        ``refunded`` / ``outstanding`` values as transient attributes on the
+        ORM aggregate (``_billing_paid_amount`` etc.), which this mapper reads.
+        When those are absent (e.g. mapper used directly in unit tests) the
+        neutral ``0.00`` defaults are emitted — the mapper never queries the
+        database itself.
 
         Args:
             invoice: An ``Invoice`` ORM instance with items loaded.
@@ -480,9 +487,6 @@ class InvoiceMapper:
         Returns:
             An ``InvoiceFinancialSummary``.
         """
-        paid_amount = Decimal("0.00")
-        outstanding_amount = Decimal("0.00")
-
         if hasattr(invoice, "items") and invoice.items:
             subtotal = sum(
                 (item.unit_price or Decimal("0.00")) * (item.quantity or 0)
@@ -503,6 +507,13 @@ class InvoiceMapper:
             discount_total = Decimal("0.00")
             tax_total = Decimal("0.00")
             grand_total = Decimal("0.00")
+
+        paid_amount = getattr(
+            invoice, "_billing_paid_amount", Decimal("0.00")
+        )
+        outstanding_amount = getattr(
+            invoice, "_billing_outstanding_amount", Decimal("0.00")
+        )
 
         return InvoiceFinancialSummary(
             currency_code=invoice.currency_code,

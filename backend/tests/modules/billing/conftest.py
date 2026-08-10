@@ -74,8 +74,12 @@ from app.modules.billing.models import (  # noqa: E402
 # Stub record IDs
 # ---------------------------------------------------------------------------
 _STUB_PATIENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-_STUB_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
-_STUB_USER_INT_ID = 1
+# auth.users.id is INTEGER — every billing actor/FK column (created_by,
+# changed_by, allocated_by, reserved_by, ...) is Integer. The stub user is
+# seeded below with id=1, so the actor id MUST be the integer 1, never a UUID
+# (a UUID bound into an Integer column fails on SQLite and PostgreSQL alike).
+_STUB_USER_ID = 1  # INTEGER FK to users table
+_STUB_USER_INT_ID = _STUB_USER_ID
 _STUB_DOCTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 _STUB_APPOINTMENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000003")
 _STUB_TREATMENT_PLAN_ID = uuid.UUID("00000000-0000-0000-0000-000000000004")

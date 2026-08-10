@@ -133,7 +133,11 @@ function renderApp(route: string) {
 // The full suite runs many jsdom files in parallel (Windows), so lazy chunk
 // loads + renders can exceed Testing Library's default 1 s wait — use a
 // generous timeout for the async route assertions.
-const WAIT_MS = 8000;
+// Generous shared wait budget: these tests render the whole App (lazy route
+// chunks + full chrome) and the slowest navigation takes ~6s alone — under
+// parallel full-suite load it can exceed 8s, so 15s keeps the budget below
+// the 20s per-test cap while avoiding spurious flakes.
+const WAIT_MS = 15000;
 
 describe('Treatment module — navigation & routing (Sprint 12A.2)', () => {
   beforeEach(() => {

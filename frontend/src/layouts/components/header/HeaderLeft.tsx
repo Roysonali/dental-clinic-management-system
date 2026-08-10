@@ -22,9 +22,11 @@ export interface HeaderLeftProps {
   onToggleSidebar?: () => void;
   /** Dynamic page title from the current route */
   pageTitle?: string;
+  /** Mobile navigation drawer open state (drives hamburger aria-expanded) */
+  mobileDrawerOpen?: boolean;
 }
 
-export const HeaderLeft: FC<HeaderLeftProps> = ({ onToggleSidebar, pageTitle = 'Dashboard' }) => {
+export const HeaderLeft: FC<HeaderLeftProps> = ({ onToggleSidebar, pageTitle = 'Dashboard', mobileDrawerOpen = false }) => {
   return (
     <div className="flex items-center gap-3 min-w-0">
       {/* Sidebar toggle — visible at all breakpoints */}
@@ -33,6 +35,7 @@ export const HeaderLeft: FC<HeaderLeftProps> = ({ onToggleSidebar, pageTitle = '
         variant="ghost"
         size="sm"
         aria-label="Toggle sidebar"
+        aria-expanded={mobileDrawerOpen}
         className="inline-flex"
         onClick={onToggleSidebar}
       />

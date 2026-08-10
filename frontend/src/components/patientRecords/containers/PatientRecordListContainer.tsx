@@ -4,6 +4,10 @@ import { PatientRecordTable } from '../PatientRecordTable';
 import { CreateRecordDrawer } from '../dialogs/CreateRecordDrawer';
 import { Pagination } from '../../common/Pagination/Pagination';
 import { ToastContainer, type Toast } from '../../common/Toast';
+import { MobilePatientRecordList } from '../mobile/MobilePatientRecordList';
+import { MobilePageHeader } from '../../../layouts/components/mobile/MobilePageHeader';
+import { MobileBottomNav } from '../../../layouts/components/mobile/MobileBottomNav';
+import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { usePatientRecords } from '../../../hooks/patientRecords/usePatientRecords';
 import { usePatientRecordFilters } from '../../../hooks/patientRecords/usePatientRecordFilters';
 import { usePatientRecordNames } from '../../../hooks/patientRecords/usePatientRecordNames';
@@ -30,6 +34,7 @@ const TOAST_DURATION_MS = 5000;
  */
 export const PatientRecordListContainer: FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobileViewport();
   const filters = usePatientRecordFilters();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -118,6 +123,43 @@ export const PatientRecordListContainer: FC = () => {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
+      {isMobile ? (
+        <>
+          <MobilePageHeader
+            title="Patient Records"
+            addLabel="Create record"
+            onAdd={() => {
+              setCreateError(null);
+              setCreateFieldErrors({});
+              setConflictAppointmentId(null);
+              setCreateOpen(true);
+            }}
+          />
+          <MobilePatientRecordList
+            records={enriched}
+            loading={recordsQuery.isLoading}
+            error={queryError}
+            onRetry={() => void recordsQuery.refetch()}
+            searchValue={filters.searchInput}
+            onSearchChange={filters.setSearchInput}
+            status={filters.status}
+            onStatusChange={filters.setStatus}
+            finalized={filters.finalized}
+            onFinalizedChange={filters.setFinalized}
+            hasActiveFilters={filters.hasActiveFilters}
+            onClearFilters={filters.clearFilters}
+            onView={(record) => navigate(`${ROUTES.PATIENT_RECORDS}/${record.id}`)}
+            page={filters.page}
+            totalPages={totalPages}
+            totalCount={recordsQuery.data?.total}
+            pageSize={filters.pageSize}
+            onPageChange={filters.setPage}
+            onPageSizeChange={filters.setPageSize}
+          />
+          <MobileBottomNav />
+        </>
+      ) : (
+        <>
       <PatientRecordTable
         records={enriched}
         loading={recordsQuery.isLoading}
@@ -163,6 +205,8 @@ export const PatientRecordListContainer: FC = () => {
           </select>
         }
       />
+        </>
+      )}
 
       <CreateRecordDrawer
         open={createOpen}

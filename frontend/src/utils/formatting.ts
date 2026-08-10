@@ -66,3 +66,61 @@ export const formatFee = (
   if (!Number.isFinite(numeric)) return '—';
   return `${symbol}${numeric.toFixed(2)}`;
 };
+
+/**
+ * Currency-code → symbol mapping for the billing module's supported
+ * currencies (mirrors the backend `CurrencyCode` enum in
+ * `app/modules/billing/enums.py`). Unknown codes fall back to a code-prefixed
+ * display (e.g. `"XYZ 100.00"`) rather than rendering an empty prefix.
+ */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  INR: '₹',
+};
+
+/**
+ * Format a monetary amount with two decimals, thousands grouping, and the
+ * symbol for the given ISO currency code, e.g. `formatCurrency('4210.00', 'INR')`
+ * → "₹4,210.00". Returns "—" for null, undefined, empty strings, and any
+ * value that cannot be coerced to a finite number (numeric strings such as
+ * the backend's quantized Decimal wire format `"15000.00"` are supported).
+ *
+ * Single shared currency formatter for the Billing module (financial data
+ * presentation rules: right-aligned, grouped, 2-dp precision, no ambiguous
+ * signs). Defaults to INR — the Billing presentation currency
+ * (`PAYMENT_CURRENCY_CODE`, the single point of change for Billing INR
+ * display) — so an omitted code can never render an off-currency amount
+ * (aggregated totals like `BillingTotalsResponse` carry no currency code of
+ * their own). The backend's other supported codes (USD/EUR/GBP) remain
+ * formattable when passed explicitly.
+ *
+ * Uses the explicit `en-US` locale so grouping/symbol output is
+ * deterministic across environments (an enterprise financial UI must not
+ * flip formatting with the runtime locale).
+ */
+export function formatCurrency(
+  value: number | string | null | undefined,
+  currencyCode = 'INR',
+): string {
+  if (value === null || value === undefined || value === '') return '—';
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  const grouped = numeric.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const symbol = CURRENCY_SYMBOLS[currencyCode];
+  return symbol ? `${symbol}${grouped}` : `${currencyCode} ${grouped}`;
+}
+
+/**
+ * Format a count with thousands grouping, e.g. `formatCount(1234)` → "1,234".
+ * Returns "—" for null or undefined. Used for count KPIs (paid invoices,
+ * payments, credit notes, etc.).
+ */
+export function formatCount(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return value.toLocaleString('en-US');
+}

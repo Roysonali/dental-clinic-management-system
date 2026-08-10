@@ -1,10 +1,12 @@
 import type { FC, ReactNode } from 'react';
 
 /**
- * SectionHeader — heading row for a dashboard section.
+ * SectionHeader — heading row for a dashboard/landing section.
  *
  * The `id` prop is used by the parent `<section aria-labelledby="...">` to
  * associate the heading with its section landmark for screen readers.
+ *
+ * Shared by the home dashboard and module dashboards (e.g. Billing).
  *
  * @example
  * ```tsx

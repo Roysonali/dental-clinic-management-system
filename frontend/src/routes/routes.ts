@@ -23,8 +23,46 @@ export const ROUTES = {
   PROCEDURES: '/procedures',
   PATIENT_RECORDS: '/patient-records',
   BILLING: '/billing',
+  /** Invoice list (Phase 2 — Sprint 14A.2). */
+  BILLING_INVOICES: '/billing/invoices',
+  /** Credit Note detail (Phase 4 — Sprint 14A.4). */
+  BILLING_CREDIT_NOTES: '/billing/credit-notes',
+  /** Payment list (Phase 3 — Sprint 14A.3). */
+  BILLING_PAYMENTS: '/billing/payments',
+  /** Receipt detail (Phase 5 — Sprint 14A.5). */
+  BILLING_RECEIPTS: '/billing/receipts',
+  /** Refund timeline (Phase 5 — Sprint 14A.5). */
+  BILLING_REFUNDS: '/billing/refunds',
   SETTINGS: '/settings',
 } as const;
+
+/**
+ * Query param name that asks the invoice list to auto-open the create drawer.
+ *
+ * The Billing Dashboard's "New invoice" CTA navigates to
+ * `/billing/invoices?create=true` so the user lands directly on the invoice
+ * creation form — no second click. The invoice list consumes the intent on
+ * mount and strips it again when the drawer closes.
+ */
+export const INVOICE_CREATE_QUERY_PARAM = 'create';
+
+/**
+ * List routes that render their own compact mobile header (hamburger +
+ * page title + add action, reference screens 47/48) on the phone breakpoint
+ * and therefore hide the global header there. Detail pages keep the global
+ * header. Single source of truth shared by AppShell (header hiding) and the
+ * list pages themselves.
+ */
+export const MOBILE_COMPACT_HEADER_ROUTES: readonly string[] = [
+  ROUTES.BILLING_INVOICES,
+  ROUTES.BILLING_PAYMENTS,
+  ROUTES.PATIENTS,
+  ROUTES.APPOINTMENTS,
+  ROUTES.TREATMENT_PLANS,
+  ROUTES.PATIENT_RECORDS,
+  ROUTES.DOCTORS,
+  ROUTES.USERS,
+] as const;
 
 /** Auth route paths */
 export type AuthRoute = (typeof ROUTES.AUTH)[keyof typeof ROUTES.AUTH];

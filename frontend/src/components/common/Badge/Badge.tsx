@@ -13,6 +13,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   danger: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200/60',
   info: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/60',
   neutral: 'bg-neutral-100 text-neutral-600 ring-1 ring-inset ring-neutral-200/60',
+  violet: 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200/60',
   outline: 'bg-transparent text-neutral-600 border border-neutral-300',
 };
 
@@ -36,6 +37,7 @@ const dotColors: Record<BadgeVariant, string> = {
   danger: 'bg-danger',
   info: 'bg-info',
   neutral: 'bg-neutral-400',
+  violet: 'bg-violet-500',
   outline: 'bg-neutral-400',
 };
 

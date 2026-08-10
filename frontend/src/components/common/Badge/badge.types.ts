@@ -9,6 +9,7 @@ export type BadgeVariant =
   | 'danger'
   | 'info'
   | 'neutral'
+  | 'violet'
   | 'outline';
 
 export type BadgeSize = 'xs' | 'sm' | 'md';

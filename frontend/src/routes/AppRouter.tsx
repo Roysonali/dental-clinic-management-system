@@ -40,6 +40,30 @@ const PatientRecordListPage = lazy(() =>
 const PatientRecordDetailsPage = lazy(() =>
   import('../pages/patientRecords/PatientRecordDetailsPage').then((m) => ({ default: m.PatientRecordDetailsPage })),
 );
+const BillingDashboardPage = lazy(() =>
+  import('../pages/billing/BillingDashboardPage').then((m) => ({ default: m.BillingDashboardPage })),
+);
+const InvoiceListPage = lazy(() =>
+  import('../pages/billing/InvoiceListPage').then((m) => ({ default: m.InvoiceListPage })),
+);
+const InvoiceDetailsPage = lazy(() =>
+  import('../pages/billing/InvoiceDetailsPage').then((m) => ({ default: m.InvoiceDetailsPage })),
+);
+const PaymentListPage = lazy(() =>
+  import('../pages/billing/PaymentListPage').then((m) => ({ default: m.PaymentListPage })),
+);
+const PaymentDetailsPage = lazy(() =>
+  import('../pages/billing/PaymentDetailsPage').then((m) => ({ default: m.PaymentDetailsPage })),
+);
+const CreditNoteDetailsPage = lazy(() =>
+  import('../pages/billing/CreditNoteDetailsPage').then((m) => ({ default: m.CreditNoteDetailsPage })),
+);
+const ReceiptDetailsPage = lazy(() =>
+  import('../pages/billing/ReceiptDetailsPage').then((m) => ({ default: m.ReceiptDetailsPage })),
+);
+const RefundDetailsPage = lazy(() =>
+  import('../pages/billing/RefundDetailsPage').then((m) => ({ default: m.RefundDetailsPage })),
+);
 
 /** Suspense fallback for lazy routes — centred spinner with an accessible label. */
 const RouteFallback: FC = () => (
@@ -216,6 +240,55 @@ const AppRouter = () => {
             <Route
               path={`${ROUTES.PATIENT_RECORDS}/:recordId`}
               element={<PatientRecordDetailsPage />}
+            />
+
+            {/* ── Billing Module (Dashboard / Invoices / Payments) ── */}
+            {/*
+              Every /billing/dashboard endpoint allows ALL roles; the
+              /billing/invoices and /billing/payments READ + WRITE endpoints
+              allow ADMIN / RECEPTIONIST / DENTAL_ASSISTANT / DOCTOR roles
+              (routers/invoice.py `_INVOICE_READ_ROLES` + `_INVOICE_WRITE_ROLES`,
+              routers/payment.py `_PAYMENT_READ_ROLES` + `_PAYMENT_WRITE_ROLES`).
+              DENTAL_ASSISTANT is excluded only from WORKFLOW actions
+              (invoice issue/cancel; payment complete/fail/void/allocate) and
+              DELETE is ADMIN-only. No route carries a client-side role gate
+              because the client cannot resolve non-admin roles — the backend
+              enforces with 403, and the list/detail containers render the
+              permission-denied state in that case (workflow buttons are shown
+              but fail closed server-side). Lazy-loaded for route-level code
+              splitting.
+            */}
+            <Route
+              path={ROUTES.BILLING}
+              element={<BillingDashboardPage />}
+            />
+            <Route
+              path={ROUTES.BILLING_INVOICES}
+              element={<InvoiceListPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_INVOICES}/:invoiceId`}
+              element={<InvoiceDetailsPage />}
+            />
+            <Route
+              path={ROUTES.BILLING_PAYMENTS}
+              element={<PaymentListPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_PAYMENTS}/:paymentId`}
+              element={<PaymentDetailsPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_CREDIT_NOTES}/:creditNoteId`}
+              element={<CreditNoteDetailsPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_RECEIPTS}/:receiptId`}
+              element={<ReceiptDetailsPage />}
+            />
+            <Route
+              path={`${ROUTES.BILLING_REFUNDS}/:refundId`}
+              element={<RefundDetailsPage />}
             />
           </Route>
         </Route>

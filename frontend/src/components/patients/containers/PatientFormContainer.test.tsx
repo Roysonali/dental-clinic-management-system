@@ -50,7 +50,9 @@ function fillValidForm() {
 
   // DOB: open the calendar and pick day 1 of the current month — always valid
   // (never in the future, year >= 1900) regardless of the test run date.
-  fireEvent.click(screen.getByRole('button', { name: 'Select a date' }));
+  // The trigger is label-associated, so query it by its field label (regex —
+  // the required indicator renders as "Date of Birth *").
+  fireEvent.click(screen.getByLabelText(/Date of Birth/));
   fireEvent.click(screen.getByRole('button', { name: '1' }));
 }
 
