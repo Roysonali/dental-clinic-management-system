@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   CalendarCheck,
@@ -7,7 +8,7 @@ import {
   UserPlus,
   CalendarPlus,
   Receipt,
-  Calendar,
+  CalendarClock,
 } from 'lucide-react';
 import { Icon } from '../../components/common/Icon/Icon';
 import { PageWrapper } from '../../layouts/components/PageWrapper';
@@ -22,23 +23,29 @@ import { QuickActionCard } from './QuickActionCard';
 import { ActivityItem } from './ActivityItem';
 import { UpcomingAppointments } from '../../components/appointments/UpcomingAppointments';
 import { ActiveTreatmentPlansCard } from '../../components/treatmentPlans/ActiveTreatmentPlansCard';
+import { ROUTES, CREATE_QUERY_PARAM } from '../../routes/routes';
 
 /**
  * DashboardPage — authenticated landing page.
  *
- * The Overview metrics, Quick Actions and Recent Activity sections remain
- * placeholder content (no backing API); the "My Treatment Plans" section
- * is REAL — ActiveTreatmentPlansCard fetches `by-doctor` plans via the
- * treatment plan service. Upcoming appointments are also live.
+ * The Overview metrics and Recent Activity sections remain placeholder
+ * content (no backing API); the Quick Actions are wired to their real
+ * destinations — each creation CTA deep-links to the target list with
+ * `?create=true` so the create drawer opens directly (the invoice list
+ * already supported this handoff; patients/appointments now mirror it).
+ * The "My Treatment Plans" section is REAL — ActiveTreatmentPlansCard
+ * fetches `by-doctor` plans via the treatment plan service. Upcoming
+ * appointments are also live.
  *
  * Composes:
  * - Statistics grid (4 metric cards, placeholder)
- * - Quick actions (4 action buttons, placeholder)
+ * - Quick actions (4 wired action buttons)
  * - My Treatment Plans (live S-13 widget)
  * - Recent activity (placeholder timeline)
  * - Upcoming appointments (live list)
  */
 export const DashboardPage: FC = () => {
+  const navigate = useNavigate();
   const isMobile = useIsMobileViewport();
   return (
     <ContentContainer width="wide">
@@ -87,18 +94,37 @@ export const DashboardPage: FC = () => {
             <QuickActionCard
               icon={<Icon icon={UserPlus} size="xl" className="text-primary-500" />}
               label="New Patient"
+              onClick={() =>
+                navigate(`${ROUTES.PATIENTS}?${CREATE_QUERY_PARAM}=true`)
+              }
             />
             <QuickActionCard
               icon={<Icon icon={CalendarPlus} size="xl" className="text-success" />}
               label="Schedule Appointment"
+              onClick={() =>
+                navigate(`${ROUTES.APPOINTMENTS}?${CREATE_QUERY_PARAM}=true`)
+              }
             />
             <QuickActionCard
               icon={<Icon icon={Receipt} size="xl" className="text-amber-500" />}
               label="Create Invoice"
+              onClick={() =>
+                navigate(`${ROUTES.BILLING_INVOICES}?${CREATE_QUERY_PARAM}=true`)
+              }
             />
+            {/* No Calendar module exists in the app (routes/nav/config) — the
+                Appointments list is the schedule view, so the CTA surfaces it
+                under an honest label instead of a dead "Calendar" button. */}
             <QuickActionCard
-              icon={<Icon icon={Calendar} size="xl" className="text-info" />}
-              label="View Calendar"
+              icon={
+                <Icon
+                  icon={CalendarClock}
+                  size="xl"
+                  className="text-info"
+                />
+              }
+              label="View Appointments"
+              onClick={() => navigate(ROUTES.APPOINTMENTS)}
             />
           </div>
         </section>

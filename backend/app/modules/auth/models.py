@@ -16,6 +16,88 @@ from app.core.constants import USER_STATUS_INACTIVE
 from app.core.constants import USER_STATUS_PENDING
 
 
+class PasswordResetToken(Base):
+    """A single-use, expiring password-reset credential.
+
+    Only the SHA-256 digest of the raw token is stored — the raw token is
+    handed to the user once (inside the reset email link) and is never
+    persisted or exposed through any API response.
+
+    Lifecycle:
+        * ``used_at`` — set when the token successfully resets a password
+          (single use: a used token is permanently invalid).
+        * ``revoked_at`` — set on all of a user's outstanding tokens when a
+          new reset is requested, invalidating older links.
+        * ``expires_at`` — hard deadline; expired tokens are rejected at
+          lookup time. Expired rows are additionally purged opportunistically
+          when the same user requests a new token (no background jobs exist).
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+        doc="Foreign key to the user who requested the reset",
+    )
+
+    token_hash = Column(
+        String(64),
+        nullable=False,
+        unique=True,
+        index=True,
+        doc="SHA-256 hex digest of the raw reset token (raw token never stored)",
+    )
+
+    expires_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+        doc="UTC timestamp after which the token is rejected",
+    )
+
+    used_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="UTC timestamp when the token was consumed by a successful reset",
+    )
+
+    revoked_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="UTC timestamp when the token was superseded/revoked by a newer request",
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        doc="UTC timestamp when the token was created",
+    )
+
+    user = relationship(
+        "User",
+        passive_deletes=True,
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<PasswordResetToken(id={self.id}, user_id={self.user_id}, "
+            f"expires_at={self.expires_at!r}, used_at={self.used_at!r})>"
+        )
+
+
 class Role(Base):
     """User role for RBAC (e.g. Admin, Doctor, Receptionist).
 

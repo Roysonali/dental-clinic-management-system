@@ -39,16 +39,34 @@
 
 ### 1.2. Environment variables
 
-Create a `.env` file in the `backend/` directory:
+Create a `.env` file in the `backend/` directory (copy from `.env.example`):
 
 ```env
 DATABASE_URL=sqlite:///./test_db.sqlite3
 JWT_SECRET=my32characterslongsupersecretkeyforjwt
 JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Password recovery
+FRONTEND_BASE_URL=http://localhost:5173
+PASSWORD_RESET_TOKEN_EXPIRE_MINUTES=30
+
+# Email delivery (password reset) — see docs/email-delivery.md
+# Leave SMTP_HOST empty to disable sending (dev fallback).
+SMTP_HOST=smtp.sendgrid.net          # e.g. SendGrid; Resend: smtp.resend.com
+SMTP_PORT=587                        # 587 STARTTLS / 465 implicit TLS
+SMTP_USERNAME=apikey                 # SendGrid: "apikey"; Resend: "resend"
+SMTP_PASSWORD=SG.xxxxxxxxxxxxxxxx    # Provider API key
+SMTP_FROM_EMAIL=no-reply@denscare.clinic
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+EMAIL_LOG_RESET_LINKS=false          # dev only — logs reset links when SMTP is off
 ```
 
 > **Note:** For PostgreSQL, change `DATABASE_URL` to `postgresql://user:pass@localhost:5432/denscare`.
+>
+> **Note:** For full details on the `SMTP_*` variables and how to wire a
+> provider (SendGrid or Resend), see [email-delivery.md](email-delivery.md).
 
 ### 1.3. Install dependencies
 

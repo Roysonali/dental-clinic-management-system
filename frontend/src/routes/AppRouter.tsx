@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { PatientListPage } from '../pages/patients/PatientListPage';
@@ -121,6 +122,14 @@ const AppRouter = () => {
           element={
             <PublicOnlyRoute>
               <ForgotPasswordPage />
+            </PublicOnlyRoute>
+          }
+        />
+        <Route
+          path={ROUTES.AUTH.RESET_PASSWORD}
+          element={
+            <PublicOnlyRoute>
+              <ResetPasswordPage />
             </PublicOnlyRoute>
           }
         />

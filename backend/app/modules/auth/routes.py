@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter
+from fastapi import BackgroundTasks
 from fastapi import Depends
 from fastapi import Path
 from fastapi import status
@@ -15,9 +16,13 @@ from app.modules.users.exceptions import SelfDeactivationNotAllowed
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     CurrentUserResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginResponse,
     PendingUserResponse,
     RegisterResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     UserApprovalRequest,
     UserApprovalResponse,
     UserRegister,
@@ -28,6 +33,8 @@ from app.modules.auth.service import (
     deactivate_user,
     fetch_pending_users,
     register_user,
+    request_password_reset,
+    reset_password,
 )
 
 
@@ -191,6 +198,71 @@ def deactivate_user_route(
 
     return {
         "message": "User deactivated successfully.",
+    }
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Request Password Reset",
+    description=(
+        "Request password-reset instructions for an email address. This "
+        "endpoint is public (no JWT required). The response is generic "
+        "and identical whether or not the account exists, so the API does "
+        "not reveal account registration status (anti-enumeration)."
+    ),
+    response_description="Generic confirmation message.",
+    responses={
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": "Validation error (e.g. invalid or missing email)",
+        },
+    },
+)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> ForgotPasswordResponse:
+    request_password_reset(db, payload.email, background_tasks)
+
+    return {
+        "message": (
+            "If an account exists for this email address, "
+            "you will receive password reset instructions."
+        ),
+    }
+
+
+@router.post(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Reset Password",
+    description=(
+        "Complete a password reset using the secure token from the reset "
+        "email. This endpoint is public (no JWT required); the token itself "
+        "is the credential. Invalid, expired, already-used, or revoked "
+        "tokens are rejected with a generic message."
+    ),
+    response_description="Reset confirmation message.",
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Reset token is invalid, expired, or already used",
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": "Validation error (e.g. weak password, missing token)",
+        },
+    },
+)
+def reset_password_route(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> ResetPasswordResponse:
+    reset_password(db, payload.token, payload.new_password)
+
+    return {
+        "message": "Your password has been reset successfully.",
     }
 
 

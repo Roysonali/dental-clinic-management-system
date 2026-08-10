@@ -74,6 +74,30 @@ export interface UserApprovalResponse {
 /** User lifecycle statuses matching backend constants */
 export type UserStatus = 'pending' | 'active' | 'inactive';
 
+/** Forgot-password request for POST /auth/forgot-password */
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+/**
+ * Forgot-password response — always the same generic message, whether or
+ * not the account exists (backend anti-enumeration contract).
+ */
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+/** Reset-password request for POST /auth/reset-password */
+export interface ResetPasswordRequest {
+  token: string;
+  new_password: string;
+}
+
+/** Reset-password response */
+export interface ResetPasswordResponse {
+  message: string;
+}
+
 /* ── Form Types (UI-specific, not sent to API) ──────────────────────── */
 
 /** Login form values (before transforming to API format) */
@@ -90,4 +114,15 @@ export interface RegisterFormValues {
   password: string;
   confirm_password: string;
   terms_accepted: boolean;
+}
+
+/** Forgot-password form values (before transforming to API format) */
+export interface ForgotPasswordFormValues {
+  email: string;
+}
+
+/** Reset-password form values (before transforming to API format) */
+export interface ResetPasswordFormValues {
+  new_password: string;
+  confirm_password: string;
 }

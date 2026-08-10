@@ -1,5 +1,5 @@
 import { useMemo, useState, type FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppointmentTable } from '../AppointmentTable';
 import { AppointmentFormContainer } from './AppointmentFormContainer';
 import { CancelAppointmentDialog } from '../CancelAppointmentDialog';
@@ -15,7 +15,7 @@ import { useAppointmentNames } from '../../../hooks/appointments/useAppointmentN
 import { useCancelAppointment } from '../../../hooks/appointments/useAppointmentMutations';
 import { apiErrorMessage, parseApiError } from '../../../services/apiError';
 import { formatISODate, formatTimeRange } from '../../../utils/date';
-import { ROUTES } from '../../../routes/routes';
+import { ROUTES, CREATE_QUERY_PARAM } from '../../../routes/routes';
 import type { EnrichedAppointment } from '../../../types/appointment';
 
 type FormState = { mode: 'create' } | { mode: 'edit'; appointment: EnrichedAppointment } | null;
@@ -38,6 +38,7 @@ type CancelState = { appointment: EnrichedAppointment } | null;
  */
 export const AppointmentListContainer: FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobileViewport();
 
   const filters = useAppointmentFilters();
@@ -115,10 +116,24 @@ export const AppointmentListContainer: FC = () => {
     filters.setPage(1);
   };
 
+  // Dashboard "Schedule Appointment" CTA deep-links to
+  // /appointments?create=true so the create drawer opens on the first render
+  // (mirrors the invoice list's create-intent handoff). The intent is
+  // stripped with `replace` when the form closes so the URL never re-opens
+  // the drawer.
+  const createRequested = searchParams.get(CREATE_QUERY_PARAM) === 'true';
+
   const openCreate = () => setFormState({ mode: 'create' });
   const openEdit = (appointment: EnrichedAppointment) =>
     setFormState({ mode: 'edit', appointment });
-  const closeForm = () => setFormState(null);
+  const closeForm = () => {
+    setFormState(null);
+    if (createRequested) {
+      const next = new URLSearchParams(searchParams);
+      next.delete(CREATE_QUERY_PARAM);
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   const handleCancelConfirm = () => {
     if (!cancelState) return;
@@ -214,7 +229,7 @@ export const AppointmentListContainer: FC = () => {
 
       <AppointmentFormContainer
         key={formState?.mode === 'edit' ? formState.appointment.id : 'create'}
-        open={formState !== null}
+        open={createRequested || formState !== null}
         mode={formState?.mode ?? 'create'}
         appointmentId={formState?.mode === 'edit' ? formState.appointment.id : null}
         onClose={closeForm}

@@ -36,6 +36,49 @@ class Settings:
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
     )
 
+    # ── Password recovery ───────────────────────────────────────────────
+    # Base URL of the frontend application used to build password-reset
+    # links. The localhost default is for local development only — a
+    # production deployment MUST set FRONTEND_BASE_URL to the real origin
+    # (e.g. https://app.denscare.clinic).
+    FRONTEND_BASE_URL: str = os.getenv(
+        "FRONTEND_BASE_URL",
+        "http://localhost:5173",
+    )
+
+    # Reset tokens expire after this many minutes. 30 is the documented
+    # default — short enough to limit a leaked token's usefulness, long
+    # enough for a typical user to finish the flow.
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "30")
+    )
+
+    # ── Email delivery (optional) ───────────────────────────────────────
+    # No provider credentials are hardcoded. When SMTP_HOST is empty the
+    # email service falls back to logging-only behaviour (see
+    # app/core/email.py). All values are read from the environment.
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
+    # STARTTLS (port 587) by default; implicit TLS (port 465) when
+    # SMTP_USE_SSL=true. Both are off for plain-text local test servers.
+    SMTP_USE_TLS: bool = (
+        os.getenv("SMTP_USE_TLS", "true").strip().lower() != "false"
+    )
+    SMTP_USE_SSL: bool = (
+        os.getenv("SMTP_USE_SSL", "false").strip().lower() == "true"
+    )
+
+    # Development-only: when TRUE and SMTP is not configured, the email
+    # service logs the full reset link (which contains the raw token) so
+    # local developers can click it. Defaults to FALSE — production must
+    # never enable this.
+    EMAIL_LOG_RESET_LINKS: bool = (
+        os.getenv("EMAIL_LOG_RESET_LINKS", "false").strip().lower() == "true"
+    )
+
     def __init__(self) -> None:
         """Validate that all required configuration values are present."""
         errors: list[str] = []
@@ -64,6 +107,16 @@ class Settings:
         if self.ACCESS_TOKEN_EXPIRE_MINUTES < 1:
             errors.append(
                 "ACCESS_TOKEN_EXPIRE_MINUTES must be >= 1"
+            )
+
+        if self.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES < 1:
+            errors.append(
+                "PASSWORD_RESET_TOKEN_EXPIRE_MINUTES must be >= 1"
+            )
+
+        if self.SMTP_PORT < 1 or self.SMTP_PORT > 65535:
+            errors.append(
+                "SMTP_PORT must be a valid TCP port (1-65535)"
             )
 
         if errors:

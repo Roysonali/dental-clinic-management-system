@@ -1,14 +1,21 @@
 import logging
 from datetime import datetime
+from datetime import timedelta
 from datetime import timezone
+from typing import Optional
 
+from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.constants import USER_STATUS_ACTIVE
 from app.core.constants import USER_STATUS_INACTIVE
 from app.core.constants import USER_STATUS_PENDING
+from app.core.email import email_service
 from app.core.security import create_access_token
+from app.core.security import generate_password_reset_token
 from app.core.security import hash_password
+from app.core.security import hash_password_reset_token
 from app.core.security import verify_password
 from app.modules.auth.exceptions import (
     ApprovalFailed,
@@ -16,6 +23,9 @@ from app.modules.auth.exceptions import (
     EmailAlreadyRegistered,
     InactiveAccount,
     InvalidCredentials,
+    InvalidResetToken,
+    PasswordResetFailed,
+    PasswordResetRequestFailed,
     RegistrationFailed,
     RoleNotFound,
     UserAlreadyActive,
@@ -26,12 +36,17 @@ from app.modules.auth.exceptions import (
 from app.modules.users.repository import count_admin_users
 
 from app.modules.users.exceptions import LastAdminCannotBeModified
+from app.modules.auth.models import PasswordResetToken
 from app.modules.auth.models import User
+from app.modules.auth.repository import create_password_reset_token
 from app.modules.auth.repository import create_user
+from app.modules.auth.repository import get_password_reset_token_by_hash
 from app.modules.auth.repository import get_pending_users
 from app.modules.auth.repository import get_role_by_id
 from app.modules.auth.repository import get_user_by_email
 from app.modules.auth.repository import get_user_by_id
+from app.modules.auth.repository import mark_password_reset_token_used
+from app.modules.auth.repository import revoke_user_password_reset_tokens
 from app.modules.auth.schemas import UserRegister
 
 
@@ -353,3 +368,174 @@ def authenticate_user(
     )
 
     return access_token
+
+
+def request_password_reset(
+    db: Session,
+    email: str,
+    background_tasks: Optional[BackgroundTasks] = None,
+) -> None:
+    """Start the password-recovery flow for an email address.
+
+    Anti-enumeration contract: the caller must return the SAME generic
+    response whether or not the account exists. When the account exists a
+    single-use, expiring reset token is created and the reset link is
+    handed to the email service; when it does not, nothing is created and
+    no email is sent — but the public behaviour is indistinguishable.
+
+    Revocation semantics: requesting a new reset revokes all of the user's
+    outstanding (unused, unrevoked) tokens, so older links stop working.
+
+    Args:
+        db: Active database session.
+        email: The email address as entered by the user (case-insensitive).
+        background_tasks: Optional FastAPI background tasks. When provided,
+            the reset email is dispatched after the HTTP response is sent
+            (so the request never waits on SMTP — this keeps the response
+            time uniform and removes the SMTP round-trip as an
+            account-enumeration timing signal). When omitted (e.g. direct
+            service calls), delivery happens synchronously.
+
+    Raises:
+        PasswordResetRequestFailed: On an unexpected database error
+            (surfaced as a generic 500 — never account-specific).
+    """
+    normalized_email = email.strip().lower()
+
+    user = get_user_by_email(db, normalized_email)
+
+    if user is None:
+        logger.warning(
+            "Password reset requested for unknown email: %s",
+            normalized_email,
+        )
+        return
+
+    raw_token = generate_password_reset_token()
+    token_hash = hash_password_reset_token(raw_token)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(
+        minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
+    )
+
+    try:
+        revoke_user_password_reset_tokens(db, user.id, now)
+        create_password_reset_token(
+            db,
+            PasswordResetToken(
+                user_id=user.id,
+                token_hash=token_hash,
+                expires_at=expires_at,
+            ),
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during password reset request: user_id=%s",
+            user.id,
+        )
+        raise PasswordResetRequestFailed()
+
+    # The reset link must be built from the configured frontend base URL —
+    # never a hardcoded origin. The raw token travels only inside this link.
+    reset_url = (
+        f"{settings.FRONTEND_BASE_URL.rstrip('/')}"
+        f"/auth/reset-password?token={raw_token}"
+    )
+
+    if background_tasks is not None:
+        background_tasks.add_task(
+            email_service.send_password_reset_email,
+            user.email,
+            reset_url,
+        )
+    else:
+        email_service.send_password_reset_email(user.email, reset_url)
+
+    logger.info(
+        "Password reset requested: user_id=%s, email_delivery_attempted=%s",
+        user.id,
+        email_service.is_configured,
+    )
+
+
+def reset_password(
+    db: Session,
+    token: str,
+    new_password: str,
+) -> User:
+    """Complete a password reset using a valid reset token.
+
+    The presented token is hashed and matched against stored digests; the
+    raw token is never compared, stored, or logged. A token is accepted
+    only when it exists, is unexpired, unused, unrevoked, and belongs to an
+    active account. Successful resets mark the token used (single use) and
+    replace the stored password hash.
+
+    Sessions are NOT invalidated server-side: the architecture uses
+    stateless JWT access tokens with no session table or blacklist, so an
+    already-issued JWT remains valid until its natural expiry (30 min).
+    Requiring a fresh login after the reset is the documented behaviour.
+
+    Args:
+        db: Active database session.
+        token: The raw reset token from the email link.
+        new_password: The new plain-text password (validated by schema).
+
+    Returns:
+        The updated User ORM instance.
+
+    Raises:
+        InvalidResetToken: If the token is missing, expired, already used,
+            revoked, or the account is disabled (generic message).
+        PasswordResetFailed: On an unexpected database error.
+    """
+    token_hash = hash_password_reset_token(token)
+    now = datetime.now(timezone.utc)
+
+    try:
+        pwd_token = get_password_reset_token_by_hash(db, token_hash)
+
+        if pwd_token is None:
+            raise InvalidResetToken()
+
+        if pwd_token.used_at is not None or pwd_token.revoked_at is not None:
+            raise InvalidResetToken()
+
+        # SQLite stores naive datetimes; Postgres returns timezone-aware.
+        # Normalize so the comparison works on both backends.
+        expires_at = pwd_token.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if expires_at <= now:
+            raise InvalidResetToken()
+
+        user = get_user_by_id(db, pwd_token.user_id)
+
+        # Disabled (inactive/pending) accounts cannot reset — possession of
+        # a token must not be able to reactivate or alter a locked account.
+        if user is None or not user.is_active:
+            raise InvalidResetToken()
+
+        user.password_hash = hash_password(new_password)
+        mark_password_reset_token_used(db, pwd_token, now)
+        db.commit()
+
+        logger.info(
+            "Password reset completed: user_id=%s",
+            user.id,
+        )
+
+        return user
+
+    except InvalidResetToken:
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during password reset",
+        )
+        raise PasswordResetFailed()
