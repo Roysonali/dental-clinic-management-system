@@ -3,23 +3,24 @@ import { render, screen, within } from '@testing-library/react';
 import { HeaderBranding } from './HeaderBranding';
 
 describe('HeaderBranding — fixed application branding area', () => {
-  it('renders the DensCare logo with the wordmark', () => {
+  it('renders the actual DensCare nameplate asset in the desktop block', () => {
     render(<HeaderBranding />);
 
-    // The shared Logo component renders the "Dens" + "Care" wordmark in the
-    // desktop branding block.
+    // Desktop: the complete name.png nameplate (alt "DensCare") only.
     const desktop = screen.getByTestId('header-branding-desktop');
-    expect(within(desktop).getByText('Dens')).toBeInTheDocument();
-    expect(within(desktop).getByText('Care')).toBeInTheDocument();
+    const nameplate = within(desktop).getByAltText('DensCare');
+    expect(nameplate.tagName.toLowerCase()).toBe('img');
+    expect(nameplate).toHaveAttribute('src', expect.stringContaining('name.png'));
   });
 
-  it('renders the brand mark as a decorative image (aria-hidden, not text)', () => {
+  it('renders the actual brand mark asset in the compact block (no wordmark)', () => {
     render(<HeaderBranding />);
 
-    // Both the desktop (full) and compact (icon-only) variants render in
-    // jsdom; every variant draws the tooth icon as aria-hidden SVG art.
+    // Tablet/mobile: the square logo.png mark, carrying the brand name.
     const compact = screen.getByTestId('header-branding-compact');
-    expect(compact.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    const mark = within(compact).getByAltText('DensCare');
+    expect(mark.tagName.toLowerCase()).toBe('img');
+    expect(mark).toHaveAttribute('src', expect.stringContaining('logo.png'));
   });
 
   it('aligns the desktop branding block with the sidebar width', () => {

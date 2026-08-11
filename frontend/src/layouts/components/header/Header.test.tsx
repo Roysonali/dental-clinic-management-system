@@ -55,13 +55,12 @@ describe('Header — enterprise global header (Task 2)', () => {
     localStorage.setItem('denscare_access_token', 'jwt-token');
   });
 
-  it('renders the DensCare branding block (logo + wordmark) as the left section', () => {
+  it('renders the DensCare branding block from the actual assets as the left section', () => {
     renderHeader();
 
     const header = screen.getByLabelText('App header');
-    // The shared Logo renders the "Dens" + "Care" wordmark (desktop variant).
-    expect(within(header).getAllByText('Dens').length).toBeGreaterThan(0);
-    expect(within(header).getAllByText('Care').length).toBeGreaterThan(0);
+    // Desktop nameplate + compact mark both carry the brand name.
+    expect(within(header).getAllByAltText('DensCare').length).toBeGreaterThan(0);
   });
 
   it('renders the dynamic page title from the current route', () => {
