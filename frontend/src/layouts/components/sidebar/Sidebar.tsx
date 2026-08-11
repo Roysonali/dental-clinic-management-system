@@ -1,12 +1,13 @@
 import { useState, type FC } from 'react';
-import { SidebarHeader } from './SidebarHeader';
 import { SidebarContent } from './SidebarContent';
 import { SidebarFooter } from './SidebarFooter';
 
 /**
  * Sidebar — main application sidebar with collapsible navigation.
  *
- * Composes SidebarHeader, SidebarContent, and SidebarFooter.
+ * Composes SidebarContent and SidebarFooter. Branding is NOT rendered here
+ * — it lives in the global Header's fixed branding area (HeaderBranding),
+ * which is aligned with the sidebar width on desktop.
  *
  * Supports both controlled and uncontrolled collapse state:
  *
@@ -67,9 +68,6 @@ export const Sidebar: FC<SidebarProps> = ({ collapsed: controlledCollapsed, onCo
       `}
       aria-label="Sidebar navigation"
     >
-      {/* ── Branding ──────────────────────────────────── */}
-      <SidebarHeader collapsed={collapsed} />
-
       {/* ── Navigation ────────────────────────────────── */}
       <SidebarContent collapsed={collapsed} />
 

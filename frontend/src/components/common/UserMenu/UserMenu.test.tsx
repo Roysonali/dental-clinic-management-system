@@ -38,6 +38,16 @@ describe('UserMenu', () => {
     expect(screen.getByText('DM')).toBeInTheDocument();
   });
 
+  it('shows a decorative dropdown chevron beside the user identity', () => {
+    renderUserMenu();
+
+    const trigger = getTrigger();
+    // Chevron is aria-hidden decoration — the accessible name still comes
+    // from the user's name content, and the icon itself is not a control.
+    expect(trigger.querySelector('.lucide-chevron-down')).not.toBeNull();
+    expect(trigger.querySelector('.lucide-chevron-down')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('exposes the trigger with the correct accessibility attributes', () => {
     renderUserMenu();
 

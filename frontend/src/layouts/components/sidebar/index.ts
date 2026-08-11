@@ -7,7 +7,6 @@
 export { Sidebar } from './Sidebar';
 export type { SidebarProps } from './Sidebar';
 
-export { SidebarHeader } from './SidebarHeader';
 export { SidebarContent } from './SidebarContent';
 export { SidebarGroup } from './SidebarGroup';
 export { SidebarItem } from './SidebarItem';
