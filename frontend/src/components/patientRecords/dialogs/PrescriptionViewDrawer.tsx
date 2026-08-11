@@ -1,5 +1,5 @@
 import { useState, type FC } from 'react';
-import { X, Plus, Pencil, Trash2 } from 'lucide-react';
+import { X, Plus, Pencil, Trash2, Download, Printer } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '../../common/Drawer/Drawer';
 import { IconButton } from '../../common/Button/IconButton';
@@ -8,10 +8,14 @@ import { Button } from '../../common/Button/Button';
 import { DataTable, type DataTableColumn } from '../../common/DataTable';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { ResultState } from '../../common/ResultState/ResultState';
+import { PrintDocumentDialog } from '../../common/PrintDocument';
+import { PrescriptionDocument } from '../PrescriptionDocument';
 import { ItemFormDialog } from './ItemFormDialog';
 import { ItemDeleteConfirm } from './ItemDeleteConfirm';
 import { patientRecordService } from '../../../services/patientRecordService';
+import { patientService } from '../../../services/patientService';
 import { patientRecordQueryKeys } from '../../../hooks/patientRecords/patientRecordQueryKeys';
+import { patientQueryKeys } from '../../../hooks/patients/usePatients';
 import {
   useCreatePrescriptionItem,
   useDeletePrescriptionItem,
@@ -33,6 +37,10 @@ interface PrescriptionViewDrawerProps {
   prescriptionId: string | null;
   /** Parent record id — item mutations invalidate the record aggregate too. */
   recordId: string;
+  /** Parent record's patient id — patient display data for the printable document. */
+  patientId: string | null;
+  /** Resolved patient display name ("Patient #…" fallback is done by the document). */
+  patientName: string | null;
   isFinalized: boolean;
   /** Resolved prescriber name ("User #id" fallback is done by the tab). */
   prescribedByName: string | null;
@@ -52,6 +60,8 @@ export const PrescriptionViewDrawer: FC<PrescriptionViewDrawerProps> = ({
   open,
   prescriptionId,
   recordId,
+  patientId,
+  patientName,
   isFinalized,
   prescribedByName,
   notify,
@@ -63,6 +73,18 @@ export const PrescriptionViewDrawer: FC<PrescriptionViewDrawerProps> = ({
     enabled: open && prescriptionId != null,
   });
   const prescription = prescriptionQuery.data;
+
+  // Patient display data for the printable document — shares the exact
+  // cache key the record page's name resolution already populates, so no
+  // extra network call when the page has resolved the patient.
+  const patientQuery = useQuery({
+    queryKey: patientQueryKeys.detail(patientId ?? ''),
+    queryFn: () => patientService.get(patientId as string),
+    enabled: open && patientId != null,
+  });
+  const patient = patientQuery.data;
+
+  const [printOpen, setPrintOpen] = useState(false);
 
   const createMutation = useCreatePrescriptionItem(prescriptionId ?? '', recordId);
   const updateMutation = useUpdatePrescriptionItem(prescriptionId ?? '', recordId);
@@ -132,8 +154,8 @@ export const PrescriptionViewDrawer: FC<PrescriptionViewDrawerProps> = ({
   return (
     <Drawer open={open} onClose={onClose} position="right" size="lg" ariaLabel="Prescription details">
       <Drawer.Header>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col gap-0.5">
+        <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-col gap-0.5">
             <h2 className="text-h3 font-semibold tracking-tight text-neutral-900">Prescription</h2>
             <p className="text-caption text-neutral-500">
               {prescription
@@ -141,13 +163,37 @@ export const PrescriptionViewDrawer: FC<PrescriptionViewDrawerProps> = ({
                 : 'Loading…'}
             </p>
           </div>
-          <IconButton
-            icon={<Icon icon={X} size="sm" />}
-            aria-label="Close"
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-          />
+          {/* Labeled document actions — same pattern as the invoice detail header */}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {prescription && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrintOpen(true)}
+                  leftIcon={<Icon icon={Printer} size="xs" />}
+                >
+                  Print
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPrintOpen(true)}
+                  leftIcon={<Icon icon={Download} size="xs" />}
+                  title="Opens the print dialog — choose “Save as PDF” to download"
+                >
+                  Download PDF
+                </Button>
+              </>
+            )}
+            <IconButton
+              icon={<Icon icon={X} size="sm" />}
+              aria-label="Close"
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+            />
+          </div>
         </div>
       </Drawer.Header>
 
@@ -241,6 +287,26 @@ export const PrescriptionViewDrawer: FC<PrescriptionViewDrawerProps> = ({
           </div>
         )}
       </Drawer.Body>
+
+      {/* Printable prescription — preview + print/download surface (Task 4) */}
+      <PrintDocumentDialog
+        open={printOpen}
+        title="Prescription"
+        documentType="Prescription"
+        onClose={() => setPrintOpen(false)}
+      >
+        {prescription && (
+          <PrescriptionDocument
+            prescription={prescription}
+            patientName={patientName ?? (patient?.full_name ?? null)}
+            patientCode={patient?.patient_code ?? null}
+            patientAge={patient?.age ?? null}
+            patientGender={patient?.gender ?? null}
+            patientDOB={patient?.date_of_birth ?? null}
+            prescriberName={prescribedByName}
+          />
+        )}
+      </PrintDocumentDialog>
 
       <ItemFormDialog
         open={itemFormOpen}

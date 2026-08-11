@@ -32,6 +32,10 @@ import type {
 
 interface RecordPrescriptionsTabProps {
   recordId: string;
+  /** Parent record's patient id — passed to the view drawer for the printable document. */
+  patientId: string;
+  /** Resolved patient display name — same best-effort resolution as the page header. */
+  patientName: string | null;
   isFinalized: boolean;
   notify: (variant: 'success', title: string, description?: string) => void;
 }
@@ -47,6 +51,8 @@ interface RecordPrescriptionsTabProps {
  */
 export const RecordPrescriptionsTab: FC<RecordPrescriptionsTabProps> = ({
   recordId,
+  patientId,
+  patientName,
   isFinalized,
   notify,
 }) => {
@@ -296,6 +302,8 @@ export const RecordPrescriptionsTab: FC<RecordPrescriptionsTabProps> = ({
         open={viewingId !== null}
         prescriptionId={viewingId}
         recordId={recordId}
+        patientId={patientId}
+        patientName={patientName}
         isFinalized={isFinalized}
         prescribedByName={
           viewingId

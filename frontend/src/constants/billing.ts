@@ -23,6 +23,20 @@ import type {
 /* ── Status presentation (backend enums → badge variants) ─────────── */
 
 /**
+ * Invoice status → human-readable label (mirrors `INVOICE_STATUS_OPTIONS`).
+ * Used by the printable invoice document's payment-status line.
+ */
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft: 'Draft',
+  issued: 'Issued',
+  partially_paid: 'Partially Paid',
+  paid: 'Paid',
+  overdue: 'Overdue',
+  cancelled: 'Cancelled',
+  void: 'Void',
+};
+
+/**
  * Invoice status → BadgeVariant map. Text labels (not colour alone) are
  * rendered by `StatusBadge`, so statuses remain distinguishable for
  * colour-blind users (WCAG 1.4.1).
