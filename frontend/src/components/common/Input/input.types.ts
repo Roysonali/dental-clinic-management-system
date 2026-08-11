@@ -26,6 +26,13 @@ export interface InputProps
   leadingIcon?: ReactNode;
   /** Trailing icon/suffix element */
   trailingIcon?: ReactNode;
+  /**
+   * Treat the trailing icon as an interactive action control (e.g. a
+   * visibility toggle). The trailing slot is `pointer-events-none` by
+   * default so decorative icons never block input clicks; set this to
+   * allow the control to receive pointer events.
+   */
+  trailingAction?: boolean;
   /** Text prefix (before the value, inside the input) */
   prefix?: string;
   /** Text suffix (after the value, inside the input) */
