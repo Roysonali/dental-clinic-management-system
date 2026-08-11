@@ -78,7 +78,16 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           {...rest}
         />
 
-        {/* Custom checkbox visual */}
+        {/* Custom checkbox visual.
+            NOTE on checked-state styling: `peer-checked:` compiles to the
+            general-sibling selector `:is(:where(.peer):checked~*)`, which only
+            reaches elements that are DIRECT SIBLINGS of the hidden input. The
+            checkmark SVG is a child of this box, so the peer-checked classes
+            must live here on the box (the sibling), using an arbitrary child
+            selector (`[&>svg]:`) to reach the checkmark. Putting
+            `peer-checked:opacity-100` directly on the SVG would never match —
+            the checked box previously rendered solid blue with an invisible
+            checkmark. */}
         <span
           className={`
             ${boxSize} mt-0.5 shrink-0 rounded border-2
@@ -90,6 +99,8 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
                 : 'border-neutral-300 peer-hover:border-neutral-400'
             }
             peer-checked:border-primary-500 peer-checked:bg-primary-500
+            peer-checked:[&>svg]:opacity-100
+            peer-indeterminate:border-primary-500 peer-indeterminate:bg-primary-500
             peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500/30 peer-focus-visible:ring-offset-1
           `}
           aria-hidden="true"
@@ -114,7 +125,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           ) : (
             /* Checkmark icon */
             <svg
-              className={`${iconSize} text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-150`}
+              className={`${iconSize} text-white opacity-0 transition-opacity duration-150`}
               viewBox="0 0 12 12"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
