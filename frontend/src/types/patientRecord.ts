@@ -275,18 +275,17 @@ export interface PrescriptionItemResponse {
   updated_at: string;
 }
 
-/* ── Attachments (metadata only — no upload/download) ───────────── */
+/* ── Attachments (real file uploads) ───────────────────────────── */
 
-export interface AttachmentCreateRequest {
+/**
+ * Multipart upload payload — sent as `FormData` (`file` + `attachment_type`)
+ * to `POST /patient-records/{id}/attachments`. The backend validates the
+ * actual file (magic bytes, extension, size) — never the client.
+ */
+export interface AttachmentUploadPayload {
+  /** The actual file selected by the user */
+  file: File;
   attachment_type: AttachmentType;
-  /** 1–255, non-empty */
-  file_name: string;
-  /** 1–1000 — client-supplied path/link string (no file upload) */
-  file_path: string;
-  /** ≤ 100 */
-  mime_type?: string | null;
-  /** ≥ 0; backend rejects > 50 MB (400) */
-  file_size?: number | null;
 }
 
 export interface AttachmentUpdateRequest {
@@ -294,7 +293,7 @@ export interface AttachmentUpdateRequest {
   file_name?: string;
   mime_type?: string | null;
   file_size?: number | null;
-  /** file_path is IMMUTABLE — never accepted by the update endpoint. */
+  /** The stored file and its storage reference are IMMUTABLE. */
 }
 
 /** Row from `GET /patient-records/{id}/attachments`. */
@@ -305,6 +304,8 @@ export interface AttachmentListItem {
   mime_type: string | null;
   file_size: number | null;
   created_at: string;
+  /** ID of the user who uploaded the file (null for legacy rows). */
+  uploaded_by: number | null;
 }
 
 /* ── Follow-ups ─────────────────────────────────────────────────── */
@@ -388,10 +389,8 @@ export interface PrescriptionFormValues {
 
 export interface AttachmentFormValues {
   attachment_type: string;
-  file_name: string;
-  file_path: string;
-  mime_type: string;
-  file_size: string;
+  /** Selected file — required in create mode, ignored in edit mode. */
+  file: File | null;
 }
 
 export interface FollowupFormValues {

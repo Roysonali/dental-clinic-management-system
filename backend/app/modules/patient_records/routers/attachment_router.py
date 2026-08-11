@@ -6,35 +6,45 @@ Production-grade FastAPI router for managing file attachments linked to
 patient clinical records.
 
 Every endpoint enforces:
-* **MIME validation** - the service layer validates MIME types against
-  allowed types per attachment category (image, document, video).
-* **File validation** - file size is validated against a 50 MB limit.
-* **RBAC** - role-based access control (admin / doctor / receptionist).
+* **File validation** - the service validates the actual file (magic-byte
+  MIME sniffing, extension allowlist, size limit from settings) before
+  anything is stored.  The client-declared ``Content-Type`` is untrusted.
+* **Authorized access** - upload/delete require write roles; download,
+  preview and metadata reads require read roles (admin / doctor /
+  receptionist).
 * **Actor propagation** - the authenticated user's ID is passed to the
-  service layer for audit logging.
+  service layer for audit logging (upload, download, update, delete).
 * **Finalized-record protection** - attachments cannot be uploaded,
   updated, or deleted if the parent patient record is finalized or
-  soft-deleted.
-* **OpenAPI metadata** - every route carries a summary, description,
-  and response description for generated docs.
+  soft-deleted.  Downloads/previews remain available for finalized
+  records (a locked chart is still readable).
+* **No path exposure** - stored files are served by opaque attachment
+  UUID through authenticated endpoints; the filesystem/storage location
+  is never returned.
 
-Domain exceptions (``AttachmentNotFound``, ``PatientRecordBusinessRule``,
-``PatientRecordNotFound``) propagate to the global
-``patient_record_exception_handler``.
+Domain exceptions (``AttachmentNotFound``, ``AttachmentDownloadError``,
+``PatientRecordBusinessRule``, ``PatientRecordNotFound``) propagate to the
+global ``patient_record_exception_handler``.
 """
 
 from __future__ import annotations
 
 import math
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import (
     APIRouter,
     Depends,
+    File,
+    Form,
     Query,
+    UploadFile,
     status,
 )
+from fastapi.responses import Response
 
+from app.core.config import settings
 from app.modules.auth.models import User
 from app.modules.patient_records.dependencies.patient_record_dependencies import (
     get_attachment_service,
@@ -43,14 +53,21 @@ from app.modules.patient_records.dependencies.permissions import (
     require_patient_record_read,
     require_patient_record_write,
 )
-from app.modules.patient_records.exceptions import AttachmentNotFound
+from app.modules.patient_records.enums import AttachmentType
+from app.modules.patient_records.exceptions import (
+    AttachmentNotFound,
+    PatientRecordBusinessRule,
+)
 from app.modules.patient_records.schemas.attachment_schema import (
-    AttachmentCreate,
     AttachmentListResponse,
     AttachmentResponse,
     AttachmentUpdate,
+    AttachmentUpload,
 )
 from app.modules.patient_records.services import AttachmentService
+from app.modules.patient_records.services.attachment_service import (
+    is_previewable_mime_type,
+)
 
 # ---------------------------------------------------------------------------
 # Router definitions
@@ -71,6 +88,21 @@ item_router = APIRouter(
 )
 
 
+def _content_disposition(filename: str, *, inline: bool) -> str:
+    """Build a safe Content-Disposition header value for a filename.
+
+    The original filename is user-supplied, so it is only ever placed in
+    the header — never in a filesystem path.  Non-ASCII characters are
+    encoded with the RFC 5987 ``filename*`` form.
+    """
+    disposition = "inline" if inline else "attachment"
+    ascii_name = filename.encode("ascii", "ignore").decode("ascii")
+    quoted = ascii_name.replace('"', "").replace("\\", "")
+    if not quoted:
+        quoted = "download"
+    return f"{disposition}; filename=\"{quoted}\"; filename*=UTF-8''{quote(filename)}"
+
+
 # ======================================================================
 # POST /patient-records/{record_id}/attachments
 # ======================================================================
@@ -82,21 +114,39 @@ item_router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Upload Attachment",
     description=(
-        "Register a file attachment under a patient record.  The "
-        "parent record must exist, must not be finalized, and must "
-        "not be soft-deleted.  MIME type and file size are validated "
-        "against allowed types (image, document, video) and a 50 MB "
-        "limit.  An audit entry is written on success."
+        "Upload a file attachment under a patient record using "
+        "``multipart/form-data`` (fields: ``file``, ``attachment_type``). "
+        "The parent record must exist, must not be finalized, and must "
+        "not be soft-deleted.  The file is validated by magic bytes, "
+        "extension and size (limit from configuration) before being "
+        "stored; only metadata is persisted.  An audit entry is written "
+        "on success."
     ),
     response_description="The newly created attachment record.",
 )
-def upload_attachment(
+async def upload_attachment(
     record_id: UUID,
-    payload: AttachmentCreate,
+    file: UploadFile = File(..., description="The file to upload"),
+    attachment_type: AttachmentType = Form(
+        ...,
+        description="Attachment category (IMAGE, PDF, REPORT, SCAN, DOCUMENT)",
+    ),
     current_user: User = Depends(require_patient_record_write),
     service: AttachmentService = Depends(get_attachment_service),
 ) -> AttachmentResponse:
-    """Register a file attachment under a patient record."""
+    """Upload a real file attachment under a patient record."""
+    # Read up to the size limit + 1 byte so an oversized file is rejected
+    # without being buffered in memory beyond the limit.
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+
+    payload = AttachmentUpload(
+        file_name=file.filename or "upload",
+        content=content,
+        content_type=file.content_type,
+        attachment_type=attachment_type,
+    )
+
     return service.upload_attachment(
         patient_record_id=record_id,
         payload=payload,
@@ -185,6 +235,97 @@ def get_attachment(
 
 
 # ======================================================================
+# GET /attachments/{attachment_id}/download
+# ======================================================================
+
+
+@item_router.get(
+    "/{attachment_id}/download",
+    status_code=status.HTTP_200_OK,
+    summary="Download Attachment",
+    description=(
+        "Stream the stored file for an attachment with the original "
+        "filename (``Content-Disposition: attachment``).  Requires "
+        "patient-record read access; the stored file is served through "
+        "this authenticated endpoint only.  Returns 404 when the "
+        "attachment is a legacy metadata-only row or its stored file is "
+        "missing.  Downloads are written to the audit trail."
+    ),
+    response_description="Raw file bytes.",
+)
+def download_attachment(
+    attachment_id: UUID,
+    current_user: User = Depends(require_patient_record_read),
+    service: AttachmentService = Depends(get_attachment_service),
+) -> Response:
+    """Download the stored file for an attachment."""
+    content, attachment = service.download_attachment(
+        attachment_id=attachment_id,
+        actor_id=current_user.id,
+    )
+
+    return Response(
+        content=content,
+        media_type=attachment.mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": _content_disposition(
+                attachment.file_name,
+                inline=False,
+            ),
+        },
+    )
+
+
+# ======================================================================
+# GET /attachments/{attachment_id}/preview
+# ======================================================================
+
+
+@item_router.get(
+    "/{attachment_id}/preview",
+    status_code=status.HTTP_200_OK,
+    summary="Preview Attachment",
+    description=(
+        "Stream the stored file inline (``Content-Disposition: inline``) "
+        "for browser rendering.  Only PDF and common image formats are "
+        "previewable; other types return 400.  Requires patient-record "
+        "read access.  Downloads/previews are written to the audit trail."
+    ),
+    response_description="Raw file bytes (inline).",
+)
+def preview_attachment(
+    attachment_id: UUID,
+    current_user: User = Depends(require_patient_record_read),
+    service: AttachmentService = Depends(get_attachment_service),
+) -> Response:
+    """Stream the stored file inline for browser preview."""
+    content, attachment = service.download_attachment(
+        attachment_id=attachment_id,
+        actor_id=current_user.id,
+    )
+
+    if not is_previewable_mime_type(attachment.mime_type):
+        raise PatientRecordBusinessRule(
+            message=(
+                "Preview is not supported for this file type — use "
+                "Download instead."
+            ),
+            details={"mime_type": attachment.mime_type},
+        )
+
+    return Response(
+        content=content,
+        media_type=attachment.mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": _content_disposition(
+                attachment.file_name,
+                inline=True,
+            ),
+        },
+    )
+
+
+# ======================================================================
 # PATCH /attachments/{attachment_id}
 # ======================================================================
 
@@ -196,8 +337,8 @@ def get_attachment(
     summary="Update Attachment",
     description=(
         "Partially update attachment metadata (file name, MIME type, "
-        "file size, attachment type).  The ``file_path`` is immutable "
-        "after creation.  The parent patient record must not be "
+        "file size, attachment type).  The stored file and its storage "
+        "reference are immutable.  The parent patient record must not be "
         "finalized or soft-deleted.  An audit entry is written on "
         "success."
     ),
@@ -228,8 +369,9 @@ def update_attachment(
     summary="Delete Attachment",
     description=(
         "Soft-delete an attachment.  The row is not removed from the "
-        "database; ``is_deleted`` is set to true.  The parent patient "
-        "record must not be finalized or soft-deleted."
+        "database; ``is_deleted`` is set to true and the stored file is "
+        "removed from storage (best-effort).  The parent patient record "
+        "must not be finalized or soft-deleted."
     ),
     response_description="No content - attachment has been soft-deleted.",
 )

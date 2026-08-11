@@ -8,8 +8,9 @@
  *   notes ≤ 2000.
  * - Prescription: notes ≤ 3000; items 1–20 of (name 2–255, dosage/
  *   frequency/duration 1–100, instructions ≤ 2000).
- * - Attachment (metadata only): type + file_name + file_path required;
- *   file_size ≥ 0 and ≤ 50 MB (backend 400).
+ * - Attachment (create): type + an actual File; size ≤ 10 MB and an
+ *   allow-listed extension/MIME (backend re-validates magic bytes).
+ *   Edit: type only — the file is immutable.
  * - Follow-up: date required and must be today or future (backend 400);
  *   notes ≤ 2000.
  *
@@ -19,10 +20,8 @@
  */
 import { z } from 'zod';
 import {
-  ATTACHMENT_FILE_NAME_MAX,
-  ATTACHMENT_FILE_PATH_MAX,
   ATTACHMENT_MAX_FILE_SIZE_BYTES,
-  ATTACHMENT_MIME_MAX,
+  ATTACHMENT_MAX_FILE_SIZE_MB,
   DIAGNOSIS_NAME_MAX,
   DIAGNOSIS_NOTES_MAX,
   FOLLOWUP_NOTES_MAX,
@@ -156,38 +155,88 @@ export const defaultPrescriptionFormValues: PrescriptionFormValues = {
   items: [emptyPrescriptionItem],
 };
 
-/* ── Attachment (metadata only) ──────────────────────────────────── */
+/* ── Attachment (real file upload) ─────────────────────────────── */
 
+/** Extensions the backend allowlist accepts (mirrors its service). */
+const ALLOWED_ATTACHMENT_EXTENSIONS = [
+  '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.tif', '.tiff', '.bmp',
+  '.doc', '.docx', '.txt',
+] as const;
+
+/** MIME types the backend allowlist accepts (extension check is primary). */
+const ALLOWED_ATTACHMENT_MIMES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/tiff',
+  'image/bmp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+] as const;
+
+function isAllowedAttachmentFile(file: File): boolean {
+  const dot = file.name.lastIndexOf('.');
+  const ext = dot > 0 ? file.name.slice(dot).toLowerCase() : '';
+  if ((ALLOWED_ATTACHMENT_EXTENSIONS as readonly string[]).includes(ext)) return true;
+  return (ALLOWED_ATTACHMENT_MIMES as readonly string[]).includes(file.type.toLowerCase());
+}
+
+const attachmentTypeRule = z
+  .string()
+  .min(1, 'Attachment type is required')
+  .refine(
+    (v) => ['IMAGE', 'PDF', 'REPORT', 'SCAN', 'DOCUMENT'].includes(v),
+    { message: 'Select a valid attachment type' },
+  );
+
+/** Create-mode schema: type + an actual file with client-side guard rails
+ * (the backend re-validates magic bytes, extension and size authoritatively). */
 export const attachmentFormSchema = z.object({
-  attachment_type: z
-    .string()
-    .min(1, 'Attachment type is required')
-    .refine(
-      (v) => ['IMAGE', 'PDF', 'REPORT', 'SCAN', 'DOCUMENT'].includes(v),
-      { message: 'Select a valid attachment type' },
-    ),
-  file_name: requiredText(1, ATTACHMENT_FILE_NAME_MAX, 'File name'),
-  file_path: requiredText(1, ATTACHMENT_FILE_PATH_MAX, 'File path'),
-  mime_type: optionalText(ATTACHMENT_MIME_MAX, 'MIME type'),
-  file_size: z
-    .string()
-    .trim()
-    .refine((v) => v === '' || /^\d+$/.test(v), {
-      message: 'File size must be a whole number of bytes',
-    })
-    .refine((v) => v === '' || Number(v) <= ATTACHMENT_MAX_FILE_SIZE_BYTES, {
-      message: 'File size cannot exceed 50 MB',
+  attachment_type: attachmentTypeRule,
+  file: z
+    .instanceof(File, { message: 'Choose a file to upload' })
+    .nullable()
+    .superRefine((value, ctx) => {
+      if (value === null) {
+        ctx.addIssue({ code: 'custom', message: 'Choose a file to upload' });
+        return;
+      }
+      if (value.size === 0) {
+        ctx.addIssue({ code: 'custom', message: 'The selected file is empty' });
+      }
+      if (value.size > ATTACHMENT_MAX_FILE_SIZE_BYTES) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `File exceeds the ${ATTACHMENT_MAX_FILE_SIZE_MB} MB limit`,
+        });
+      }
+      if (!isAllowedAttachmentFile(value)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'File type is not supported. Use PDF, JPG, PNG, DOC, DOCX or TXT.',
+        });
+      }
     }),
 });
 
 export type AttachmentFormSchema = z.infer<typeof attachmentFormSchema>;
 
+/** Edit-mode schema: only the category is editable — the file is immutable.
+ * The `file` field stays in the shape (always null in the form values) so
+ * create/edit resolvers share the exact `AttachmentFormValues` type. */
+export const attachmentEditFormSchema = z.object({
+  attachment_type: attachmentTypeRule,
+  file: z.instanceof(File).nullable(),
+});
+
+export type AttachmentEditFormSchema = z.infer<typeof attachmentEditFormSchema>;
+
 export const defaultAttachmentFormValues: AttachmentFormValues = {
   attachment_type: '',
-  file_name: '',
-  file_path: '',
-  mime_type: '',
-  file_size: '',
+  file: null,
 };
 
 /* ── Follow-up ───────────────────────────────────────────────────── */

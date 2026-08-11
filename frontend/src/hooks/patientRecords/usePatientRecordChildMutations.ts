@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { patientRecordService } from '../../services/patientRecordService';
 import { patientRecordQueryKeys } from './patientRecordQueryKeys';
 import type {
-  AttachmentCreateRequest,
   AttachmentUpdateRequest,
+  AttachmentUploadPayload,
   DiagnosisCreateRequest,
   DiagnosisResponse,
   DiagnosisUpdateRequest,
@@ -145,7 +145,7 @@ export function useDeletePrescriptionItem(prescriptionId: string, recordId: stri
 
 export function useCreateAttachment(recordId: string) {
   const queryClient = useQueryClient();
-  return useMutation<void, Error, AttachmentCreateRequest>({
+  return useMutation<void, Error, AttachmentUploadPayload>({
     mutationFn: (payload) => patientRecordService.createAttachment(recordId, payload).then(() => undefined),
     onSuccess: () => invalidateRecordChildren(queryClient, recordId),
   });

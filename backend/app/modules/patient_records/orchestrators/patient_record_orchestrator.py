@@ -91,7 +91,7 @@ if TYPE_CHECKING:
         FollowupCreate,
     )
     from app.modules.patient_records.schemas.attachment_schema import (
-        AttachmentCreate,
+        AttachmentUpload,
     )
 
 logger = logging.getLogger(__name__)
@@ -224,7 +224,7 @@ class PatientRecordOrchestrator:
         diagnoses: list["DiagnosisCreate"] | None = None,
         prescription_payload: "PrescriptionCreate | None" = None,
         followup_payload: "FollowupCreate | None" = None,
-        attachment_payload: "AttachmentCreate | None" = None,
+        attachment_payload: "AttachmentUpload | None" = None,
         actor_id: int,
     ) -> "PatientRecord":
         """Add clinical data (diagnoses, prescription, followup, attachment)

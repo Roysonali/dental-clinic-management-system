@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     String,
     func,
 )
@@ -57,6 +58,23 @@ class PatientRecordAttachment(Base):
     file_path: Mapped[str] = mapped_column(
         String(1000),
         nullable=False,
+    )
+
+    #: Opaque, server-generated storage reference for uploaded files.
+    #: ``None`` for legacy rows that only carry a client-supplied path.
+    storage_key: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    #: User who uploaded the file (null for legacy/metadata-only rows).
+    uploaded_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     mime_type: Mapped[str | None] = mapped_column(

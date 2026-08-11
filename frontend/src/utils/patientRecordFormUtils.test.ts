@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  attachmentFormValuesToCreateRequest,
   attachmentFormValuesToUpdateRequest,
+  attachmentFormValuesToUploadRequest,
   diagnosisFormValuesToCreateRequest,
   diagnosisFormValuesToUpdateRequest,
   followupFormValuesToCreateRequest,
@@ -175,48 +175,35 @@ describe('prescription transformers', () => {
 });
 
 describe('attachment transformers', () => {
-  it('create request parses file_size to int and nulls empty mime', () => {
-    const request = attachmentFormValuesToCreateRequest({
+  it('builds a multipart upload payload from the selected file + type', () => {
+    const file = new File(['%PDF-1.4'], 'opg.pdf', { type: 'application/pdf' });
+    const request = attachmentFormValuesToUploadRequest({
       attachment_type: 'PDF',
-      file_name: 'opg.pdf',
-      file_path: 'D:\\Xrays\\opg.pdf',
-      mime_type: '',
-      file_size: '524288',
+      file,
     });
-    expect(request).toEqual({
-      attachment_type: 'PDF',
-      file_name: 'opg.pdf',
-      file_path: 'D:\\Xrays\\opg.pdf',
-      mime_type: null,
-      file_size: 524288,
-    });
+    expect(request).toEqual({ file, attachment_type: 'PDF' });
   });
 
-  it('omits file_size when empty', () => {
-    const request = attachmentFormValuesToCreateRequest({
-      attachment_type: 'PDF',
-      file_name: 'opg.pdf',
-      file_path: 'D:\\Xrays\\opg.pdf',
-      mime_type: 'application/pdf',
-      file_size: '',
-    });
-    expect(request.file_size).toBeUndefined();
+  it('throws when no file is selected', () => {
+    expect(() =>
+      attachmentFormValuesToUploadRequest({ attachment_type: 'PDF', file: null }),
+    ).toThrow('No file selected');
   });
 
-  it('update never includes file_path (immutable)', () => {
+  it('update only ever carries a changed type (file immutable)', () => {
     const request = attachmentFormValuesToUpdateRequest(
-      {
-        attachment_type: 'DOCUMENT',
-        file_name: 'opg.pdf',
-        file_path: 'D:\\Xrays\\opg.pdf',
-        mime_type: '',
-        file_size: '1',
-      },
-      { attachment_type: 'PDF', file_name: 'opg.pdf', mime_type: 'application/pdf', file_size: 1 },
+      { attachment_type: 'DOCUMENT', file: null },
+      { attachment_type: 'PDF' },
     );
-    expect('file_path' in request).toBe(false);
-    expect(request.attachment_type).toBe('DOCUMENT');
-    expect(request.mime_type).toBeNull();
+    expect(request).toEqual({ attachment_type: 'DOCUMENT' });
+  });
+
+  it('update omits the type when unchanged', () => {
+    const request = attachmentFormValuesToUpdateRequest(
+      { attachment_type: 'PDF', file: null },
+      { attachment_type: 'PDF' },
+    );
+    expect(request).toEqual({});
   });
 });
 

@@ -77,13 +77,15 @@ def _make_prescription_item_orm(item_id=None, prescription_id=None, medicine_nam
     return i
 
 
-def _make_attachment_orm(attachment_id=None, patient_record_id=None, attachment_type=AttachmentType.DOCUMENT, file_name="report.pdf", file_path="/uploads/report.pdf", mime_type="application/pdf", file_size=1024, is_deleted=False):
+def _make_attachment_orm(attachment_id=None, patient_record_id=None, attachment_type=AttachmentType.DOCUMENT, file_name="report.pdf", file_path="/uploads/report.pdf", mime_type="application/pdf", file_size=1024, is_deleted=False, storage_key=None, uploaded_by=1):
     a = MagicMock()
     a.id = attachment_id or uuid4()
     a.patient_record_id = patient_record_id or uuid4()
     a.attachment_type = attachment_type
     a.file_name = file_name
     a.file_path = file_path
+    a.storage_key = storage_key
+    a.uploaded_by = uploaded_by
     a.mime_type = mime_type
     a.file_size = file_size
     a.is_deleted = is_deleted

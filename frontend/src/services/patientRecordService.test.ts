@@ -197,28 +197,43 @@ describe('patientRecordService — children', () => {
     expect(postMock).toHaveBeenCalledWith('/prescriptions/px1/items/bulk', []);
   });
 
-  it('wires attachment metadata CRUD (no upload)', async () => {
+  it('uploads an attachment as multipart form-data', async () => {
     postMock.mockResolvedValue({ data: {} });
-    await patientRecordService.createAttachment('r1', {
-      attachment_type: 'PDF',
-      file_name: 'opg.pdf',
-      file_path: 'D:\\x',
-    });
-    expect(postMock).toHaveBeenCalledWith('/patient-records/r1/attachments', {
-      attachment_type: 'PDF',
-      file_name: 'opg.pdf',
-      file_path: 'D:\\x',
-    });
+    const file = new File(['%PDF-1.4 fake'], 'report.pdf', { type: 'application/pdf' });
+    await patientRecordService.createAttachment('r1', { file, attachment_type: 'PDF' });
 
+    const [url, body] = postMock.mock.calls[0];
+    expect(url).toBe('/patient-records/r1/attachments');
+    expect(body).toBeInstanceOf(FormData);
+    const form = body as FormData;
+    expect(form.get('file')).toBe(file);
+    expect(form.get('attachment_type')).toBe('PDF');
+  });
+
+  it('lists attachments (created_at DESC)', async () => {
     getMock.mockResolvedValue({ data: listEnvelope });
     await patientRecordService.listAttachments('r1', { page: 1, page_size: 10 });
     expect(getMock).toHaveBeenCalledWith('/patient-records/r1/attachments', {
       params: { page: 1, page_size: 10 },
     });
+  });
 
+  it('downloads an attachment as a blob through the authorized endpoint', async () => {
+    getMock.mockResolvedValue({ data: new Blob(['%PDF-1.4']) });
+    await patientRecordService.downloadAttachment('at1');
+    expect(getMock).toHaveBeenCalledWith('/attachments/at1/download', { responseType: 'blob' });
+  });
+
+  it('previews an attachment inline', async () => {
+    getMock.mockResolvedValue({ data: new Blob(['x']) });
+    await patientRecordService.previewAttachment('at1');
+    expect(getMock).toHaveBeenCalledWith('/attachments/at1/preview', { responseType: 'blob' });
+  });
+
+  it('PATCHes attachment metadata (stored file immutable)', async () => {
     patchMock.mockResolvedValue({ data: {} });
-    await patientRecordService.updateAttachment('at1', { file_name: 'renamed.pdf' });
-    expect(patchMock).toHaveBeenCalledWith('/attachments/at1', { file_name: 'renamed.pdf' });
+    await patientRecordService.updateAttachment('at1', { attachment_type: 'SCAN' });
+    expect(patchMock).toHaveBeenCalledWith('/attachments/at1', { attachment_type: 'SCAN' });
   });
 
   it('wires follow-up CRUD', async () => {

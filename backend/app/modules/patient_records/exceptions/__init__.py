@@ -7,6 +7,7 @@ from .patient_record_exceptions import (
     PrescriptionNotFound,
     PrescriptionItemNotFound,
     AttachmentNotFound,
+    AttachmentDownloadError,
     FollowupNotFound,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "PrescriptionNotFound",
     "PrescriptionItemNotFound",
     "AttachmentNotFound",
+    "AttachmentDownloadError",
     "FollowupNotFound",
 ]

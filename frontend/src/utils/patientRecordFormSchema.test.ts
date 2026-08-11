@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  attachmentEditFormSchema,
   attachmentFormSchema,
   diagnosisFormSchema,
   followupFormSchema,
@@ -116,32 +117,47 @@ describe('prescriptionFormSchema', () => {
 });
 
 describe('attachmentFormSchema', () => {
-  const valid = {
-    attachment_type: 'PDF',
-    file_name: 'opg.pdf',
-    file_path: 'D:\\Xrays\\PAT-0001\\opg.pdf',
-    mime_type: 'application/pdf',
-    file_size: '524288',
-  };
+  const makeFile = (name = 'opg.pdf', type = 'application/pdf', size = 1024) =>
+    new File(['x'.repeat(size)], name, { type });
 
-  it('accepts valid metadata', () => {
+  it('accepts a valid file + type', () => {
+    const valid = { attachment_type: 'PDF', file: makeFile() };
     expect(attachmentFormSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('requires type, file_name and file_path', () => {
-    for (const key of ['attachment_type', 'file_name', 'file_path'] as const) {
-      const { error } = attachmentFormSchema.safeParse({ ...valid, [key]: '' });
-      expect(error?.issues.some((i) => i.path[0] === key)).toBe(true);
-    }
+  it('requires an attachment type', () => {
+    const { error } = attachmentFormSchema.safeParse({
+      attachment_type: '',
+      file: makeFile(),
+    });
+    expect(error?.issues.some((i) => i.path[0] === 'attachment_type')).toBe(true);
   });
 
-  it('rejects a file size over 50 MB', () => {
-    const { error } = attachmentFormSchema.safeParse({ ...valid, file_size: String(50 * 1024 * 1024 + 1) });
-    expect(error?.issues.some((i) => i.path[0] === 'file_size')).toBe(true);
+  it('requires a file', () => {
+    const { error } = attachmentFormSchema.safeParse({ attachment_type: 'PDF', file: null });
+    expect(error?.issues.some((i) => i.path[0] === 'file')).toBe(true);
   });
 
-  it('accepts an empty optional size', () => {
-    expect(attachmentFormSchema.safeParse({ ...valid, file_size: '' }).success).toBe(true);
+  it('rejects a file over the 10 MB limit', () => {
+    const big = makeFile('big.pdf', 'application/pdf', 10 * 1024 * 1024 + 1);
+    const { error } = attachmentFormSchema.safeParse({ attachment_type: 'PDF', file: big });
+    expect(error?.issues.some((i) => i.path[0] === 'file')).toBe(true);
+  });
+
+  it('rejects an unsupported file type', () => {
+    const exe = new File(['MZ'], 'script.exe', { type: 'application/x-msdownload' });
+    const { error } = attachmentFormSchema.safeParse({ attachment_type: 'PDF', file: exe });
+    expect(error?.issues.some((i) => i.path[0] === 'file')).toBe(true);
+  });
+
+  it('accepts an image file for the IMAGE type', () => {
+    const png = new File(['\x89PNG'], 'xray.png', { type: 'image/png' });
+    expect(attachmentFormSchema.safeParse({ attachment_type: 'IMAGE', file: png }).success).toBe(true);
+  });
+
+  it('edit schema validates only the type (file always null)', () => {
+    expect(attachmentEditFormSchema.safeParse({ attachment_type: 'PDF', file: null }).success).toBe(true);
+    expect(attachmentEditFormSchema.safeParse({ attachment_type: '', file: null }).success).toBe(false);
   });
 });
 

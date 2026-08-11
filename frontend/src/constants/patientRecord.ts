@@ -26,8 +26,25 @@ export const PATIENT_RECORD_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 /** Max medicine items per prescription (schema `max_length=20`). */
 export const PRESCRIPTION_MAX_ITEMS = 20;
 
-/** Backend attachment size cap (50 MB) — service rejects larger with 400. */
-export const ATTACHMENT_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+/** Backend attachment size cap (MB) — mirrors MAX_UPLOAD_SIZE_MB (10). */
+export const ATTACHMENT_MAX_FILE_SIZE_MB = 10;
+/** Backend attachment size cap in bytes — service rejects larger with 400. */
+export const ATTACHMENT_MAX_FILE_SIZE_BYTES = ATTACHMENT_MAX_FILE_SIZE_MB * 1024 * 1024;
+
+/**
+ * `accept` attribute for the attachment file input — matches the backend
+ * extension/MIME allowlist (IMAGE, SCAN, PDF, REPORT, DOCUMENT).
+ */
+export const ATTACHMENT_FILE_ACCEPT =
+  '.pdf,.jpg,.jpeg,.png,.gif,.webp,.tif,.tiff,.bmp,.doc,.docx,.txt,' +
+  'application/pdf,image/jpeg,image/png,image/gif,image/webp,image/tiff,image/bmp,' +
+  'application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain';
+
+/** Human-readable accepted-types hint shown in the upload drop zone. */
+export const ATTACHMENT_FILE_ACCEPT_HINT = 'PDF, JPG, PNG, GIF, WEBP, TIFF, BMP, DOC, DOCX, TXT';
+
+/** File extensions that can be previewed in the browser (PDF + images). */
+export const PREVIEWABLE_ATTACHMENT_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'] as const;
 
 /* ── Record status presentation ──────────────────────────────────── */
 
@@ -132,10 +149,11 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   PRESCRIPTION_ITEM_BULK_CREATED: 'Medicines added',
   PRESCRIPTION_ITEM_UPDATED: 'Medicine updated',
   PRESCRIPTION_ITEM_DELETED: 'Medicine removed',
-  ATTACHMENT_UPLOADED: 'Attachment registered',
-  ATTACHMENT_BULK_UPLOADED: 'Attachments registered',
+  ATTACHMENT_UPLOADED: 'Attachment uploaded',
+  ATTACHMENT_BULK_UPLOADED: 'Attachments uploaded',
   ATTACHMENT_UPDATED: 'Attachment updated',
   ATTACHMENT_DELETED: 'Attachment removed',
+  ATTACHMENT_DOWNLOADED: 'Attachment downloaded',
   FOLLOWUP_CREATED: 'Follow-up scheduled',
   FOLLOWUP_UPDATED: 'Follow-up updated',
   FOLLOWUP_DELETED: 'Follow-up removed',

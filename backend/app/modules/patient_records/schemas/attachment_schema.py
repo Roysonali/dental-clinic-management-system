@@ -111,12 +111,84 @@ class AttachmentBase(BaseModel):
 
 
 # ==========================================================
-# CREATE
+# CREATE (multipart upload payload)
 # ==========================================================
 
-class AttachmentCreate(AttachmentBase):
+class AttachmentUpload(BaseModel):
+    """Internal payload handed from the router to the service for a real
+    file upload.
+
+    The HTTP endpoint accepts ``multipart/form-data`` (a raw ``file`` plus
+    an ``attachment_type`` form field); this model is the service-layer
+    contract so the service never depends on FastAPI types.
+
+    Attributes:
+        file_name: Original client-supplied filename (metadata only — it
+            is never used as a filesystem path).
+        content: Full file bytes.
+        content_type: MIME type declared by the client (untrusted — the
+            service re-validates against the actual file signature).
+        attachment_type: DensCare attachment category the file is
+            registered under.
     """
-    Create attachment schema.
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+    file_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        title="File Name",
+        description="Original uploaded file name (metadata only)",
+        examples=["opg_scan.jpg"],
+    )
+
+    content: bytes = Field(
+        ...,
+        title="File Content",
+        description="Raw file bytes",
+    )
+
+    content_type: Optional[str] = Field(
+        default=None,
+        max_length=255,
+        title="Declared Content Type",
+        description="Client-declared MIME type (re-validated server-side)",
+    )
+
+    attachment_type: AttachmentType = Field(
+        ...,
+        title="Attachment Type",
+        description="Type of attachment",
+    )
+
+    @field_validator("file_name")
+    @classmethod
+    def validate_file_name(
+        cls,
+        value: str,
+    ) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Field cannot be empty.")
+        # Filenames are metadata only — but still reject path separators
+        # so they can never be mistaken for paths downstream.
+        if "/" in value or "\\" in value:
+            raise ValueError(
+                "File name must be a plain name, not a path."
+            )
+        return value
+
+
+class AttachmentCreate(AttachmentBase):
+    """Legacy JSON metadata registration schema.
+
+    Deprecated — real uploads use ``AttachmentUpload`` via the multipart
+    endpoint.  Kept so existing metadata-only registrations (and the
+    orchestrator contracts) continue to typecheck.
     """
 
     pass
@@ -245,6 +317,12 @@ class AttachmentResponse(
 
     updated_at: datetime
 
+    uploaded_by: Optional[int] = Field(
+        default=None,
+        title="Uploaded By",
+        description="ID of the user who uploaded the file",
+    )
+
 
 # ==========================================================
 # LIST ITEM
@@ -273,6 +351,12 @@ class AttachmentListItem(
     file_size: Optional[int]
 
     created_at: datetime
+
+    uploaded_by: Optional[int] = Field(
+        default=None,
+        title="Uploaded By",
+        description="ID of the user who uploaded the file",
+    )
 
 
 # ==========================================================
