@@ -103,10 +103,49 @@ describe('PrescriptionViewDrawer printable document actions (Task 4)', () => {
     expect(await screen.findByText('ghjk')).toBeInTheDocument();
     expect(screen.getByText('500mg')).toBeInTheDocument();
 
-    // Both document actions render in the drawer header (labeled, like the
-    // invoice detail header).
+    // Both document actions render in the drawer header (labeled).
     expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
+  });
+
+  it('groups the document actions separately from the drawer close control', async () => {
+    renderDrawer();
+    await screen.findByText('ghjk');
+
+    // The title + metadata row is the drawer identity; Close sits at the
+    // far-right edge per the DensCare Drawer pattern ([Title] … [Close]).
+    expect(screen.getByRole('heading', { name: 'Prescription' })).toBeInTheDocument();
+    expect(screen.getByText(/Prescribed .*· receptionist2/)).toBeInTheDocument();
+
+    // Print and Download PDF are grouped under one labelled action group.
+    const actions = screen.getByRole('group', { name: 'Document actions' });
+    expect(within(actions).getByRole('button', { name: 'Print' })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
+
+    // The drawer Close control is NOT part of the document-action group.
+    expect(within(actions).queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('closes the drawer via the header close control', async () => {
+    const onClose = vi.fn();
+    renderWithProviders(
+      <PrescriptionViewDrawer
+        open
+        prescriptionId="rx1"
+        recordId="rec1"
+        patientId="p1"
+        patientName="Test Patient-Two"
+        isFinalized={false}
+        prescribedByName="receptionist2"
+        notify={() => {}}
+        onClose={onClose}
+      />,
+    );
+    await screen.findByText('ghjk');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('opens the printable prescription document from the print action', async () => {

@@ -1,6 +1,6 @@
 import { useMemo, useState, type FC } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Pill } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import { Card } from '../../common/Card/Card';
 import { Button } from '../../common/Button/Button';
 import { Icon } from '../../common/Icon/Icon';
@@ -45,9 +45,11 @@ interface RecordPrescriptionsTabProps {
  *
  * Table from the list payload: prescribed_at · prescribed_by (resolved user
  * name, "User #id" fallback) · medicine_count (from the response — never
- * recomputed). Actions: New prescription, View items, Edit notes (notes
- * only — the backend PATCH accepts just notes), Delete. All hidden once the
- * record is finalized.
+ * recomputed). Actions: New prescription, View Prescription (labeled — opens
+ * the printable document drawer with Print / Download PDF), Edit notes
+ * (notes only — the backend PATCH accepts just notes), Delete. Viewing a
+ * prescription stays available for finalized records; only the mutating
+ * actions (New, Edit notes, Delete) are hidden once the record is finalized.
  */
 export const RecordPrescriptionsTab: FC<RecordPrescriptionsTabProps> = ({
   recordId,
@@ -216,40 +218,51 @@ export const RecordPrescriptionsTab: FC<RecordPrescriptionsTabProps> = ({
             ) : undefined
           }
           rowActionsHeader=""
-          rowActions={(row) =>
-            !isFinalized ? (
-              <div className="flex items-center justify-end gap-1">
-                <IconButton
-                  icon={<Icon icon={Pill} size="sm" />}
-                  aria-label={`View prescription`}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewingId(row.id)}
-                />
-                <IconButton
-                  icon={<Icon icon={Pencil} size="sm" />}
-                  aria-label="Edit prescription notes"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setServerMessage(null);
-                    setNotesTarget(row);
-                  }}
-                />
-                <IconButton
-                  icon={<Icon icon={Trash2} size="sm" />}
-                  aria-label="Delete prescription"
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger hover:bg-danger/10"
-                  onClick={() => {
-                    setServerMessage(null);
-                    setDeleting(row);
-                  }}
-                />
-              </div>
-            ) : undefined
-          }
+          rowActions={(row) => (
+            <div className="flex items-center justify-end gap-1.5">
+              {/* Explicitly labeled — the prescription opens a document, so a
+                  bare icon (previously a pill, easily mistaken for an
+                  attachment paperclip) never has to carry that meaning. The
+                  action stays available for finalized records: a locked
+                  prescription must still be viewable and printable. */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setViewingId(row.id)}
+                leftIcon={<Icon icon={FileText} size="xs" />}
+                title="Open the prescription — view, print or download"
+              >
+                View Prescription
+              </Button>
+              {!isFinalized && (
+                <>
+                  <IconButton
+                    icon={<Icon icon={Pencil} size="sm" />}
+                    aria-label="Edit prescription notes"
+                    title="Edit prescription notes"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setServerMessage(null);
+                      setNotesTarget(row);
+                    }}
+                  />
+                  <IconButton
+                    icon={<Icon icon={Trash2} size="sm" />}
+                    aria-label="Delete prescription"
+                    title="Delete prescription"
+                    variant="ghost"
+                    size="sm"
+                    className="text-danger hover:bg-danger/10"
+                    onClick={() => {
+                      setServerMessage(null);
+                      setDeleting(row);
+                    }}
+                  />
+                </>
+              )}
+            </div>
+          )}
         />
 
         {!listQuery.isLoading && items.length > 0 && (

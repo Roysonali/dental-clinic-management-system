@@ -128,11 +128,18 @@ export const PrintDocumentDialog: FC<PrintDocumentDialogProps> = ({
             narrow screens instead of squeezing the button labels; the shared
             Button now guarantees labels never wrap (whitespace-nowrap). */}
         <Modal.Footer className="no-print flex-wrap">
-          <p className="mr-auto max-w-xs text-caption text-neutral-500">
-            Download uses the browser print dialog — choose{' '}
-            <span className="font-medium text-neutral-700">“Save as PDF”</span>{' '}
-            to save a PDF file.
-          </p>
+          <div className="mr-auto max-w-sm text-caption text-neutral-500">
+            <p>
+              Download uses the browser print dialog — choose{' '}
+              <span className="font-medium text-neutral-700">“Save as PDF”</span>{' '}
+              to save a PDF file.
+            </p>
+            <p className="mt-1">
+              For a clean document, turn off{' '}
+              <span className="font-medium text-neutral-700">“Headers and footers”</span>{' '}
+              so browser details (URL, date, title) never print.
+            </p>
+          </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Close
           </Button>

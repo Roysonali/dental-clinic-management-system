@@ -127,4 +127,64 @@ describe('PrescriptionDocument', () => {
     // Medicines without instructions render a dash.
     expect(screen.getAllByText('—').length).toBe(20);
   });
+
+  it('wraps long clinical text instead of truncating or overflowing', () => {
+    const longMedicine =
+      'Amoxicillin 250mg/5ml oral suspension bottle 100ml (Co-Amoxiclav equivalent)';
+    const longInstructions =
+      'Take one tablet every 8 hours with food. Complete the full course even if symptoms improve ' +
+      'before the course ends, and avoid alcohol for the duration of treatment.';
+    const longPrescriber = 'Dr. Aravindh Krishna Moorthy Suryanarayanan';
+
+    render(
+      <PrescriptionDocument
+        prescription={makePrescription({
+          items: [
+            {
+              id: 'it-long',
+              prescription_id: 'rx1',
+              medicine_name: longMedicine,
+              dosage: '1 tablet',
+              frequency: 'TDS',
+              duration: '7 days',
+              instructions: longInstructions,
+              created_at: '2026-07-27T10:30:00Z',
+              updated_at: '2026-07-27T10:30:00Z',
+            },
+          ],
+        })}
+        {...basePatientProps}
+        prescriberName={longPrescriber}
+      />,
+    );
+
+    // The full text is present and its cells wrap — a printed document must
+    // never truncate (clip) or overflow its clinical content.
+    const medicineCell = screen.getByText(longMedicine);
+    expect(medicineCell).toBeInTheDocument();
+    expect(medicineCell.className).toContain('break-words');
+
+    const instructionsCell = screen.getByText(longInstructions);
+    expect(instructionsCell.className).toContain('break-words');
+
+    // The long prescriber name wraps too — never truncates on paper.
+    const prescriber = screen.getByText(longPrescriber);
+    expect(prescriber.className).toContain('break-words');
+  });
+
+  it('renders only the document — no browser or application artifacts', () => {
+    render(<PrescriptionDocument prescription={makePrescription()} {...basePatientProps} />);
+
+    // The print surface carries the document only: no dialog chrome, no
+    // download instructions, no browser/debug details.
+    const body = document.body.textContent ?? '';
+    expect(body).toContain('Prescription');
+    expect(body).toContain('DensCare');
+    expect(body).not.toContain('localhost');
+    expect(body).not.toContain('Headers and footers');
+    expect(body).not.toContain('Save as PDF');
+    expect(body).not.toContain('Download PDF');
+    expect(body).not.toContain('Print');
+    expect(body).not.toContain('Close');
+  });
 });

@@ -72,13 +72,33 @@ describe('PrintDocumentDialog', () => {
     );
 
     // The portaled .print-document must contain ONLY the document children —
-    // no Close / Print / Download buttons and no "Save as PDF" guidance.
+    // no Close / Print / Download buttons, no "Save as PDF" guidance and no
+    // browser-print tips (headers/footers) either.
     const surface = document.body.querySelector('.print-document');
     expect(surface?.textContent).toContain('Only the document');
     expect(surface?.textContent).not.toContain('Download PDF');
     expect(surface?.textContent).not.toContain('Save as PDF');
+    expect(surface?.textContent).not.toContain('Headers and footers');
     expect(surface?.textContent).not.toContain('Print');
     expect(surface?.textContent).not.toContain('Close');
+  });
+
+  it('guides the user to disable browser headers and footers for a clean document', () => {
+    render(
+      <PrintDocumentDialog
+        open
+        title="Prescription"
+        documentType="Prescription"
+        onClose={() => {}}
+      >
+        <div>Rx content</div>
+      </PrintDocumentDialog>,
+    );
+
+    // The dialog teaches both the download mechanism and how to keep the
+    // document free of browser chrome (title/URL/date) in the printed PDF.
+    expect(screen.getByText(/Save as PDF/)).toBeInTheDocument();
+    expect(screen.getByText(/Headers and footers/)).toBeInTheDocument();
   });
 
   it('renders nothing (dialog + surface) when closed', () => {

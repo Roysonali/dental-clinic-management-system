@@ -397,6 +397,11 @@ body {
    NOT marked .no-print. */
 .print-document {
   display: none;
+  /* Faithful reproduction: document backgrounds (patient/notes blocks) are
+     part of the design, so force the engine to print them regardless of the
+     user's "Background graphics" print-dialog preference. */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 @media print {
@@ -443,6 +448,12 @@ body {
   /* Keep summary/notes blocks intact across page breaks (tables are free
      to paginate and the browser repeats <thead> on each printed page). */
   .print-break-avoid {
+    break-inside: avoid;
+  }
+
+  /* A medicine/line-item row must never be split mid-cell across a page
+     boundary — the whole row moves to the next page instead. */
+  .print-document table tr {
     break-inside: avoid;
   }
 }

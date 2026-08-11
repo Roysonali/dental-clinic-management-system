@@ -84,7 +84,9 @@ export const PrescriptionDocument: FC<PrescriptionDocumentProps> = ({
         </div>
         <div className="flex justify-between gap-3 border-b border-neutral-100 pb-1.5">
           <dt className="text-neutral-500">Prescribed by</dt>
-          <dd className="max-w-[60%] truncate font-semibold" title={prescriberName ?? undefined}>
+          {/* Long names must wrap on paper — never truncate inside a
+              printed document. */}
+          <dd className="min-w-0 text-right font-semibold break-words">
             {prescriberName ?? `User #${prescription.prescribed_by}`}
           </dd>
         </div>
@@ -106,7 +108,19 @@ export const PrescriptionDocument: FC<PrescriptionDocumentProps> = ({
       </div>
 
       {/* ── Medicines ───────────────────────────────────────────── */}
+      {/* Column widths keep the table readable when medicine names or
+          instructions are long: Medicine and Instructions flex to fit,
+          the short clinical fields (dosage/frequency/duration) hold a
+          steady share, and every cell wraps instead of overflowing. */}
       <table className="mt-5 w-full border-collapse text-left text-body-sm">
+        <colgroup>
+          <col className="w-8" />
+          <col className="w-[26%]" />
+          <col className="w-[15%]" />
+          <col className="w-[15%]" />
+          <col className="w-[15%]" />
+          <col />
+        </colgroup>
         <thead>
           <tr className="border-b-2 border-neutral-300 text-caption font-semibold uppercase tracking-wide text-neutral-500">
             <th scope="col" className="py-2 pr-3">#</th>
@@ -121,13 +135,13 @@ export const PrescriptionDocument: FC<PrescriptionDocumentProps> = ({
           {items.map((item, index) => (
             <tr key={item.id} className="align-top border-b border-neutral-100">
               <td className="py-2 pr-3 text-neutral-400 tabular-nums">{index + 1}</td>
-              <td className="py-2 pr-3 font-medium text-neutral-900">
+              <td className="min-w-0 py-2 pr-3 break-words font-medium text-neutral-900">
                 {item.medicine_name}
               </td>
-              <td className="py-2 pr-3 tabular-nums">{item.dosage}</td>
-              <td className="py-2 pr-3 tabular-nums">{item.frequency}</td>
-              <td className="py-2 pr-3 tabular-nums">{item.duration}</td>
-              <td className="py-2 whitespace-pre-wrap break-words text-neutral-700">
+              <td className="min-w-0 py-2 pr-3 break-words tabular-nums">{item.dosage}</td>
+              <td className="min-w-0 py-2 pr-3 break-words tabular-nums">{item.frequency}</td>
+              <td className="min-w-0 py-2 pr-3 break-words tabular-nums">{item.duration}</td>
+              <td className="min-w-0 py-2 whitespace-pre-wrap break-words text-neutral-700">
                 {item.instructions || '—'}
               </td>
             </tr>

@@ -144,56 +144,83 @@ export const PrescriptionViewDrawer: FC<PrescriptionViewDrawerProps> = ({
   };
 
   const columns: DataTableColumn<PrescriptionItemResponse>[] = [
-    { key: 'medicine_name', header: 'Medicine', render: (row) => <span className="font-medium text-neutral-900">{row.medicine_name}</span> },
+    {
+      key: 'medicine_name',
+      header: 'Medicine',
+      render: (row) => (
+        <span className="block max-w-[180px] truncate font-medium text-neutral-900" title={row.medicine_name}>
+          {row.medicine_name}
+        </span>
+      ),
+    },
     { key: 'dosage', header: 'Dosage', accessor: 'dosage' },
     { key: 'frequency', header: 'Frequency', accessor: 'frequency' },
     { key: 'duration', header: 'Duration', accessor: 'duration' },
-    { key: 'instructions', header: 'Instructions', render: (row) => <span className="block max-w-[220px] truncate text-neutral-600" title={row.instructions ?? ''}>{row.instructions || '—'}</span> },
+    {
+      key: 'instructions',
+      header: 'Instructions',
+      render: (row) => (
+        <span className="block max-w-[180px] truncate text-neutral-600" title={row.instructions ?? ''}>
+          {row.instructions || '—'}
+        </span>
+      ),
+    },
   ];
 
   return (
     <Drawer open={open} onClose={onClose} position="right" size="lg" ariaLabel="Prescription details">
       <Drawer.Header>
-        <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h2 className="text-h3 font-semibold tracking-tight text-neutral-900">Prescription</h2>
-            <p className="text-caption text-neutral-500">
-              {prescription
-                ? `Prescribed ${formatISODate(prescription.prescribed_at)} · ${prescribedByName ?? `User #${prescription.prescribed_by}`}`
-                : 'Loading…'}
-            </p>
-          </div>
-          {/* Labeled document actions — same pattern as the invoice detail header */}
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {prescription && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPrintOpen(true)}
-                  leftIcon={<Icon icon={Printer} size="xs" />}
-                >
-                  Print
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPrintOpen(true)}
-                  leftIcon={<Icon icon={Download} size="xs" />}
-                  title="Opens the print dialog — choose “Save as PDF” to download"
-                >
-                  Download PDF
-                </Button>
-              </>
-            )}
+        <div className="flex w-full flex-col gap-3">
+          {/* Title + metadata row. The drawer control (Close) sits at the
+              far-right edge — the established DensCare Drawer pattern
+              ([Title] … [Close]) — so it never reads as a document action. */}
+          <div className="flex w-full items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h2 className="text-h3 font-semibold tracking-tight text-neutral-900">Prescription</h2>
+              <p className="text-caption text-neutral-500">
+                {prescription
+                  ? `Prescribed ${formatISODate(prescription.prescribed_at)} · ${prescribedByName ?? `User #${prescription.prescribed_by}`}`
+                  : 'Loading…'}
+              </p>
+            </div>
             <IconButton
               icon={<Icon icon={X} size="sm" />}
               aria-label="Close"
+              title="Close"
               variant="ghost"
               size="sm"
               onClick={onClose}
             />
           </div>
+
+          {/* Document actions — grouped together in their own row, clearly
+              separate from the drawer control, so they read as actions ON
+              the prescription document. */}
+          {prescription && (
+            <div
+              role="group"
+              aria-label="Document actions"
+              className="flex flex-wrap items-center gap-2"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPrintOpen(true)}
+                leftIcon={<Icon icon={Printer} size="xs" />}
+              >
+                Print
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPrintOpen(true)}
+                leftIcon={<Icon icon={Download} size="xs" />}
+                title="Opens the print dialog — choose “Save as PDF” to download"
+              >
+                Download PDF
+              </Button>
+            </div>
+          )}
         </div>
       </Drawer.Header>
 
