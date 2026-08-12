@@ -1,8 +1,8 @@
 import type { FC } from 'react';
 import { MobileCard } from '../../../layouts/components/mobile/MobileCard';
 import { TreatmentPlanStatusBadge } from '../TreatmentPlanStatusBadge';
-import { formatFee } from '../../../utils/formatting';
-import { TREATMENT_PLAN_CURRENCY_SYMBOL } from '../../../constants/treatmentPlan';
+import { formatCurrency } from '../../../utils/formatting';
+import { TREATMENT_PLAN_CURRENCY_CODE } from '../../../constants/treatmentPlan';
 import type { EnrichedTreatmentPlan } from '../../../types/treatmentPlan';
 
 interface MobileTreatmentPlanCardProps {
@@ -15,7 +15,7 @@ interface MobileTreatmentPlanCardProps {
  * MobileTreatmentPlanCard — mobile presentation of a treatment plan row
  * (reference card language: plan code + status pill, bold patient, muted
  * doctor line, divider, footer with item count + estimated cost). Cost uses
- * the module's existing ₱ display convention (same as the desktop table).
+ * the module's INR (₹) display convention (same as the desktop table).
  */
 export const MobileTreatmentPlanCard: FC<MobileTreatmentPlanCardProps> = ({ plan, onClick }) => {
   const patientName = plan.patient_name ?? `Patient #${plan.patient_id}`;
@@ -42,7 +42,7 @@ export const MobileTreatmentPlanCard: FC<MobileTreatmentPlanCardProps> = ({ plan
           {plan.item_count} {plan.item_count === 1 ? 'item' : 'items'}
         </span>
         <span className="shrink-0 text-base font-bold tracking-tight text-neutral-900">
-          {formatFee(plan.total_estimated_cost, TREATMENT_PLAN_CURRENCY_SYMBOL)}
+          {formatCurrency(plan.total_estimated_cost, TREATMENT_PLAN_CURRENCY_CODE)}
         </span>
       </span>
     </MobileCard>

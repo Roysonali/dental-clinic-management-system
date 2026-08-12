@@ -76,7 +76,7 @@ describe('DoctorTable', () => {
     expect(screen.getByText('+639123456789')).toBeInTheDocument();
     // Years + formatted fee
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('₱800.00')).toBeInTheDocument();
+    expect(screen.getByText('₹800.00')).toBeInTheDocument();
     // Status + availability badges
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Inactive').length).toBeGreaterThan(0);
@@ -139,8 +139,8 @@ describe('DoctorTable', () => {
 
   it('renders the consultation fee cell for every supported fee value without crashing', () => {
     const cases: Array<{ label: string; fee: unknown; expected: string }> = [
-      { label: 'numeric fee', fee: 800, expected: '₱800.00' },
-      { label: 'numeric string fee', fee: '800.00', expected: '₱800.00' },
+      { label: 'numeric fee', fee: 800, expected: '₹800.00' },
+      { label: 'numeric string fee', fee: '800.00', expected: '₹800.00' },
       { label: 'null fee', fee: null, expected: '—' },
       { label: 'undefined fee', fee: undefined, expected: '—' },
       { label: 'invalid string fee', fee: 'not-a-number', expected: '—' },

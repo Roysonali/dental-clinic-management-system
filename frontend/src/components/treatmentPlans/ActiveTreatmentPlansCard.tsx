@@ -6,8 +6,8 @@ import { Skeleton } from '../common/Skeleton/Skeleton';
 import { EmptyState } from '../common/EmptyState/EmptyState';
 import { Button } from '../common/Button/Button';
 import { TreatmentPlanStatusBadge } from './TreatmentPlanStatusBadge';
-import { TREATMENT_PLAN_CURRENCY_SYMBOL } from '../../constants/treatmentPlan';
-import { formatFee } from '../../utils/formatting';
+import { TREATMENT_PLAN_CURRENCY_CODE } from '../../constants/treatmentPlan';
+import { formatCurrency } from '../../utils/formatting';
 import { formatISODate } from '../../utils/date';
 import { useMyActiveTreatmentPlans } from '../../hooks/treatmentPlans/useMyActiveTreatmentPlans';
 import { useAuth } from '../../hooks/auth/useAuth';
@@ -166,7 +166,7 @@ export const ActiveTreatmentPlansCard: FC = () => {
               </span>
               <span className="flex shrink-0 items-center gap-3">
                 <span className="hidden text-body-sm tabular-nums text-neutral-700 sm:inline">
-                  {formatFee(plan.total_estimated_cost, TREATMENT_PLAN_CURRENCY_SYMBOL)}
+                  {formatCurrency(plan.total_estimated_cost, TREATMENT_PLAN_CURRENCY_CODE)}
                 </span>
                 <span className="hidden text-caption text-neutral-400 md:inline">
                   {formatISODate(plan.updated_at)}

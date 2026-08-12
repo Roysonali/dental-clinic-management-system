@@ -3,8 +3,8 @@ import { Stethoscope } from 'lucide-react';
 import { Card } from '../common/Card/Card';
 import { DescriptionList } from '../common/DescriptionList/DescriptionList';
 import { Icon } from '../common/Icon/Icon';
-import { CURRENCY_SYMBOL } from '../../constants/doctor';
-import { formatFee } from '../../utils/formatting';
+import { DOCTOR_CURRENCY_CODE } from '../../constants/doctor';
+import { formatCurrency } from '../../utils/formatting';
 import type { DoctorResponse } from '../../types/doctor';
 
 interface DoctorClinicalCardProps {
@@ -35,7 +35,7 @@ export const DoctorClinicalCard: FC<DoctorClinicalCardProps> = ({ doctor }) => {
             },
             {
               label: 'Consultation Fee',
-              value: formatFee(doctor.consultation_fee, CURRENCY_SYMBOL),
+              value: formatCurrency(doctor.consultation_fee, DOCTOR_CURRENCY_CODE),
             },
             {
               label: 'Consultation Duration',

@@ -5,6 +5,7 @@ import { Form, FormActions, ValidationSummary } from '../common/Form';
 import { Input, Select, Textarea, DatePicker } from '../common/Input';
 import { UserSearchSelect } from '../common/UserSearchSelect/UserSearchSelect';
 import {
+  DOCTOR_CURRENCY_SYMBOL,
   DOCTOR_GENDERS,
   DOCTOR_GENDER_LABELS,
   MAX_CONSULTATION_DURATION,
@@ -218,7 +219,7 @@ export const DoctorForm: FC<DoctorFormProps> = ({
           type="number"
           step="0.01"
           min="0.01"
-          prefix="₱"
+          prefix={DOCTOR_CURRENCY_SYMBOL}
           disabled={disabled}
           inputMode="decimal"
           error={fieldError('consultation_fee')}

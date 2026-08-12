@@ -26,7 +26,11 @@ import { SidebarFooter } from './SidebarFooter';
  * - Collapsed: narrow width (64px), icons only, tooltips on hover
  *
  * Mobile readiness:
- * - Uses hidden on mobile (lg:flex), ready for Drawer integration in Sprint 4
+ * - `forceVisible` renders the nav as a full-height (`h-full`) flex column
+ *   so it is bounded by the MobileDrawer's viewport-height panel; that gives
+ *   SidebarContent's `flex-1 overflow-y-auto` a real height constraint and
+ *   makes the navigation area (not the page) the scroll container, with the
+ *   footer pinned at the bottom.
  * - Structure is framework-agnostic: can be moved into a Drawer without refactoring
  *
  * @example
@@ -63,7 +67,7 @@ export const Sidebar: FC<SidebarProps> = ({ collapsed: controlledCollapsed, onCo
     <nav
       className={`
         shrink-0 flex-col border-r border-neutral-200 bg-white transition-[width] duration-200
-        ${forceVisible ? 'flex' : 'hidden lg:flex'}
+        ${forceVisible ? 'flex h-full' : 'hidden lg:flex'}
         ${collapsed ? 'w-16' : 'w-[var(--sidebar-width)]'}
       `}
       aria-label="Sidebar navigation"

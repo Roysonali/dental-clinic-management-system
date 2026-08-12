@@ -5,8 +5,8 @@ import { Modal } from '../../common/Modal/Modal';
 import { Form, FormActions, ValidationSummary } from '../../common/Form';
 import { Select, Textarea } from '../../common/Input';
 import { itemFormSchema, defaultItemFormValues } from '../../../utils/itemFormSchema';
-import { TOOTH_ARCHES, TOOTH_QUADRANTS, TREATMENT_PLAN_CURRENCY_SYMBOL } from '../../../constants/treatmentPlan';
-import { formatFee } from '../../../utils/formatting';
+import { TOOTH_ARCHES, TOOTH_QUADRANTS, TREATMENT_PLAN_CURRENCY_CODE } from '../../../constants/treatmentPlan';
+import { formatCurrency } from '../../../utils/formatting';
 import type { ItemFormValues } from '../../../types/treatmentPlan';
 
 interface AddItemDialogProps {
@@ -60,7 +60,7 @@ export const AddItemDialog: FC<AddItemDialogProps> = ({
   const watchedProcedureId = useWatch({ control, name: 'procedure_id' });
   const defaultCostHint =
     watchedProcedureId && procedureCostMap[watchedProcedureId] != null
-      ? formatFee(procedureCostMap[watchedProcedureId], TREATMENT_PLAN_CURRENCY_SYMBOL)
+      ? formatCurrency(procedureCostMap[watchedProcedureId], TREATMENT_PLAN_CURRENCY_CODE)
       : undefined;
 
   return (
