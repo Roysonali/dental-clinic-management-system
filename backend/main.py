@@ -43,6 +43,7 @@ from app.modules.treatment.routers import (
 )
 from app.modules.billing.routers import billing_router
 from app.core.exception_handlers import (register_exception_handlers)
+import os
 
 app = FastAPI(
     title="DensCare API",
@@ -86,12 +87,20 @@ register_exception_handlers(app)
 # opening the app at http://127.0.0.1:5173 makes every browser request a
 # cross-origin request whose Origin is not allow-listed → the browser blocks
 # the response with "Access to XMLHttpRequest ... blocked by CORS".
+
+
+frontend_urls = os.getenv("FRONTEND_URLS", "")
+allowed_origins = [url.strip() for url in frontend_urls.split(",") if url.strip()]
+
+allowed_origins += [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=allowed_origins,
+    
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
