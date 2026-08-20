@@ -2,7 +2,8 @@ import axios from "axios";
 import { readAccessToken } from '../utils/authSession';
 
 export const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL:
+    import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000",
   // Fail fast instead of hanging forever; the timeout is surfaced via
   // parseApiError as a "timeout" kind (axios ECONNABORTED).
   timeout: 15_000,
