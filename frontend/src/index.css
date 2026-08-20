@@ -374,3 +374,86 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   PRINT DOCUMENTS (Task 4 — Printable Prescriptions & Invoices)
+   ══════════════════════════════════════════════════════════════════════
+   Print architecture: the shared PrintDocumentDialog renders the document
+   content once for on-screen preview and once into a print surface portaled
+   to <body>. When window.print() runs, only that surface prints:
+
+   - `body *` is made invisible (visibility technique — the app chrome keeps
+     its layout but never prints; the hidden ancestors do not clip the
+     absolutely-positioned document).
+   - `.print-document` (the portaled surface) is re-shown and re-flowed from
+     the top-left, so multi-page documents paginate naturally with A4 page
+     breaks and repeated table headers.
+   - `.no-print` marks screen-only chrome (dialog buttons, hints) that must
+     never reach paper.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* The print surface portal exists only for printing — hidden on screen.
+   The on-screen A4 preview lives inside the dialog (Modal.Body), which is
+   NOT marked .no-print. */
+.print-document {
+  display: none;
+  /* Faithful reproduction: document backgrounds (patient/notes blocks) are
+     part of the design, so force the engine to print them regardless of the
+     user's "Background graphics" print-dialog preference. */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Dialog chrome (header/subtitle, preview frame, footer buttons, hints)
+     never reaches paper. Must live INSIDE the media query — an outer
+     .no-print { display: none } rule would hide the on-screen preview too. */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide the application chrome (sidebar, header, workspace, modals,
+     drawers) — only the active print surface remains visible. */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-document,
+  .print-document * {
+    visibility: visible !important;
+  }
+
+  .print-document {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Keep summary/notes blocks intact across page breaks (tables are free
+     to paginate and the browser repeats <thead> on each printed page). */
+  .print-break-avoid {
+    break-inside: avoid;
+  }
+
+  /* A medicine/line-item row must never be split mid-cell across a page
+     boundary — the whole row moves to the next page instead. */
+  .print-document table tr {
+    break-inside: avoid;
+  }
+}

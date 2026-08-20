@@ -59,7 +59,7 @@ if TYPE_CHECKING:
         FollowupCreate,
     )
     from app.modules.patient_records.schemas.attachment_schema import (
-        AttachmentCreate,
+        AttachmentUpload,
     )
     from app.modules.patient_records.services import (
         PatientRecordService,
@@ -217,7 +217,7 @@ class ClinicalWorkflowOrchestrator:
         *,
         diagnoses: list["DiagnosisCreate"] | None = None,
         prescription_payload: "PrescriptionCreate | None" = None,
-        attachment_payload: "AttachmentCreate | None" = None,
+        attachment_payload: "AttachmentUpload | None" = None,
         followup_payload: "FollowupCreate | None" = None,
         actor_id: int,
     ) -> dict:

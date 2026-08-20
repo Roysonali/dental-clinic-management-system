@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
-import { Plus } from 'lucide-react';
 import { ProcedureTable } from '../ProcedureTable';
 import { ProcedureFormDialog } from '../ProcedureFormDialog';
 import { DeleteProcedureDialog, type ProcedureStatusIntent } from '../DeleteProcedureDialog';
-import { PermissionGate } from '../../rbac/PermissionGate';
-import { Button } from '../../common/Button/Button';
-import { Icon } from '../../common/Icon/Icon';
 import { Pagination } from '../../common/Pagination/Pagination';
-import { SearchBar } from '../../common/SearchBar/SearchBar';
-import { Select } from '../../common/Input/Select';
 import { ToastContainer, type Toast } from '../../common/Toast';
 import { useProcedures } from '../../../hooks/procedures/useProcedures';
 import { useProcedureSearch } from '../../../hooks/procedures/useProcedureSearch';
@@ -16,10 +10,9 @@ import { useProcedure } from '../../../hooks/procedures/useProcedure';
 import { useCreateProcedure, useUpdateProcedure, useActivateProcedure, useDeactivateProcedure, useDeleteProcedure } from '../../../hooks/procedures/useProcedureMutations';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { procedureFormValuesToCreate, procedureFormValuesToUpdate } from '../procedureFormUtils';
-import { PROCEDURE_CATEGORY_FILTERS, PROCEDURE_PAGE_SIZE_OPTIONS } from '../../../constants/procedure';
-import { ADMIN_ROLES } from '../../../constants/roles';
+import { PROCEDURE_PAGE_SIZE_OPTIONS } from '../../../constants/procedure';
 import { parseApiError } from '../../../services/apiError';
-import type { ProcedureFormValues, ProcedureListParams, ProcedureResponse } from '../../../types/procedure';
+import type { ProcedureCategory, ProcedureFormValues, ProcedureListParams, ProcedureResponse } from '../../../types/procedure';
 
 /** Toast lifetime before auto-dismiss (ms). */
 const TOAST_DURATION_MS = 5000;
@@ -34,7 +27,7 @@ const TOAST_DURATION_MS = 5000;
  */
 export const ProcedureListContainer: FC = () => {
   const [searchInput, setSearchInput] = useState('');
-  const [category, setCategory] = useState<ProcedureListParams['category'] | 'all'>('all');
+  const [category, setCategory] = useState<ProcedureCategory | 'all'>('all');
   const [isActive, setIsActive] = useState<'all' | 'active' | 'inactive'>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -112,6 +105,14 @@ export const ProcedureListContainer: FC = () => {
     }
   };
 
+  const openCreateForm = () => {
+    setFormMode('create');
+    setEditingId(null);
+    setFormError(null);
+    setFormFieldErrors({});
+    setFormOpen(true);
+  };
+
   const handleStatusConfirm = () => {
     if (!statusState) return;
     setStatusError(null);
@@ -140,63 +141,26 @@ export const ProcedureListContainer: FC = () => {
   const queryError = proceduresQuery.error ? parseApiError(proceduresQuery.error).message : null;
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:max-w-xl">
-          <SearchBar
-            value={searchInput}
-            onChange={setSearchInput}
-            placeholder="Search procedures…"
-            loading={isSearching ? searchQuery.isFetching : proceduresQuery.isFetching && !proceduresQuery.isPlaceholderData}
-          />
-          <Select
-            label="Category"
-            options={PROCEDURE_CATEGORY_FILTERS}
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value as ProcedureListParams['category'] | 'all');
-              setPage(1);
-            }}
-          />
-          <Select
-            label="Status"
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
-            ]}
-            value={isActive}
-            onChange={(e) => {
-              setIsActive(e.target.value as 'all' | 'active' | 'inactive');
-              setPage(1);
-            }}
-          />
-        </div>
-
-        <PermissionGate requiredRoles={ADMIN_ROLES}>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              setFormMode('create');
-              setEditingId(null);
-              setFormError(null);
-              setFormFieldErrors({});
-              setFormOpen(true);
-            }}
-            leftIcon={<Icon icon={Plus} size="xs" />}
-          >
-            New Procedure
-          </Button>
-        </PermissionGate>
-      </div>
-
+    <div className="flex w-full flex-col gap-4">
       <ProcedureTable
         procedures={visibleRows}
         loading={rowsLoading}
         error={queryError}
         onRetry={() => void (isSearching ? searchQuery.refetch() : proceduresQuery.refetch())}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchLoading={isSearching ? searchQuery.isFetching : proceduresQuery.isFetching && !proceduresQuery.isPlaceholderData}
+        category={category}
+        onCategoryChange={(next) => {
+          setCategory(next);
+          setPage(1);
+        }}
+        status={isActive}
+        onStatusChange={(next) => {
+          setIsActive(next);
+          setPage(1);
+        }}
+        onCreate={openCreateForm}
         onEdit={(procedure) => {
           setFormMode('edit');
           setEditingId(procedure.id);

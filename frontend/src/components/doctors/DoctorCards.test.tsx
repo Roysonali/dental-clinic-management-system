@@ -66,7 +66,7 @@ describe('DoctorClinicalCard', () => {
     expect(screen.getByText('Clinical Information')).toBeInTheDocument();
     expect(screen.getByText('DMD, UP Manila')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('₱800.00')).toBeInTheDocument();
+    expect(screen.getByText('₹800.00')).toBeInTheDocument();
     expect(screen.getByText('30 min')).toBeInTheDocument();
     expect(screen.getByText('Seasoned practitioner with a focus on preventive care.')).toBeInTheDocument();
   });

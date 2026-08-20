@@ -4,8 +4,8 @@ import { DataTable } from '../common/DataTable/DataTable';
 import { Button } from '../common/Button/Button';
 import { Icon } from '../common/Icon/Icon';
 import { TreatmentPlanStatusBadge } from './TreatmentPlanStatusBadge';
-import { TREATMENT_PLAN_CURRENCY_SYMBOL } from '../../constants/treatmentPlan';
-import { formatFee } from '../../utils/formatting';
+import { TREATMENT_PLAN_CURRENCY_CODE } from '../../constants/treatmentPlan';
+import { formatCurrency } from '../../utils/formatting';
 import { formatISODate } from '../../utils/date';
 import type { EnrichedTreatmentPlan } from '../../types/treatmentPlan';
 
@@ -89,7 +89,8 @@ export const TreatmentPlanTable: FC<TreatmentPlanTableProps> = ({
           header: 'Total Cost',
           accessor: 'total_estimated_cost',
           align: 'right',
-          render: (plan) => formatFee(plan.total_estimated_cost, TREATMENT_PLAN_CURRENCY_SYMBOL),
+          cellClassName: 'tabular-nums',
+          render: (plan) => formatCurrency(plan.total_estimated_cost, TREATMENT_PLAN_CURRENCY_CODE),
         },
         {
           key: 'created_at',

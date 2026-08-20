@@ -4,8 +4,8 @@ import { DataTable } from '../common/DataTable/DataTable';
 import { Button } from '../common/Button/Button';
 import { Icon } from '../common/Icon/Icon';
 import { Badge } from '../common/Badge/Badge';
-import { TREATMENT_PLAN_CURRENCY_SYMBOL } from '../../constants/treatmentPlan';
-import { formatFee } from '../../utils/formatting';
+import { TREATMENT_PLAN_CURRENCY_CODE } from '../../constants/treatmentPlan';
+import { formatCurrency } from '../../utils/formatting';
 import { formatToothLabel } from '../../utils/treatmentPlanFormatting';
 import type { TreatmentPlanItemResponse } from '../../types/treatmentPlan';
 
@@ -80,13 +80,15 @@ export const TreatmentPlanItemsTable: FC<TreatmentPlanItemsTableProps> = ({
           key: 'cost',
           header: 'Est. Cost',
           align: 'right',
-          render: (item) => formatFee(item.estimated_cost, TREATMENT_PLAN_CURRENCY_SYMBOL),
+          cellClassName: 'tabular-nums',
+          render: (item) => formatCurrency(item.estimated_cost, TREATMENT_PLAN_CURRENCY_CODE),
         },
         {
           key: 'discount',
           header: 'Discount',
           align: 'right',
-          render: (item) => (item.discount ? formatFee(item.discount, TREATMENT_PLAN_CURRENCY_SYMBOL) : '—'),
+          cellClassName: 'tabular-nums',
+          render: (item) => (item.discount ? formatCurrency(item.discount, TREATMENT_PLAN_CURRENCY_CODE) : '—'),
         },
         {
           key: 'status',

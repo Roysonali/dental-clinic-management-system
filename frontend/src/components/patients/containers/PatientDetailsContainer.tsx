@@ -1,6 +1,7 @@
 import { useState, type FC } from 'react';
-import { useParams } from 'react-router-dom';
-import { Pencil, UserCheck, UserX } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, Pencil, UserCheck, UserX } from 'lucide-react';
+import { ROUTES } from '../../../routes/routes';
 import { usePatient } from '../../../hooks/patients/usePatient';
 import { useActivatePatient, useDeactivatePatient } from '../../../hooks/patients/usePatientMutations';
 import { parseApiError } from '../../../services/apiError';
@@ -36,6 +37,28 @@ function EmptyTab({ title, description }: { title: string; description: string }
     <div className="rounded-xl border border-neutral-200 bg-white p-8">
       <EmptyState title={title} description={description} />
     </div>
+  );
+}
+
+/**
+ * BackToPatientsButton — detail-page Back control, mirroring the Users
+ * module's pattern (ghost Button + ChevronLeft → ROUTES.PATIENTS).
+ * Rendered in every state (loading / error / loaded) so mobile users can
+ * always return to the Patient list without relying on the browser back
+ * button.
+ */
+function BackToPatientsButton() {
+  const navigate = useNavigate();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => navigate(ROUTES.PATIENTS)}
+      leftIcon={<Icon icon={ChevronLeft} size="sm" />}
+      className="self-start"
+    >
+      Back to Patients
+    </Button>
   );
 }
 
@@ -119,26 +142,36 @@ export const PatientDetailsContainer: FC = () => {
 
   if (patientQuery.isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center" role="status" aria-label="Loading patient">
-        <Spinner size="lg" variant="primary" />
-      </div>
+      <ContentContainer width="wide">
+        <div className="flex flex-col gap-6">
+          <BackToPatientsButton />
+          <div className="flex h-64 items-center justify-center" role="status" aria-label="Loading patient">
+            <Spinner size="lg" variant="primary" />
+          </div>
+        </div>
+      </ContentContainer>
     );
   }
 
   if (patientQuery.isError || !patientQuery.data) {
     return (
-      <div className="rounded-xl border border-danger/20 bg-danger/5 p-8">
-        <ResultState
-          variant="error"
-          title="Unable to load patient"
-          description={errorMessage ?? 'This patient could not be found.'}
-          actions={
-            <Button variant="primary" size="md" onClick={() => void patientQuery.refetch()}>
-              Retry
-            </Button>
-          }
-        />
-      </div>
+      <ContentContainer width="wide">
+        <div className="flex flex-col gap-6">
+          <BackToPatientsButton />
+          <div className="rounded-xl border border-danger/20 bg-danger/5 p-8">
+            <ResultState
+              variant="error"
+              title="Unable to load patient"
+              description={errorMessage ?? 'This patient could not be found.'}
+              actions={
+                <Button variant="primary" size="md" onClick={() => void patientQuery.refetch()}>
+                  Retry
+                </Button>
+              }
+            />
+          </div>
+        </div>
+      </ContentContainer>
     );
   }
 
@@ -147,6 +180,8 @@ export const PatientDetailsContainer: FC = () => {
   return (
     <ContentContainer width="wide">
       <div className="flex flex-col gap-6">
+        <BackToPatientsButton />
+
         <PatientHeader
           patient={patient}
           actions={

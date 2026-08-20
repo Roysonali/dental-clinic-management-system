@@ -45,9 +45,10 @@ const APPOINTMENT_TOOLBAR_COLUMNS: ToolbarColumnDescriptor[] = [
 /**
  * AppointmentToolbar — search + status filter + New Appointment action +
  * column visibility menu. Mirrors PatientToolbar exactly: composes the shared
- * DataTableToolbar so search/filters stay grouped as table controls, the
- * Columns menu renders beneath the primary CTA (never beside it), and the CTA
- * pins to the far right and never wraps on desktop.
+ * DataTableToolbar so search/filters stay grouped as table controls, while
+ * the Columns menu and the New Appointment CTA share the right-side cluster
+ * on a single row (Columns first, then the CTA), which pins to the far right
+ * and never wraps on desktop.
  */
 export const AppointmentToolbar: FC<AppointmentToolbarProps> = ({
   searchValue,

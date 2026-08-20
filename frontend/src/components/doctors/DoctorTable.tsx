@@ -12,8 +12,8 @@ import { ResultState } from '../common/ResultState/ResultState';
 import { Button } from '../common/Button/Button';
 import { DoctorAvatar } from './DoctorAvatar';
 import { DoctorStatusBadge } from './DoctorStatusBadge';
-import { CURRENCY_SYMBOL } from '../../constants/doctor';
-import { formatFee } from '../../utils/formatting';
+import { DOCTOR_CURRENCY_CODE } from '../../constants/doctor';
+import { formatCurrency } from '../../utils/formatting';
 import { useIsNarrowViewport } from '../../hooks/useIsNarrowViewport';
 import type { ColumnVisibility } from '../common/DataTable';
 import type { DoctorResponse } from '../../types/doctor';
@@ -118,7 +118,7 @@ function DoctorCard({
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-neutral-100 pt-4 text-body-sm">
         <div className="min-w-0">
           <dt className="text-caption text-neutral-400">Consultation Fee</dt>
-          <dd className="font-medium tabular-nums text-neutral-800">{formatFee(doctor.consultation_fee, CURRENCY_SYMBOL)}</dd>
+          <dd className="font-medium tabular-nums text-neutral-800">{formatCurrency(doctor.consultation_fee, DOCTOR_CURRENCY_CODE)}</dd>
         </div>
         <div className="min-w-0">
           <dt className="text-caption text-neutral-400">Experience</dt>
@@ -379,7 +379,7 @@ export const DoctorTable: FC<DoctorTableProps> = ({
         {
           key: 'consultation_fee',
           header: 'Consultation Fee',
-          render: (doctor) => formatFee(doctor.consultation_fee, CURRENCY_SYMBOL),
+          render: (doctor) => formatCurrency(doctor.consultation_fee, DOCTOR_CURRENCY_CODE),
           sortValue: (doctor) => doctor.consultation_fee ?? 0,
           sortable: true,
           hideable: true,

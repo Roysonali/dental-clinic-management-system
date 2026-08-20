@@ -48,14 +48,15 @@ export const getInitials = (fullName: string | null | undefined): string => {
 
 /**
  * Format a monetary amount with two decimals and the given currency
- * symbol, e.g. `formatFee(800, '₱')` → "₱800.00". Returns "—" for null,
+ * symbol, e.g. `formatFee(800, '₹')` → "₹800.00". Returns "—" for null,
  * undefined, empty strings, and any value that cannot be coerced to a
  * finite number (including the numeric strings the API may deliver, e.g.
  * `"800.00"`). Defensive by design: this shared helper is the last line of
  * defence for fee display, so it never throws on unexpected input.
  *
- * Shared by the Doctor table and details cards (single source of truth
- * for fee display; the symbol comes from the caller's module constants).
+ * Symbol-based helper retained for generic use. Module fee displays now
+ * prefer `formatCurrency(value, code)` (code → symbol mapping with
+ * thousands grouping); callers of `formatFee` pass their own symbol.
  */
 export const formatFee = (
   value: number | string | null | undefined,

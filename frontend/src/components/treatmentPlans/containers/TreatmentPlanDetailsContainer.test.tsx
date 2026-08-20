@@ -211,7 +211,7 @@ describe('TreatmentPlanDetailsContainer', () => {
 
   // F-01 regression: the detail aggregate carries NO item_count /
   // total_estimated_cost — the Plan Summary card must derive both from the
-  // embedded items (1 item × ₱1,500) instead of rendering blank / "₱—".
+  // embedded items (1 item × ₹1,500) instead of rendering blank / "₹—".
   it('derives the Plan Summary totals from plan.items (F-01 regression)', async () => {
     renderDetails();
 
@@ -220,9 +220,9 @@ describe('TreatmentPlanDetailsContainer', () => {
     const summaryCard = screen.getByText('Plan Summary').closest('div.rounded-xl');
     expect(summaryCard).not.toBeNull();
     expect(within(summaryCard as HTMLElement).getByText('1')).toBeInTheDocument();
-    // formatFee emits no thousands separator — "₱1500.00".
-    expect(within(summaryCard as HTMLElement).getByText('₱1500.00')).toBeInTheDocument();
+    // formatCurrency renders INR with thousands grouping — "₹1,500.00".
+    expect(within(summaryCard as HTMLElement).getByText('₹1,500.00')).toBeInTheDocument();
     // The pre-fix defect rendered a placeholder dash for an undefined total.
-    expect(screen.queryByText('₱—')).not.toBeInTheDocument();
+    expect(screen.queryByText('₹—')).not.toBeInTheDocument();
   });
 });

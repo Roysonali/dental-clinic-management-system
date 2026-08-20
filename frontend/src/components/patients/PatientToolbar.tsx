@@ -45,10 +45,10 @@ const PATIENT_TOOLBAR_COLUMNS: ToolbarColumnDescriptor[] = [
  * visibility menu. Composes the shared DataTableToolbar (which reuses the
  * Dropdown primitive for the columns menu).
  *
- * Layout: search + status filter + Columns menu stay grouped as table
- * controls; the Register Patient button is the module's primary CTA and is
- * rendered via `primaryActions` so it pins to the far right and never
- * wraps/shrinks on desktop.
+ * Layout: search + status filter stay grouped as table controls on the
+ * left; the Columns menu and Register Patient button share the right-side
+ * cluster on a single row (Columns first, then the CTA), which pins to the
+ * far right and never wraps/shrinks on desktop.
  */
 export const PatientToolbar: FC<PatientToolbarProps> = ({
   searchValue,

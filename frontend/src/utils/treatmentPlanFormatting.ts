@@ -4,11 +4,11 @@
  * Covers the backend quirks verified in the contract review:
  * - Version snapshot monetary values are STRINGS (`"15000.00"`), unlike
  *   top-level responses where they are JSON numbers ([BCR §6.6]).
- * - Money is formatted with the shared `formatFee` + the module currency
- *   symbol ([P2.5 §2.3]).
+ * - Money is formatted with the shared `formatCurrency` + the module
+ *   presentation currency code (INR → ₹, grouped) ([P2.5 §2.3]).
  */
-import { formatFee } from './formatting';
-import { TREATMENT_PLAN_CURRENCY_SYMBOL } from '../constants/treatmentPlan';
+import { formatCurrency } from './formatting';
+import { TREATMENT_PLAN_CURRENCY_CODE } from '../constants/treatmentPlan';
 
 /** Parse a snapshot monetary value (string or number) into a number. NaN-safe. */
 export function parseSnapshotMoney(value: string | number | null | undefined): number {
@@ -17,9 +17,9 @@ export function parseSnapshotMoney(value: string | number | null | undefined): n
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-/** Format a cost for display using the module currency symbol. */
+/** Format a cost for display in the module presentation currency (₹). */
 export function formatTreatmentCost(value: number | string | null | undefined): string {
-  return formatFee(value, TREATMENT_PLAN_CURRENCY_SYMBOL);
+  return formatCurrency(value, TREATMENT_PLAN_CURRENCY_CODE);
 }
 
 /** Tooth label, e.g. "#46 (MOD)" or "#36" or "—" when unset. */

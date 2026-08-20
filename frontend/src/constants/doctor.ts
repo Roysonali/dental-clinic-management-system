@@ -68,8 +68,20 @@ export const EMERGENCY_CONTACT_NAME_MAX_LENGTH = 100;
 
 /* ── Display ─────────────────────────────────────────────────────────── */
 
-/** Currency prefix for the consultation fee column (PHP). */
-export const CURRENCY_SYMBOL = '₱';
+/**
+ * Doctor-module presentation currency (approved DensCare product
+ * requirement — the clinic bills in INR).
+ *
+ * Fee displays (list table, mobile card, clinical details card) render
+ * through the shared `formatCurrency(value, code)` formatter, which maps
+ * INR → ₹ with thousands grouping, e.g. `formatCurrency(15000, 'INR')` →
+ * "₹15,000.00". This code is the single point of change for Doctor fee
+ * presentation.
+ */
+export const DOCTOR_CURRENCY_CODE = 'INR' as const;
+
+/** Rupee glyph for the fee input prefix (matches the shared formatter's INR symbol). */
+export const DOCTOR_CURRENCY_SYMBOL = '₹' as const;
 
 /* ── List / pagination UI constants ─────────────────────────────────── */
 

@@ -187,6 +187,32 @@ class FollowupNotFound(PatientRecordException):
 
 
 # ==================================================================
+# Attachment download exceptions
+# ==================================================================
+
+
+class AttachmentDownloadError(PatientRecordException):
+    """Raised when an attachment's stored file cannot be served.
+
+    Covers both legacy metadata-only rows (no ``storage_key``) and rows
+    whose stored object is missing from the storage backend.  Mapped to
+    HTTP 404 by the global exception handler.
+    """
+
+    def __init__(
+        self,
+        attachment_id: Any | None = None,
+        details: Any = None,
+    ) -> None:
+        identifier = f"id={attachment_id!r}" if attachment_id is not None else "unknown"
+        super().__init__(
+            code="ATTACHMENT_DOWNLOAD_ERROR",
+            message=f"Attachment file for {identifier} is not available",
+            details=details,
+        )
+
+
+# ==================================================================
 # Business rule exceptions
 # ==================================================================
 

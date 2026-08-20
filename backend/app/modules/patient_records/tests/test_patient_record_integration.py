@@ -40,10 +40,14 @@ from app.modules.patient_records.schemas.patient_record_schema import PatientRec
 from app.modules.patient_records.schemas.diagnosis_schema import DiagnosisCreate, DiagnosisUpdate
 from app.modules.patient_records.schemas.prescription_schema import PrescriptionCreate, PrescriptionItemCreate
 from app.modules.patient_records.schemas.followup_schema import FollowupCreate, FollowupUpdate
-from app.modules.patient_records.schemas.attachment_schema import AttachmentCreate
-from app.modules.patient_records.constants import PRESCRIPTION_CREATED
-from app.modules.patient_records.exceptions import PatientRecordBusinessRule
+from app.modules.patient_records.schemas.attachment_schema import AttachmentUpload
+from app.modules.patient_records.constants import PRESCRIPTION_CREATED, ATTACHMENT_DOWNLOADED
+from app.modules.patient_records.exceptions import (
+    AttachmentDownloadError,
+    PatientRecordBusinessRule,
+)
 from app.modules.patient_records.validators import PatientRecordValidator
+from app.core.storage import LocalStorage
 
 
 @pytest.fixture(scope="function")
@@ -228,28 +232,71 @@ class TestSoftDeleteWorkflow:
 
 
 class TestAttachmentWorkflow:
-    """upload attachment -> get -> delete."""
+    """upload file -> get -> download -> delete (real storage round-trip)."""
 
-    def test_attachment_lifecycle(self, db: Session):
+    def test_attachment_lifecycle(self, db: Session, tmp_path):
         record_repo = PatientRecordRepository(db)
         record = PatientRecord(patient_id=uuid4(), appointment_id=uuid4())
         record = record_repo.create_patient_record(record)
-        svc = AttachmentService(db)
+        storage = LocalStorage(tmp_path / "uploads")
+        svc = AttachmentService(db, storage=storage)
 
-        attachment = svc.upload_attachment(record.id, AttachmentCreate(
-            attachment_type=AttachmentType.DOCUMENT, file_name="xray.pdf",
-            file_path="/uploads/xray.pdf", mime_type="application/pdf", file_size=1024,
+        content = b"%PDF-1.4\nreal pdf content"
+        attachment = svc.upload_attachment(record.id, AttachmentUpload(
+            file_name="xray.pdf",
+            content=content,
+            content_type="application/pdf",
+            attachment_type=AttachmentType.PDF,
         ), actor_id=1)
         assert attachment.id is not None
         assert attachment.file_name == "xray.pdf"
+        assert attachment.mime_type == "application/pdf"
+        assert attachment.file_size == len(content)
+        assert attachment.uploaded_by == 1
+        assert attachment.storage_key is not None
+        # Physical object really exists on disk.
+        assert storage.exists(attachment.storage_key)
 
         assert svc.get_attachment(attachment.id) is not None
         _, total = svc.list_attachments(record.id)
         assert total >= 1
 
+        # Download returns the exact bytes and writes an audit entry.
+        downloaded, att = svc.download_attachment(attachment.id, actor_id=2)
+        assert downloaded == content
+        assert att.id == attachment.id
+        audits, _ = AuditLogRepository(db).get_by_record(record.id)
+        assert ATTACHMENT_DOWNLOADED in [a.action for a in audits]
+
         svc.delete_attachment(attachment.id, actor_id=1)
+        # Soft delete hides the row AND removes the physical file.
         assert svc.get_attachment(attachment.id) is None
         visible = svc.get_attachment(attachment.id, include_deleted=True)
         assert visible is not None
         assert visible.is_deleted is True
+        assert not storage.exists(attachment.storage_key)
+        db.rollback()
+
+    def test_legacy_row_without_file_cannot_be_downloaded(self, db: Session, tmp_path):
+        """Metadata-only legacy rows (no storage_key) must not resolve."""
+        record_repo = PatientRecordRepository(db)
+        record = PatientRecord(patient_id=uuid4(), appointment_id=uuid4())
+        record = record_repo.create_patient_record(record)
+        storage = LocalStorage(tmp_path / "uploads")
+        svc = AttachmentService(db, storage=storage)
+
+        # Simulate a legacy metadata-only row (storage_key stays NULL).
+        legacy = PatientRecordAttachment(
+            patient_record_id=record.id,
+            attachment_type=AttachmentType.DOCUMENT,
+            file_name="legacy.pdf",
+            file_path="D:\\Xrays\\legacy.pdf",
+            mime_type="application/pdf",
+            file_size=1024,
+        )
+        legacy = svc.attachment_repo.create(legacy)
+        db.commit()
+
+        with pytest.raises(AttachmentDownloadError):
+            svc.download_attachment(legacy.id, actor_id=1)
         db.rollback()

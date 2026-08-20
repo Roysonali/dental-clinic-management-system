@@ -323,22 +323,56 @@ class TestPrescriptionEndpoints:
         assert resp.status_code == 404
 
 
+def _make_mock_attachment(**overrides):
+    att = MagicMock()
+    defaults = dict(
+        id=uuid4(),
+        attachment_type="PDF",
+        file_name="report.pdf",
+        file_path="a" * 32,
+        storage_key="a" * 32,
+        uploaded_by=1,
+        mime_type="application/pdf",
+        file_size=1024,
+        patient_record_id=uuid4(),
+        created_at="2026-01-15T10:30:00Z",
+        updated_at="2026-06-20T14:45:00Z",
+    )
+    for key, value in {**defaults, **overrides}.items():
+        setattr(att, key, value)
+    return att
+
+
 class TestAttachmentEndpoints:
-    def test_upload_success(self, client, mock_att_svc):
-        att = MagicMock()
-        att.id = uuid4()
-        att.attachment_type = "DOCUMENT"
-        att.file_name = "report.pdf"
-        att.file_path = "/uploads/report.pdf"
-        att.mime_type = "application/pdf"
-        att.file_size = 1024
-        att.patient_record_id = uuid4()
-        att.created_at = "2026-01-15T10:30:00Z"
-        att.updated_at = "2026-06-20T14:45:00Z"
+    def test_upload_success_multipart(self, client, mock_att_svc):
+        att = _make_mock_attachment()
         mock_att_svc.upload_attachment.return_value = att
-        payload = {"attachment_type": "DOCUMENT", "file_name": "report.pdf", "file_path": "/uploads/report.pdf"}
-        resp = client.post(f"/patient-records/{uuid4()}/attachments", json=payload)
+        resp = client.post(
+            f"/patient-records/{uuid4()}/attachments",
+            data={"attachment_type": "PDF"},
+            files={"file": ("report.pdf", b"%PDF-1.4 fake", "application/pdf")},
+        )
         assert resp.status_code == 201
+        assert resp.json()["file_name"] == "report.pdf"
+        # The service receives the raw file + declared type.
+        upload_payload = mock_att_svc.upload_attachment.call_args.kwargs["payload"]
+        assert upload_payload.file_name == "report.pdf"
+        assert upload_payload.content.startswith(b"%PDF-1.4")
+        assert upload_payload.attachment_type == "PDF"
+
+    def test_upload_missing_file_is_422(self, client):
+        resp = client.post(
+            f"/patient-records/{uuid4()}/attachments",
+            data={"attachment_type": "PDF"},
+        )
+        assert resp.status_code == 422
+
+    def test_upload_missing_type_is_422(self, client):
+        resp = client.post(
+            f"/patient-records/{uuid4()}/attachments",
+            files={"file": ("report.pdf", b"%PDF-1.4 fake", "application/pdf")},
+        )
+        assert resp.status_code == 422
 
     def test_list_success(self, client, mock_att_svc):
         mock_att_svc.list_attachments.return_value = ([], 0)
@@ -346,24 +380,59 @@ class TestAttachmentEndpoints:
         assert resp.status_code == 200
 
     def test_get_success(self, client, mock_att_svc):
-        att = MagicMock()
-        att.id = uuid4()
-        att.attachment_type = "DOCUMENT"
-        att.file_name = "report.pdf"
-        att.file_path = "/uploads/report.pdf"
-        att.mime_type = "application/pdf"
-        att.file_size = 1024
-        att.patient_record_id = uuid4()
-        att.created_at = "2026-01-15T10:30:00Z"
-        att.updated_at = "2026-06-20T14:45:00Z"
+        att = _make_mock_attachment()
         mock_att_svc.get_attachment.return_value = att
         resp = client.get(f"/attachments/{att.id}")
         assert resp.status_code == 200
+        assert resp.json()["uploaded_by"] == 1
 
     def test_get_not_found(self, client, mock_att_svc):
         mock_att_svc.get_attachment.return_value = None
         resp = client.get(f"/attachments/{uuid4()}")
         assert resp.status_code == 404
+
+    def test_download_success(self, client, mock_att_svc):
+        att = _make_mock_attachment(file_name="Réport pdf.pdf")
+        mock_att_svc.download_attachment.return_value = (b"%PDF-1.4 content", att)
+        resp = client.get(f"/attachments/{att.id}/download")
+        assert resp.status_code == 200
+        assert resp.content == b"%PDF-1.4 content"
+        assert resp.headers["content-type"].startswith("application/pdf")
+        disposition = resp.headers["content-disposition"]
+        assert disposition.startswith("attachment")
+        # Non-ASCII filename is preserved via the RFC 5987 filename* form.
+        assert "filename*=UTF-8''" in disposition
+
+    def test_download_not_found(self, client, mock_att_svc):
+        mock_att_svc.download_attachment.side_effect = AttachmentNotFound(attachment_id=uuid4())
+        resp = client.get(f"/attachments/{uuid4()}/download")
+        assert resp.status_code == 404
+
+    def test_download_legacy_row_returns_404(self, client, mock_att_svc):
+        from app.modules.patient_records.exceptions import AttachmentDownloadError
+        mock_att_svc.download_attachment.side_effect = AttachmentDownloadError(attachment_id=uuid4())
+        resp = client.get(f"/attachments/{uuid4()}/download")
+        assert resp.status_code == 404
+
+    def test_preview_success_inline(self, client, mock_att_svc):
+        att = _make_mock_attachment(mime_type="application/pdf")
+        mock_att_svc.download_attachment.return_value = (b"%PDF-1.4 content", att)
+        resp = client.get(f"/attachments/{att.id}/preview")
+        assert resp.status_code == 200
+        assert resp.headers["content-disposition"].startswith("inline")
+
+    def test_preview_unsupported_type_returns_400(self, client, mock_att_svc):
+        att = _make_mock_attachment(mime_type="text/plain", file_name="notes.txt")
+        mock_att_svc.download_attachment.return_value = (b"plain text", att)
+        resp = client.get(f"/attachments/{att.id}/preview")
+        assert resp.status_code == 400
+
+    def test_download_denied_for_unauthorized_role(self, client, app):
+        """RBAC/IDOR: a user without patient-record read roles is denied
+        even with a valid attachment ID (not just hidden in the UI)."""
+        app.dependency_overrides[get_current_user] = lambda: _make_mock_user("NURSE")
+        resp = client.get(f"/attachments/{uuid4()}/download")
+        assert resp.status_code == 403
 
     def test_delete_success(self, client, mock_att_svc):
         resp = client.delete(f"/attachments/{uuid4()}")

@@ -23,6 +23,7 @@ from app.modules.auth.exceptions import (
     UserNotFound,
 )
 from app.modules.patient_records.exceptions import (
+    AttachmentDownloadError as PatientRecordAttachmentDownloadError,
     AttachmentNotFound as PatientRecordAttachmentNotFound,
     DiagnosisNotFound as PatientRecordDiagnosisNotFound,
     FollowupNotFound as PatientRecordFollowupNotFound,
@@ -205,6 +206,7 @@ _PATIENT_RECORD_EXCEPTION_MAP: dict[type[PatientRecordException], int] = {
     PatientRecordPrescriptionNotFound: status.HTTP_404_NOT_FOUND,
     PrescriptionItemNotFound: status.HTTP_404_NOT_FOUND,
     PatientRecordAttachmentNotFound: status.HTTP_404_NOT_FOUND,
+    PatientRecordAttachmentDownloadError: status.HTTP_404_NOT_FOUND,
     PatientRecordFollowupNotFound: status.HTTP_404_NOT_FOUND,
 }
 

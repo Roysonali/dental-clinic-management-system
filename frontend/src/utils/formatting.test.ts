@@ -12,28 +12,28 @@ import {
 
 describe('formatFee', () => {
   it('formats a fee with two decimals and the given symbol', () => {
-    expect(formatFee(800, '₱')).toBe('₱800.00');
-    expect(formatFee(1234.5, '₱')).toBe('₱1234.50');
+    expect(formatFee(800, '₹')).toBe('₹800.00');
+    expect(formatFee(1234.5, '₹')).toBe('₹1234.50');
     expect(formatFee(0.01, '$')).toBe('$0.01');
   });
 
   it('formats numeric string fees (backend Decimal wire format)', () => {
-    expect(formatFee('800', '₱')).toBe('₱800.00');
-    expect(formatFee('800.00', '₱')).toBe('₱800.00');
-    expect(formatFee('1234.5', '₱')).toBe('₱1234.50');
+    expect(formatFee('800', '₹')).toBe('₹800.00');
+    expect(formatFee('800.00', '₹')).toBe('₹800.00');
+    expect(formatFee('1234.5', '₹')).toBe('₹1234.50');
     expect(formatFee('0.01', '$')).toBe('$0.01');
   });
 
   it('returns an em-dash for nullish values', () => {
-    expect(formatFee(null, '₱')).toBe('—');
-    expect(formatFee(undefined, '₱')).toBe('—');
+    expect(formatFee(null, '₹')).toBe('—');
+    expect(formatFee(undefined, '₹')).toBe('—');
   });
 
   it('returns an em-dash for empty and invalid string values without throwing', () => {
-    expect(formatFee('', '₱')).toBe('—');
-    expect(formatFee('not-a-number', '₱')).toBe('—');
-    expect(formatFee('NaN', '₱')).toBe('—');
-    expect(formatFee('Infinity', '₱')).toBe('—');
+    expect(formatFee('', '₹')).toBe('—');
+    expect(formatFee('not-a-number', '₹')).toBe('—');
+    expect(formatFee('NaN', '₹')).toBe('—');
+    expect(formatFee('Infinity', '₹')).toBe('—');
   });
 });
 

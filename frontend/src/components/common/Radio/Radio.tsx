@@ -47,7 +47,15 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(
           {...rest}
         />
 
-        {/* Custom radio visual */}
+        {/* Custom radio visual.
+            NOTE: `peer-checked:` compiles to the general-sibling selector
+            `:is(:where(.peer):checked~*)`, which only reaches elements that are
+            DIRECT SIBLINGS of the hidden input. The inner dot is a child of this
+            circle, so the checked-state control lives here on the circle (the
+            sibling) via an arbitrary child selector (`[&>span]:`), which reaches
+            the dot. Putting `peer-checked:scale-100` directly on the dot would
+            never match — the checked radio previously showed a blue border with
+            no dot. */}
         <span
           className={`
             ${outerSize} mt-0.5 shrink-0 rounded-full border-2
@@ -55,6 +63,7 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(
             transition-all duration-150
             border-neutral-300 peer-hover:border-neutral-400
             peer-checked:border-primary-500
+            peer-checked:[&>span]:scale-100
             peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500/30 peer-focus-visible:ring-offset-1
             peer-disabled:border-neutral-200
           `}
@@ -64,7 +73,7 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(
           <span
             className={`
               ${innerSize} rounded-full bg-primary-500
-              scale-0 peer-checked:scale-100
+              scale-0
               transition-transform duration-150
             `}
           />

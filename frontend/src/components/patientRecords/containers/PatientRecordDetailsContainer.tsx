@@ -340,7 +340,13 @@ export const PatientRecordDetailsContainer: FC<{ recordId: string }> = ({ record
           <RecordDiagnosesTab recordId={record.id} isFinalized={record.is_finalized} notify={notify} />
         </Tabs.Content>
         <Tabs.Content value="prescriptions" className="mt-4" lazy>
-          <RecordPrescriptionsTab recordId={record.id} isFinalized={record.is_finalized} notify={notify} />
+          <RecordPrescriptionsTab
+            recordId={record.id}
+            patientId={record.patient_id}
+            patientName={patientName}
+            isFinalized={record.is_finalized}
+            notify={notify}
+          />
         </Tabs.Content>
         <Tabs.Content value="followups" className="mt-4" lazy>
           <RecordFollowupsTab recordId={record.id} isFinalized={record.is_finalized} notify={notify} />

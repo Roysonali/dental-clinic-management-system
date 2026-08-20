@@ -41,7 +41,14 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
     const trackHeight = size === 'sm' ? 'h-5' : 'h-6';
     const trackWidth = size === 'sm' ? 'w-9' : 'w-11';
     const thumbSize = size === 'sm' ? 'h-3.5 w-3.5' : 'h-5 w-5';
-    const thumbTranslate = size === 'sm' ? 'peer-checked:translate-x-4' : 'peer-checked:translate-x-5';
+    // The checked-state control must live on the TRACK (the direct sibling of
+    // the hidden input): `peer-checked:` compiles to the general-sibling
+    // selector `:is(:where(.peer):checked~*)`, which never reaches the thumb
+    // because the thumb is a CHILD of the track. The arbitrary child selector
+    // (`[&>span]:`) bridges from the track to the thumb. Putting
+    // `peer-checked:translate-x-*` on the thumb directly would never match —
+    // the switch previously turned blue but the thumb never slid.
+    const thumbTranslate = size === 'sm' ? 'peer-checked:[&>span]:translate-x-4' : 'peer-checked:[&>span]:translate-x-5';
 
     const inner = (
       <>
@@ -56,13 +63,16 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
           {...rest}
         />
 
-        {/* Track */}
+        {/* Track — carries the checked-state child selector (`[&>span]:`) so
+            the thumb (a child of this track) can be driven by the peer input,
+            which only reaches direct siblings. */}
         <span
           className={`
             ${trackWidth} ${trackHeight} shrink-0 rounded-full
             flex items-center px-0.5
             transition-colors duration-150
             bg-neutral-300 peer-checked:bg-primary-500
+            ${thumbTranslate}
             peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500/30 peer-focus-visible:ring-offset-1
             peer-disabled:cursor-not-allowed peer-disabled:opacity-50
           `}
@@ -73,7 +83,6 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
             className={`
               ${thumbSize} rounded-full bg-white shadow-sm
               transition-transform duration-150
-              ${thumbTranslate}
             `}
           />
         </span>

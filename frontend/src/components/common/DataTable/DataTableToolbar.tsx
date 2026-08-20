@@ -33,7 +33,7 @@ interface DataTableToolbarProps {
    * Primary actions (e.g. a "Create" CTA) rendered at the far right,
    * visually separated from the table-controls cluster and pinned so it
    * never wraps or shrinks on desktop. The column-visibility menu
-   * ("Columns") renders directly beneath it, left-aligned.
+   * ("Columns") renders beside it (to its left) on the same row.
    */
   primaryActions?: ReactNode;
   /** Additional classes */
@@ -47,11 +47,13 @@ interface DataTableToolbarProps {
  * Layout:
  * - **Table controls** (search + `children`) are grouped together on the
  *   left and may wrap internally on narrow screens.
- * - **Right action stack** is pinned to the far right and never
- *   wraps/shrinks: `primaryActions` (the module's primary CTA) on top with
- *   the column-visibility menu directly beneath it, left-aligned to the
- *   CTA. On desktop the CTA therefore shares the first row with the
- *   table controls; on narrow screens everything stacks vertically.
+ * - **Right action cluster** is pinned to the far right and never
+ *   shrinks: the column-visibility menu ("Columns") and `primaryActions`
+ *   (the module's primary CTA) share a single row — Columns first, then
+ *   the CTA — and wrap gracefully only when the viewport genuinely
+ *   cannot fit them side by side. On desktop the whole toolbar is one
+ *   horizontally-centered row: `[Search][Filters] [Columns][CTA]`;
+ *   below the `lg` breakpoint everything stacks vertically.
  *
  * The column-visibility menu reuses the existing `Dropdown` primitive
  * (outside-click, Escape, arrow-key navigation).
@@ -99,13 +101,13 @@ export const DataTableToolbar: FC<DataTableToolbarProps> = ({
 
   return (
     <div
-      className={`flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between ${className}`}
+      className={`flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between ${className}`}
     >
       {/* Table controls: search + children (grouped on the left) */}
       {hasControls && (
         <div className="flex flex-1 flex-wrap items-center gap-2">
           {hasSearch && (
-            <div className="relative w-full sm:max-w-xs">
+            <div className="relative w-full sm:max-w-sm">
               <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
                 <Icon icon={Search} size="sm" />
               </div>
@@ -135,13 +137,12 @@ export const DataTableToolbar: FC<DataTableToolbarProps> = ({
         </div>
       )}
 
-      {/* Right action stack: primary CTA on top, Columns menu directly
-          beneath it (left-aligned). ml-auto covers the edge case where no
-          table-controls cluster renders. */}
+      {/* Right action cluster: Columns menu beside the primary CTA on a
+          single row (wraps gracefully on narrow screens). Order is
+          [Columns][CTA] to match the desktop toolbar spec. ml-auto covers
+          the edge case where no table-controls cluster renders. */}
       {(primaryActions || canToggleVisibility) && (
-        <div className="flex shrink-0 flex-col items-start gap-2 lg:ml-auto">
-          {primaryActions}
-
+        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:ml-auto">
           {canToggleVisibility && (
             <Dropdown>
               <Dropdown.Trigger
@@ -175,6 +176,8 @@ export const DataTableToolbar: FC<DataTableToolbarProps> = ({
               </Dropdown.Content>
             </Dropdown>
           )}
+
+          {primaryActions}
         </div>
       )}
     </div>

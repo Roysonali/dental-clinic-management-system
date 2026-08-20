@@ -82,6 +82,29 @@ describe('DataTableToolbar', () => {
     expect(screen.getByRole('checkbox', { name: 'Name' })).toBeInTheDocument();
   });
 
+  it('keeps the Columns menu and the primary CTA in one right-side row cluster, Columns first', () => {
+    render(
+      <DataTableToolbar
+        columns={[{ key: 'name', label: 'Name', hideable: true }]}
+        columnVisibility={{ name: true }}
+        onColumnVisibilityChange={vi.fn()}
+        primaryActions={<button type="button">Register Patient</button>}
+      />,
+    );
+
+    const columnsButton = screen.getByRole('button', { name: 'Columns' });
+    const cta = screen.getByRole('button', { name: 'Register Patient' });
+
+    // Columns precedes the CTA in the DOM (renders to its left), so the
+    // single-row desktop layout is [Columns][Primary CTA] rather than the
+    // old stack with Columns beneath the CTA.
+    expect(columnsButton.compareDocumentPosition(cta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Both controls are direct children of the same right-side cluster
+    // (the Dropdown wrapper is the only element between Columns and it).
+    expect(columnsButton.parentElement?.parentElement).toBe(cta.parentElement);
+  });
+
   it('opens the column-visibility menu and toggles a column', async () => {
     const user = userEvent.setup();
     const onColumnVisibilityChange = vi.fn();

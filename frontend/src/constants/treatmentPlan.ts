@@ -23,8 +23,17 @@ export const TREATMENT_PLAN_MAX_PAGE_SIZE = 100;
 /** Page-size options offered in the list toolbar. */
 export const TREATMENT_PLAN_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-/** Currency symbol used across treatment plan cost displays (₱). */
-export const TREATMENT_PLAN_CURRENCY_SYMBOL = '₱';
+/**
+ * Treatment-module presentation currency (approved DensCare product
+ * requirement — the clinic bills in INR).
+ *
+ * Cost displays (procedure catalog, treatment plan tables, item drawers,
+ * summaries) render through the shared `formatCurrency(value, code)`
+ * formatter, which maps INR → ₹ with thousands grouping, e.g.
+ * `formatCurrency(15000, 'INR')` → "₹15,000.00". This code is the single
+ * point of change for treatment/procedure currency presentation.
+ */
+export const TREATMENT_PLAN_CURRENCY_CODE = 'INR' as const;
 
 /* ── Status presentation ─────────────────────────────────────────── */
 

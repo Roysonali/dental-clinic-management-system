@@ -1,9 +1,11 @@
 import { useEffect, useState, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText } from 'lucide-react';
+import { Download, FileText, Printer } from 'lucide-react';
 import { Card } from '../../../common/Card/Card';
 import { Button } from '../../../common/Button/Button';
 import { Icon } from '../../../common/Icon/Icon';
+import { PrintDocumentDialog } from '../../../common/PrintDocument';
+import { InvoiceDocument } from '../InvoiceDocument';
 import { ToastContainer, type Toast } from '../../../common/Toast';
 import { StatusBadge } from '../../../common/StatusBadge/StatusBadge';
 import { InvoiceSummaryCards } from '../InvoiceSummaryCards';
@@ -79,6 +81,9 @@ export const InvoiceDetailsContainer: FC<{ invoiceId: string }> = ({ invoiceId }
   /* ── Credit note drawer state ─────────────────────────────────── */
   const [createCreditNoteOpen, setCreateCreditNoteOpen] = useState(false);
   const [createCreditNoteError, setCreateCreditNoteError] = useState<string | null>(null);
+
+  /* ── Printable document (Task 4) ─────────────────────────────── */
+  const [printOpen, setPrintOpen] = useState(false);
 
   // Auto-dismiss the transient toast.
   useEffect(() => {
@@ -250,6 +255,23 @@ export const InvoiceDetailsContainer: FC<{ invoiceId: string }> = ({ invoiceId }
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPrintOpen(true)}
+                leftIcon={<Icon icon={Printer} size="xs" />}
+              >
+                Print
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPrintOpen(true)}
+                leftIcon={<Icon icon={Download} size="xs" />}
+                title="Opens the print dialog — choose “Save as PDF” to download"
+              >
+                Download PDF
+              </Button>
+              <Button
                 variant="primary"
                 size="sm"
                 onClick={() => setCreateCreditNoteOpen(true)}
@@ -357,6 +379,16 @@ export const InvoiceDetailsContainer: FC<{ invoiceId: string }> = ({ invoiceId }
           setDeleteError(null);
         }}
       />
+
+      {/* Printable invoice — preview + print/download surface (Task 4) */}
+      <PrintDocumentDialog
+        open={printOpen}
+        title={`Invoice ${invoice.invoice_number}`}
+        documentType="Invoice"
+        onClose={() => setPrintOpen(false)}
+      >
+        <InvoiceDocument invoice={invoice} />
+      </PrintDocumentDialog>
 
       <CreateCreditNoteDrawer
         key={createCreditNoteOpen ? 'open' : 'closed'}

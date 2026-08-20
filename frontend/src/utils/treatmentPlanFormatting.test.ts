@@ -23,13 +23,13 @@ describe('treatmentPlanFormatting (Decimal wire-format contract — F-03)', () =
   });
 
   describe('formatTreatmentCost', () => {
-    it('formats numbers with the module currency symbol (2 decimals)', () => {
-      expect(formatTreatmentCost(1500)).toBe('₱1500.00');
-      expect(formatTreatmentCost(0)).toBe('₱0.00');
+    it('formats numbers in the module INR presentation currency (₹, grouped, 2 decimals)', () => {
+      expect(formatTreatmentCost(1500)).toBe('₹1,500.00');
+      expect(formatTreatmentCost(0)).toBe('₹0.00');
     });
 
     it('formats string Decimals too (snapshot money)', () => {
-      expect(formatTreatmentCost('15000.00')).toBe('₱15000.00');
+      expect(formatTreatmentCost('15000.00')).toBe('₹15,000.00');
     });
 
     it('renders a dash for undefined (pre-fix F-01 placeholder behaviour)', () => {

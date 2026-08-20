@@ -11,7 +11,7 @@ interface AttachmentDeleteConfirmProps {
   onClose: () => void;
 }
 
-/** Delete attachment metadata confirmation (soft delete, idempotent). */
+/** Delete attachment confirmation (soft delete + stored file removal). */
 export const AttachmentDeleteConfirm: FC<AttachmentDeleteConfirmProps> = ({
   open,
   fileName,
@@ -31,7 +31,8 @@ export const AttachmentDeleteConfirm: FC<AttachmentDeleteConfirmProps> = ({
         <p className="text-body text-neutral-700">
           Remove{' '}
           <span className="font-medium text-neutral-900">{fileName ?? 'this attachment'}</span>?
-          Only the metadata record is removed — the file itself is untouched.
+          The attachment is hidden from the record and its file is removed from
+          the clinic&apos;s secure storage. This action is recorded in the audit trail.
         </p>
         {error && (
           <p role="alert" className="mt-3 text-body-sm text-danger">

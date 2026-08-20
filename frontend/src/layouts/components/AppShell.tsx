@@ -30,11 +30,13 @@ import { CommandPaletteOverlay } from '../../components/common/CommandPalette/Co
  * ```
  * AppShell
  * ├── MobileDrawer              (mobile only, renders Sidebar inside Drawer)
- * ├── SidebarPlaceholder        (desktop only, visible on lg+)
- * └── Main area
- *     ├── HeaderPlaceholder
- *     └── Workspace
- *         └── {children}
+ * └── Shell body (column)
+ *     ├── HeaderPlaceholder     (full-width enterprise global header,
+ *     │                          branding block aligned with the sidebar)
+ *     └── Shell row
+ *         ├── SidebarPlaceholder  (desktop only, visible on lg+)
+ *         └── Workspace
+ *             └── {children}
  * ```
  *
  * @example
@@ -122,7 +124,7 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
     <MobileNavProvider
       value={{ openNav: () => setMobileDrawerOpen(true), isOpen: mobileDrawerOpen }}
     >
-      <div className="flex h-dvh w-full overflow-hidden bg-white">
+      <div className="flex h-dvh w-full flex-col overflow-hidden bg-white">
         {/* ── Command Palette Overlay ─────────────────────── */}
         <CommandPaletteOverlay
           open={commandPaletteOpen}
@@ -135,17 +137,12 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
           onClose={handleCloseMobileDrawer}
         />
 
-        {/* ── Desktop Sidebar ──────────────────────────────── */}
-        <SidebarPlaceholder
-          collapsed={sidebarCollapsed}
-          onCollapsedChange={handleSidebarCollapsedChange}
-        />
-
-        {/* ── Main Area (inert while the mobile nav drawer is open) ── */}
+        {/* ── Shell body (inert while the mobile nav drawer is open) ── */}
         <div
-          className="flex min-w-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col"
           {...(mainAreaInert ? { inert: true } : {})}
         >
+          {/* ── Global Header (full-width enterprise top bar) ── */}
           {!isCompactMobileHeader && (
             <HeaderPlaceholder
               pageTitle={pageTitle}
@@ -154,9 +151,22 @@ export const AppShell: FC<AppShellProps> = ({ children }) => {
               mobileDrawerOpen={mobileDrawerOpen}
             />
           )}
-          <Workspace>
-            {children}
-          </Workspace>
+
+          {/* ── Shell row: sidebar + workspace ──────────────── */}
+          <div className="flex min-h-0 flex-1">
+            {/* ── Desktop Sidebar ──────────────────────────── */}
+            <SidebarPlaceholder
+              collapsed={sidebarCollapsed}
+              onCollapsedChange={handleSidebarCollapsedChange}
+            />
+
+            {/* ── Workspace ─────────────────────────────────── */}
+            <div className="flex min-w-0 flex-1 flex-col">
+              <Workspace>
+                {children}
+              </Workspace>
+            </div>
+          </div>
         </div>
       </div>
     </MobileNavProvider>

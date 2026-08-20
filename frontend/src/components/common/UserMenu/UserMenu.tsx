@@ -1,7 +1,8 @@
 import type { FC, ReactNode } from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, ChevronDown } from 'lucide-react';
 import { Dropdown } from '../Dropdown/Dropdown';
 import { Avatar } from '../Avatar/Avatar';
+import { Icon } from '../Icon/Icon';
 
 interface UserMenuProps {
   /** User's full name */
@@ -81,6 +82,12 @@ export const UserMenu: FC<UserMenuProps> = ({
               </p>
             )}
           </div>
+          {/* Dropdown chevron — hidden on mobile where only the avatar shows */}
+          <Icon
+            icon={ChevronDown}
+            size="sm"
+            className="hidden shrink-0 text-neutral-400 sm:block"
+          />
         </button>
       </Dropdown.Trigger>
 

@@ -31,6 +31,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       readOnly = false,
       leadingIcon: LeadingIconComponent,
       trailingIcon: TrailingIconComponent,
+      trailingAction = false,
       prefix,
       suffix,
       className = '',
@@ -104,9 +105,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
 
-          {/* Trailing Icon */}
+          {/* Trailing Icon — decorative by default (pointer-events-none);
+              interactive controls (e.g. a password visibility toggle) opt
+              in via `trailingAction` so their clicks are never swallowed
+              by the input beneath. */}
           {TrailingIconComponent && (
-            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
+            <div
+              className={`absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 ${
+                trailingAction ? 'pointer-events-auto' : 'pointer-events-none'
+              }`}
+            >
               {TrailingIconComponent}
             </div>
           )}

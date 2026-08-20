@@ -79,6 +79,18 @@ class Settings:
         os.getenv("EMAIL_LOG_RESET_LINKS", "false").strip().lower() == "true"
     )
 
+    # ── File attachments ─────────────────────────────────────────────
+    # Base directory where uploaded patient-record attachment files are
+    # stored (local filesystem backend). The directory is created lazily
+    # on first write. Production deployments may point this at a mounted
+    # volume; swapping to an object store later only requires a new
+    # ``StorageBackend`` implementation — domain logic is unaffected.
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "uploads")
+
+    # Maximum accepted attachment file size in MB. Configurable so the
+    # limit lives in settings, never hardcoded in business logic.
+    MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "10"))
+
     def __init__(self) -> None:
         """Validate that all required configuration values are present."""
         errors: list[str] = []
@@ -117,6 +129,11 @@ class Settings:
         if self.SMTP_PORT < 1 or self.SMTP_PORT > 65535:
             errors.append(
                 "SMTP_PORT must be a valid TCP port (1-65535)"
+            )
+
+        if self.MAX_UPLOAD_SIZE_MB < 1:
+            errors.append(
+                "MAX_UPLOAD_SIZE_MB must be >= 1"
             )
 
         if errors:

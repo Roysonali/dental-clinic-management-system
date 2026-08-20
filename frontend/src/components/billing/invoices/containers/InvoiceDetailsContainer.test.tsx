@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import { Routes, Route } from 'react-router-dom';
 import { renderWithProviders } from '../../../../test/testUtils';
@@ -102,6 +102,8 @@ function renderDetails(route = '/billing/invoices/inv1', queryClient?: QueryClie
 }
 
 describe('InvoiceDetailsContainer', () => {
+  let printMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     getMock.mockReset();
     issueMock.mockReset();
@@ -109,6 +111,15 @@ describe('InvoiceDetailsContainer', () => {
     deleteMock.mockReset();
     updateMock.mockReset();
     getMock.mockResolvedValue(issuedInvoice);
+    printMock = vi.fn();
+    vi.stubGlobal('print', printMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    // The print surface is portaled to document.body — remove leftovers so
+    // they cannot leak into later tests.
+    document.body.querySelectorAll('.print-document').forEach((node) => node.remove());
   });
 
   it('renders the full invoice aggregate (header, summary cards, line items, financials, notes)', async () => {
@@ -273,6 +284,41 @@ describe('InvoiceDetailsContainer', () => {
         due_date: '2026-08-22',
         notes: 'Updated note',
       }),
+    );
+  });
+
+  it('opens the printable invoice document from Print and Download PDF (Task 4)', async () => {
+    renderDetails();
+    await screen.findByText('INV-01042');
+
+    // Both document entry points render in the header.
+    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Print' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invoice document' });
+    expect(dialog).toBeInTheDocument();
+
+    // The professional document renders inside the dialog with real data
+    // (scoped to the dialog — the page header repeats some of these values).
+    const doc = within(dialog);
+    expect(doc.getByText('Marcus Delaney')).toBeInTheDocument();
+    expect(doc.getByText('PAT-000001')).toBeInTheDocument();
+    expect(doc.getByText('Dr. Priya Raman')).toBeInTheDocument();
+    expect(doc.getByText('Composite restoration — tooth 26')).toBeInTheDocument();
+    expect(doc.getByText('Balance due')).toBeInTheDocument();
+    expect(doc.getAllByText('₹288.00').length).toBeGreaterThan(0);
+
+    // Download uses the print dialog (Save as PDF) — window.print fires.
+    const downloadButtons = screen.getAllByRole('button', { name: 'Download PDF' });
+    fireEvent.click(downloadButtons[downloadButtons.length - 1]);
+    await waitFor(() => expect(printMock).toHaveBeenCalledTimes(1));
+
+    // Closing the dialog unmounts the print surface (footer Close button —
+    // the header X carries the distinct accessible name "Close preview").
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Invoice document' })).not.toBeInTheDocument(),
     );
   });
 

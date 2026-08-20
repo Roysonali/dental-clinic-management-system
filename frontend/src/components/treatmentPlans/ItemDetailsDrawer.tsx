@@ -4,8 +4,8 @@ import { Button } from '../common/Button/Button';
 import { Alert } from '../common/Alert/Alert';
 import { Textarea } from '../common/Input/Textarea';
 import { Badge } from '../common/Badge/Badge';
-import { TREATMENT_PLAN_CURRENCY_SYMBOL } from '../../constants/treatmentPlan';
-import { formatFee } from '../../utils/formatting';
+import { TREATMENT_PLAN_CURRENCY_CODE } from '../../constants/treatmentPlan';
+import { formatCurrency } from '../../utils/formatting';
 import { formatToothLabel } from '../../utils/treatmentPlanFormatting';
 import type { TreatmentPlanItemResponse } from '../../types/treatmentPlan';
 
@@ -79,13 +79,13 @@ export const ItemDetailsDrawer: FC<ItemDetailsDrawerProps> = ({
           <div>
             <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Estimated Cost</dt>
             <dd className="mt-0.5 text-body font-medium text-neutral-900 tabular-nums">
-              {formatFee(item.estimated_cost, TREATMENT_PLAN_CURRENCY_SYMBOL)}
+              {formatCurrency(item.estimated_cost, TREATMENT_PLAN_CURRENCY_CODE)}
             </dd>
           </div>
           <div>
             <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Discount</dt>
             <dd className="mt-0.5 text-body text-neutral-900 tabular-nums">
-              {item.discount ? formatFee(item.discount, TREATMENT_PLAN_CURRENCY_SYMBOL) : '—'}
+              {item.discount ? formatCurrency(item.discount, TREATMENT_PLAN_CURRENCY_CODE) : '—'}
             </dd>
           </div>
         </dl>

@@ -11,9 +11,9 @@
  * - file_size is a string in the form; parsed to int only when present.
  */
 import type {
-  AttachmentCreateRequest,
   AttachmentFormValues,
   AttachmentUpdateRequest,
+  AttachmentUploadPayload,
   DiagnosisCreateRequest,
   DiagnosisFormValues,
   DiagnosisUpdateRequest,
@@ -166,47 +166,36 @@ export function prescriptionNotesToUpdateRequest(notes: string): PrescriptionUpd
   return { notes: toNullable(notes) };
 }
 
-/* ── Attachments (metadata only) ─────────────────────────────────── */
+/* ── Attachments (real file upload) ──────────────────────────────── */
 
-export function attachmentFormValuesToCreateRequest(
+/**
+ * Build the multipart upload payload from the form: the actual File plus
+ * the declared attachment category. The backend validates the file itself.
+ */
+export function attachmentFormValuesToUploadRequest(
   values: AttachmentFormValues,
-): AttachmentCreateRequest {
-  const request: AttachmentCreateRequest = {
-    attachment_type: values.attachment_type as AttachmentCreateRequest['attachment_type'],
-    file_name: values.file_name.trim(),
-    file_path: values.file_path.trim(),
-    mime_type: toNullable(values.mime_type),
+): AttachmentUploadPayload {
+  if (!values.file) {
+    throw new Error('No file selected');
+  }
+  return {
+    file: values.file,
+    attachment_type: values.attachment_type as AttachmentUploadPayload['attachment_type'],
   };
-  const size = values.file_size.trim();
-  if (size) request.file_size = Number(size);
-  return request;
 }
 
 /**
- * Attachment edit — file_path is IMMUTABLE on the backend, so it is never
- * part of the update payload (the form renders it read-only). attachment_type
- * IS editable and is included when it changed.
+ * Attachment edit — only the category is editable; the stored file (and
+ * its metadata) is immutable on the backend.
  */
 export function attachmentFormValuesToUpdateRequest(
   values: AttachmentFormValues,
-  original: {
-    file_name: string;
-    mime_type: string | null;
-    file_size: number | null;
-    attachment_type: string;
-  },
+  original: { attachment_type: string },
 ): AttachmentUpdateRequest {
   const request: AttachmentUpdateRequest = {};
   if (values.attachment_type !== original.attachment_type) {
     request.attachment_type = values.attachment_type as AttachmentUpdateRequest['attachment_type'];
   }
-  const file_name = values.file_name.trim();
-  if (file_name !== original.file_name) request.file_name = file_name;
-  const mime_type = toNullable(values.mime_type);
-  if (mime_type !== original.mime_type) request.mime_type = mime_type;
-  const size = values.file_size.trim();
-  const nextSize = size ? Number(size) : null;
-  if (nextSize !== original.file_size) request.file_size = nextSize ?? undefined;
   return request;
 }
 

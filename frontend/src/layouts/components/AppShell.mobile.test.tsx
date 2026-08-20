@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, render } from '@testing-library/react';
+import { screen, fireEvent, render, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AppShell } from './AppShell';
@@ -111,6 +111,18 @@ describe('AppShell — mobile navigation drawer overlay (Patient Records overlay
     // open — underlying controls cannot be focused, clicked or scrolled.
     const mainContent = screen.getByLabelText('Main content');
     expect(mainContent.closest('[inert]')).not.toBeNull();
+  });
+
+  it('bounds the sidebar nav to the drawer height so the nav list is the scroll container', () => {
+    renderShell();
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle sidebar' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Navigation drawer' });
+    // The Sidebar nav must be bounded to the drawer's viewport height
+    // (h-full). Without this it grows to its full content height inside the
+    // drawer's column flex layout, so the navigation area's flex-1
+    // overflow-y-auto never becomes scrollable and lower items are cut off.
+    expect(within(dialog).getByRole('navigation', { name: 'Sidebar navigation' })).toHaveClass('h-full');
   });
 
   it('restores interaction and clears aria-expanded when the drawer closes (Escape)', () => {

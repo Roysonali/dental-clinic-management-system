@@ -1,8 +1,8 @@
 import { api } from './api';
 import type {
-  AttachmentCreateRequest,
   AttachmentListItem,
   AttachmentUpdateRequest,
+  AttachmentUploadPayload,
   ChildListParams,
   DiagnosisCreateRequest,
   DiagnosisListItem,
@@ -229,11 +229,18 @@ export const patientRecordService = {
     await api.delete(`/prescription-items/${id}`);
   },
 
-  /* ── Attachments (metadata only) ─────────────────────────────── */
+  /* ── Attachments (real file uploads) ─────────────────────────── */
 
-  /** POST /patient-records/{id}/attachments (201) — JSON metadata, no upload. */
-  async createAttachment(recordId: string, payload: AttachmentCreateRequest): Promise<AttachmentListItem> {
-    const { data } = await api.post<AttachmentListItem>(`/patient-records/${recordId}/attachments`, payload);
+  /**
+   * POST /patient-records/{id}/attachments (201) — multipart/form-data
+   * with the real file. Axios sets the multipart boundary automatically;
+   * the Authorization header is attached by the shared interceptor.
+   */
+  async createAttachment(recordId: string, payload: AttachmentUploadPayload): Promise<AttachmentListItem> {
+    const formData = new FormData();
+    formData.append('file', payload.file);
+    formData.append('attachment_type', payload.attachment_type);
+    const { data } = await api.post<AttachmentListItem>(`/patient-records/${recordId}/attachments`, formData);
     return data;
   },
 
@@ -249,7 +256,7 @@ export const patientRecordService = {
     return data;
   },
 
-  /** GET /attachments/{id} — full attachment (incl. immutable file_path). */
+  /** GET /attachments/{id} — full attachment metadata. */
   async getAttachment(id: string): Promise<AttachmentListItem & { file_path: string; patient_record_id: string }> {
     const { data } = await api.get<AttachmentListItem & { file_path: string; patient_record_id: string }>(
       `/attachments/${id}`,
@@ -257,7 +264,26 @@ export const patientRecordService = {
     return data;
   },
 
-  /** PATCH /attachments/{id} — file_path immutable. */
+  /**
+   * GET /attachments/{id}/download — fetch the stored file as a Blob.
+   * The JWT is attached by the interceptor; files are only ever served
+   * through this authorized endpoint (never a public path).
+   */
+  async downloadAttachment(id: string): Promise<Blob> {
+    const { data } = await api.get<Blob>(`/attachments/${id}/download`, { responseType: 'blob' });
+    return data;
+  },
+
+  /**
+   * GET /attachments/{id}/preview — fetch the stored file inline for
+   * browser rendering (PDF / images only; backend rejects other types).
+   */
+  async previewAttachment(id: string): Promise<Blob> {
+    const { data } = await api.get<Blob>(`/attachments/${id}/preview`, { responseType: 'blob' });
+    return data;
+  },
+
+  /** PATCH /attachments/{id} — the stored file is immutable. */
   async updateAttachment(id: string, payload: AttachmentUpdateRequest): Promise<AttachmentListItem> {
     const { data } = await api.patch<AttachmentListItem>(`/attachments/${id}`, payload);
     return data;

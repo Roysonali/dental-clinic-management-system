@@ -42,6 +42,7 @@ function renderDetails() {
   return renderWithProviders(
     <Routes>
       <Route path="/patients/:patientId" element={<PatientDetailsContainer />} />
+      <Route path="/patients" element={<div>Patients list page</div>} />
     </Routes>,
     { route: '/patients/p1' },
   );
@@ -77,6 +78,21 @@ describe('PatientDetailsContainer', () => {
     expect(screen.getByText('Allergic to penicillin.')).toBeInTheDocument();
   });
 
+  it('navigates back to the patients list from the Back control', async () => {
+    getMock.mockResolvedValue(patient);
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Juan Dela Cruz' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Patients' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Patients list page')).toBeInTheDocument();
+    });
+  });
+
   it('renders all detail tabs', async () => {
     getMock.mockResolvedValue(patient);
     renderDetails();
@@ -96,6 +112,8 @@ describe('PatientDetailsContainer', () => {
     getMock.mockReturnValue(new Promise(() => {})); // never resolves
     renderDetails();
     expect(screen.getByRole('status', { name: 'Loading patient' })).toBeInTheDocument();
+    // The Back control is available even while loading.
+    expect(screen.getByRole('button', { name: 'Back to Patients' })).toBeInTheDocument();
   });
 
   it('shows the error state and retries', async () => {
@@ -105,6 +123,8 @@ describe('PatientDetailsContainer', () => {
     await waitFor(() => {
       expect(screen.getByText('Unable to load patient')).toBeInTheDocument();
     });
+    // The Back control is available even when the patient fails to load.
+    expect(screen.getByRole('button', { name: 'Back to Patients' })).toBeInTheDocument();
 
     getMock.mockResolvedValue(patient);
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));

@@ -1,8 +1,8 @@
 import type { FC } from 'react';
 import { FileText } from 'lucide-react';
 import { Card } from '../common/Card/Card';
-import { TREATMENT_PLAN_CURRENCY_SYMBOL } from '../../constants/treatmentPlan';
-import { formatFee } from '../../utils/formatting';
+import { TREATMENT_PLAN_CURRENCY_CODE } from '../../constants/treatmentPlan';
+import { formatCurrency } from '../../utils/formatting';
 
 interface ProgressSummaryCardProps {
   itemCount: number;
@@ -39,7 +39,7 @@ export const ProgressSummaryCard: FC<ProgressSummaryCardProps> = ({
           <div className="rounded-lg bg-neutral-50 p-4">
             <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Estimated Total</dt>
             <dd className="mt-1 text-h3 font-semibold text-neutral-900 tabular-nums">
-              {formatFee(totalEstimatedCost, TREATMENT_PLAN_CURRENCY_SYMBOL)}
+              {formatCurrency(totalEstimatedCost, TREATMENT_PLAN_CURRENCY_CODE)}
             </dd>
           </div>
         </dl>
