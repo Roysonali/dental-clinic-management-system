@@ -119,7 +119,7 @@ function fallbackMessage(kind: ApiErrorKind, status: number | null): string {
     case 'server':
       return 'Something went wrong on the server. Please try again later.';
     case 'timeout':
-      return 'The request timed out. Please try again.';
+      return 'The request timed out. The server may be starting up — please try again in a few seconds.';
     case 'offline':
       return 'You appear to be offline. Check your internet connection and try again.';
     case 'backend':
