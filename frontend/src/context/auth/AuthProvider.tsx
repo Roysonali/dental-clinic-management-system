@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { authService } from '../../services/authService';
-import { shouldRetryQuery } from '../../services/apiError';
+import { parseApiError, shouldRetryQuery } from '../../services/apiError';
 import {
   clearUnauthorizedHandler,
   registerUnauthorizedHandler,
@@ -42,6 +42,14 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   });
 
   const user = token ? (meQuery.data ?? null) : null;
+
+  // When the token exists but /auth/me fails with a *non-401* error (CORS,
+  // server down, network timeout), keep the user in "initializing" state
+  // so ProtectedRoute shows a loader instead of immediately redirecting to
+  // login.  A 401 is handled separately: the global interceptor fires
+  // handleUnauthorized which clears the token, making !!token false and
+  // therefore isInitializing false → redirect.
+  const meQueryAuthFailure = meQuery.isError && parseApiError(meQuery.error).kind === 'auth';
 
   /** Global 401 handler — clears the session and lets guards redirect. */
   const handleUnauthorized = useCallback(() => {
@@ -89,12 +97,12 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       token,
       user,
       isAuthenticated: !!token && !!user,
-      isInitializing: !!token && !user && meQuery.isPending && !meQuery.isError,
+      isInitializing: !!token && !user && (meQuery.isPending || (meQuery.isError && !meQueryAuthFailure)),
       login,
       logout,
       refreshUser,
     }),
-    [token, user, meQuery.isPending, meQuery.isError, login, logout, refreshUser],
+    [token, user, meQuery.isPending, meQuery.isError, meQueryAuthFailure, login, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
