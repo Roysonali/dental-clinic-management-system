@@ -4,9 +4,11 @@ import { readAccessToken } from '../utils/authSession';
 export const api = axios.create({
   baseURL:
     import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000",
-  // Fail fast instead of hanging forever; the timeout is surfaced via
-  // parseApiError as a "timeout" kind (axios ECONNABORTED).
-  timeout: 15_000,
+  // Render free-tier services sleep after inactivity and take 30-60s to
+  // wake up.  60s gives the first cold-start request enough time while
+  // still failing fast for genuinely unreachable servers.  The timeout
+  // is surfaced via parseApiError as a "timeout" kind (ECONNABORTED).
+  timeout: 60_000,
 });
 
 // Attach the JWT bearer token (when present) to every request.
