@@ -50,6 +50,12 @@ type DoctorOptions = { value: string; label: string }[];
  * editor mirrors backend item bounds; the net-amount preview follows the
  * backend formula and is never authoritative. Save stays disabled while the
  * form is invalid or a request is in flight (no duplicate submissions).
+ *
+ * Business relationships:
+ * - Appointment depends on Patient (filtered by patient_id)
+ * - Treatment Plan depends on Patient (filtered by patient_id)
+ * - Doctor is independent
+ * - Clearing Patient cascades to clear Appointment and Treatment Plan
  */
 export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
   open,
@@ -64,6 +70,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors, isValid },
   } = useForm<InvoiceCreateFormValues>({
     resolver: zodResolver(invoiceCreateFormSchema),
@@ -80,6 +87,23 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
   const watchedPatientId = useWatch({ control, name: 'patient_id' });
   const watchedItems = useWatch({ control, name: 'items' });
   const watchedInvoiceDate = useWatch({ control, name: 'invoice_date' });
+
+  // Track the previous patient id so we can cascade-clear dependent fields
+  // when the patient changes. Using useWatch + useEffect avoids mutating
+  // form state inside the onChange handler (which can race with validation).
+  const prevPatientRef = useMemo(() => ({ current: watchedPatientId }), []); // mutable ref
+  useEffect(() => {
+    if (
+      prevPatientRef.current !== watchedPatientId &&
+      prevPatientRef.current !== '' &&
+      watchedPatientId !== ''
+    ) {
+      // Patient changed from one patient to another — clear dependent fields.
+      setValue('appointment_id', '');
+      setValue('treatment_plan_id', '');
+    }
+    prevPatientRef.current = watchedPatientId;
+  }, [watchedPatientId, setValue, prevPatientRef]);
 
   const doctorsQuery = useDoctors();
   const planOptionsQuery = useTreatmentPlans(
@@ -180,6 +204,8 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                   options={planOptions}
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
+                  onClear={() => field.onChange('')}
+                  clearable
                   disabled={planOptionsQuery.isLoading}
                   helperText="Optional — originating treatment plan"
                 />
@@ -202,19 +228,30 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                   options={appointments.options}
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
+                  onClear={() => field.onChange('')}
+                  clearable
                   disabled={watchedPatientId === '' || appointments.loading}
                   helperText="Optional — appointments for the selected patient"
                 />
               )}
             />
 
-            <Select
-              label="Doctor"
-              placeholder={doctorsQuery.isLoading ? 'Loading doctors…' : 'Optional'}
-              options={doctorOptions}
-              error={serverErrors.doctor_id}
-              disabled={doctorsQuery.isLoading}
-              {...register('doctor_id')}
+            <Controller
+              control={control}
+              name="doctor_id"
+              render={({ field }) => (
+                <Select
+                  label="Doctor"
+                  placeholder={doctorsQuery.isLoading ? 'Loading doctors…' : 'Optional'}
+                  options={doctorOptions}
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onClear={() => field.onChange('')}
+                  clearable
+                  disabled={doctorsQuery.isLoading}
+                  error={serverErrors.doctor_id}
+                />
+              )}
             />
 
             <Controller

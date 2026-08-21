@@ -61,4 +61,8 @@ export interface SelectProps
   placeholder?: string;
   /** Array of options */
   options: readonly { value: string; label: string; disabled?: boolean }[];
+  /** Show a clear button when a value is selected */
+  clearable?: boolean;
+  /** Called when the clear button is clicked */
+  onClear?: () => void;
 }
