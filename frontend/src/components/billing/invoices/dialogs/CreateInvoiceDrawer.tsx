@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type FC } from 'react';
+import { useEffect, useMemo, useRef, type FC } from 'react';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
@@ -50,6 +50,12 @@ type DoctorOptions = { value: string; label: string }[];
  * editor mirrors backend item bounds; the net-amount preview follows the
  * backend formula and is never authoritative. Save stays disabled while the
  * form is invalid or a request is in flight (no duplicate submissions).
+ *
+ * Business relationships:
+ * - Appointment depends on Patient (filtered by patient_id)
+ * - Treatment Plan depends on Patient (filtered by patient_id)
+ * - Doctor is independent
+ * - Clearing Patient cascades to clear Appointment and Treatment Plan
  */
 export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
   open,
@@ -64,6 +70,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors, isValid },
   } = useForm<InvoiceCreateFormValues>({
     resolver: zodResolver(invoiceCreateFormSchema),
@@ -80,6 +87,18 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
   const watchedPatientId = useWatch({ control, name: 'patient_id' });
   const watchedItems = useWatch({ control, name: 'items' });
   const watchedInvoiceDate = useWatch({ control, name: 'invoice_date' });
+
+  // Track the previous patient id so we can cascade-clear dependent fields
+  // when the patient changes. Using useWatch + useEffect avoids mutating
+  // form state inside the onChange handler (which can race with validation).
+  const prevPatientRef = useRef(watchedPatientId);
+  useEffect(() => {
+    if (prevPatientRef.current !== watchedPatientId) {
+      setValue('appointment_id', '');
+      setValue('treatment_plan_id', '');
+      prevPatientRef.current = watchedPatientId;
+    }
+  }, [watchedPatientId, setValue, prevPatientRef]);
 
   const doctorsQuery = useDoctors();
   const planOptionsQuery = useTreatmentPlans(
@@ -176,12 +195,18 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
               render={({ field }) => (
                 <Select
                   label="Treatment Plan"
-                  placeholder={planOptionsQuery.isLoading ? 'Loading plans…' : 'Optional'}
+                  placeholder={planOptionsQuery.isLoading ? 'Loading plans…' : 'Select treatment plan'}
                   options={planOptions}
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
+                  onClear={() => field.onChange('')}
+                  clearable
                   disabled={planOptionsQuery.isLoading}
-                  helperText="Optional — originating treatment plan"
+                  helperText={
+                    !planOptionsQuery.isLoading && planOptions.length === 0 && watchedPatientId
+                      ? 'No treatment plans found for this patient'
+                      : 'Optional — originating treatment plan'
+                  }
                 />
               )}
             />
@@ -197,24 +222,42 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                       ? 'Select a patient first'
                       : appointments.loading
                         ? 'Loading appointments…'
-                        : 'Optional'
+                        : 'Select appointment'
                   }
                   options={appointments.options}
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
+                  onClear={() => field.onChange('')}
+                  clearable
                   disabled={watchedPatientId === '' || appointments.loading}
-                  helperText="Optional — appointments for the selected patient"
+                  helperText={
+                    watchedPatientId === ''
+                      ? 'Optional — appointments for the selected patient'
+                      : !appointments.loading && appointments.options.length === 0
+                        ? 'No appointments found for this patient'
+                        : 'Optional — appointments for the selected patient'
+                  }
                 />
               )}
             />
 
-            <Select
-              label="Doctor"
-              placeholder={doctorsQuery.isLoading ? 'Loading doctors…' : 'Optional'}
-              options={doctorOptions}
-              error={serverErrors.doctor_id}
-              disabled={doctorsQuery.isLoading}
-              {...register('doctor_id')}
+            <Controller
+              control={control}
+              name="doctor_id"
+              render={({ field }) => (
+                <Select
+                  label="Doctor"
+                  placeholder={doctorsQuery.isLoading ? 'Loading doctors…' : 'Select doctor'}
+                  options={doctorOptions}
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onClear={() => field.onChange('')}
+                  clearable
+                  disabled={doctorsQuery.isLoading}
+                  error={serverErrors.doctor_id}
+                  helperText="Optional — treating doctor"
+                />
+              )}
             />
 
             <Controller

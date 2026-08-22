@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { IconButton } from '../../common/Button/IconButton';
 import { Icon } from '../../common/Icon/Icon';
+import { Label } from '../../common/Form/Label';
 import { INVOICE_DISCOUNT_TYPE_OPTIONS, PAYMENT_CURRENCY_CODE } from '../../../constants/billing';
 import { computeLineNetAmount } from '../../../utils/invoiceFormUtils';
 import { formatCurrency } from '../../../utils/formatting';
@@ -62,10 +63,14 @@ export const LineItemsEditor: FC<LineItemsEditorProps> = ({ control, register, e
             <div className="grid grid-cols-1 gap-2.5 md:grid-cols-6">
               {/* Description */}
               <div className="md:col-span-6">
+                <Label htmlFor={`items.${index}.description`} required>
+                  Description
+                </Label>
                 <input
                   {...register(`items.${index}.description`)}
                   type="text"
-                  placeholder="Description (e.g. Composite restoration — tooth 26)"
+                  id={`items.${index}.description`}
+                  placeholder="e.g. Root canal treatment — tooth #36"
                   aria-label={`Item ${index + 1} description`}
                   aria-invalid={!!itemError?.description}
                   className={`${baseInputClass} ${itemError?.description ? errorInputClass : ''}`}
@@ -77,11 +82,15 @@ export const LineItemsEditor: FC<LineItemsEditorProps> = ({ control, register, e
 
               {/* Quantity */}
               <div className="md:col-span-1">
+                <Label htmlFor={`items.${index}.quantity`} required>
+                  Quantity
+                </Label>
                 <input
                   {...register(`items.${index}.quantity`)}
                   type="number"
+                  id={`items.${index}.quantity`}
                   min={1}
-                  placeholder="Qty"
+                  placeholder="1"
                   aria-label={`Item ${index + 1} quantity`}
                   aria-invalid={!!itemError?.quantity}
                   className={`${baseInputClass} ${itemError?.quantity ? errorInputClass : ''}`}
@@ -93,11 +102,15 @@ export const LineItemsEditor: FC<LineItemsEditorProps> = ({ control, register, e
 
               {/* Unit price */}
               <div className="md:col-span-2">
+                <Label htmlFor={`items.${index}.unit_price`} required>
+                  Unit price
+                </Label>
                 <input
                   {...register(`items.${index}.unit_price`)}
                   type="text"
+                  id={`items.${index}.unit_price`}
                   inputMode="decimal"
-                  placeholder="Unit price"
+                  placeholder="0.00"
                   aria-label={`Item ${index + 1} unit price`}
                   aria-invalid={!!itemError?.unit_price}
                   className={`${baseInputClass} ${itemError?.unit_price ? errorInputClass : ''}`}
@@ -109,12 +122,14 @@ export const LineItemsEditor: FC<LineItemsEditorProps> = ({ control, register, e
 
               {/* Discount type */}
               <div className="md:col-span-1">
+                <Label htmlFor={`items.${index}.discount_type`}>Discount</Label>
                 <select
                   {...register(`items.${index}.discount_type`)}
+                  id={`items.${index}.discount_type`}
                   aria-label={`Item ${index + 1} discount type`}
                   className={baseInputClass}
                 >
-                  <option value="">No discount</option>
+                  <option value="">None</option>
                   {INVOICE_DISCOUNT_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -125,11 +140,13 @@ export const LineItemsEditor: FC<LineItemsEditorProps> = ({ control, register, e
 
               {/* Discount value */}
               <div className="md:col-span-2">
+                <Label htmlFor={`items.${index}.discount_value`}>Discount value</Label>
                 <input
                   {...register(`items.${index}.discount_value`)}
                   type="text"
+                  id={`items.${index}.discount_value`}
                   inputMode="decimal"
-                  placeholder="Discount value"
+                  placeholder="0.00"
                   aria-label={`Item ${index + 1} discount value`}
                   aria-invalid={!!itemError?.discount_value}
                   disabled={row?.discount_type === ''}

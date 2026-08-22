@@ -82,6 +82,65 @@ describe('CreateInvoiceDrawer', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
+  it('renders meaningful placeholders for optional select fields', async () => {
+    renderDrawer();
+
+    await waitFor(() => expect(planListMock).toHaveBeenCalled());
+    await waitFor(() => expect(doctorListMock).toHaveBeenCalled());
+
+    expect(screen.getByLabelText('Treatment Plan')).toHaveTextContent('Select treatment plan');
+    expect(screen.getByLabelText('Appointment')).toHaveTextContent('Select a patient first');
+    expect(screen.getByLabelText('Doctor')).toHaveTextContent('Select doctor');
+  });
+
+  it('shows empty-state helper text when no treatment plans exist for the selected patient', async () => {
+    const onSubmit = vi.fn();
+    renderDrawer(onSubmit);
+
+    const picker = screen.getByPlaceholderText('Search patient by name or code…');
+    fireEvent.change(picker, { target: { value: 'marcus' } });
+    const option = await screen.findByRole('option', { name: /Marcus Delaney/ }, { timeout: 5000 });
+    fireEvent.click(option);
+
+    await waitFor(() =>
+      expect(screen.getByText('No treatment plans found for this patient')).toBeInTheDocument(),
+    );
+  });
+
+  it('shows empty-state helper text when no appointments exist for the selected patient', async () => {
+    const onSubmit = vi.fn();
+    renderDrawer(onSubmit);
+
+    const picker = screen.getByPlaceholderText('Search patient by name or code…');
+    fireEvent.change(picker, { target: { value: 'marcus' } });
+    const option = await screen.findByRole('option', { name: /Marcus Delaney/ }, { timeout: 5000 });
+    fireEvent.click(option);
+
+    await waitFor(() =>
+      expect(screen.getByText('No appointments found for this patient')).toBeInTheDocument(),
+    );
+  });
+
+  it('clears dependent fields when the selected patient is cleared', async () => {
+    const onSubmit = vi.fn();
+    renderDrawer(onSubmit);
+
+    const picker = screen.getByPlaceholderText('Search patient by name or code…');
+    fireEvent.change(picker, { target: { value: 'marcus' } });
+    const option = await screen.findByRole('option', { name: /Marcus Delaney/ }, { timeout: 5000 });
+    fireEvent.click(option);
+
+    // Simulate selecting a treatment plan and appointment by setting values directly.
+    // The PatientPicker clear button resets patient_id to ''.
+    const clearButton = screen.getByRole('button', { name: 'Clear selected patient' });
+    fireEvent.click(clearButton);
+
+    // After clearing the patient, the dependent selects should show their
+    // initial placeholders again (not stale values).
+    expect(screen.getByLabelText('Appointment')).toHaveDisplayValue('Select a patient first');
+    expect(screen.getByLabelText('Treatment Plan')).toHaveDisplayValue('Select treatment plan');
+  });
+
   it('keeps Save draft disabled until the form is valid (patient + dates + one item)', async () => {
     const onSubmit = vi.fn();
     renderDrawer(onSubmit);
@@ -171,6 +230,16 @@ describe('CreateInvoiceDrawer', () => {
 
     // Back to a single row — remove is disabled again.
     expect(screen.getByRole('button', { name: 'Remove item 1' })).toBeDisabled();
+  });
+
+  it('renders required indicators on line item mandatory fields', () => {
+    renderDrawer();
+
+    // Description, Quantity, and Unit price are mandatory per backend.
+    // The visible labels are rendered by the shared Label component.
+    expect(screen.getByText('Description')).toBeInTheDocument();
+    expect(screen.getByText('Quantity')).toBeInTheDocument();
+    expect(screen.getByText('Unit price')).toBeInTheDocument();
   });
 
   it('surfaces server validation errors on the matching field', async () => {
