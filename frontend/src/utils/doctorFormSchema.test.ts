@@ -151,6 +151,15 @@ describe('doctorFormSchema', () => {
       expect(parse({ languages_known: ['English', ''] }).success).toBe(false);
       expect(parse({ languages_known: ['   '] }).success).toBe(false);
     });
+
+    it('accepts language names with accented and special characters', () => {
+      expect(parse({ languages_known: ['Español'] }).success).toBe(true);
+      expect(parse({ languages_known: ['Français'] }).success).toBe(true);
+      expect(parse({ languages_known: ['Deutsch'] }).success).toBe(true);
+      expect(parse({ languages_known: ['Österreich'] }).success).toBe(true);
+      expect(parse({ languages_known: ['Ñáhuitl'] }).success).toBe(true);
+      expect(parse({ languages_known: ['Bahasa Indonesia', 'Pilipino/Tagalog'] }).success).toBe(true);
+    });
   });
 
   describe('biography', () => {

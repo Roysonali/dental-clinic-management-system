@@ -32,7 +32,7 @@ export function normalizeRegistrationNumber(value: string | null | undefined): s
 
 /** Python `str.title()` equivalent for a single word/line. */
 function toTitleCase(value: string): string {
-  return value.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+  return value.replace(/\p{L}+/gu, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
 }
 
 /**

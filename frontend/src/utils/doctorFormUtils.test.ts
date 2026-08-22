@@ -85,6 +85,24 @@ describe('doctorFormUtils', () => {
     it('drops empty entries', () => {
       expect(normalizeLanguages(['', '   ', 'English'])).toEqual(['English']);
     });
+
+    it('preserves accented characters (Español, Français, Deutsch)', () => {
+      expect(normalizeLanguages(['español'])).toEqual(['Español']);
+      expect(normalizeLanguages(['français'])).toEqual(['Français']);
+      expect(normalizeLanguages(['deutsch'])).toEqual(['Deutsch']);
+    });
+
+    it('title-cases languages starting with non-ASCII letters (Österreich, Ñáhuitl)', () => {
+      expect(normalizeLanguages(['österreich'])).toEqual(['Österreich']);
+      expect(normalizeLanguages(['ñáhuitl'])).toEqual(['Ñáhuitl']);
+    });
+
+    it('handles mixed scripts and special punctuation in language names', () => {
+      expect(normalizeLanguages(['Bahasa Indonesia', 'Pilipino/Tagalog'])).toEqual([
+        'Bahasa Indonesia',
+        'Pilipino/Tagalog',
+      ]);
+    });
   });
 
   describe('responseToFormValues', () => {

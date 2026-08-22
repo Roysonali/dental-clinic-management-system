@@ -252,7 +252,7 @@ const DropdownContent: FC<DropdownContentProps> = ({
       role="menu"
       onKeyDown={handleKeyDown}
       className={`
-        absolute z-dropdown min-w-[180px] rounded-lg border border-neutral-200 bg-white py-1 shadow-lg
+        absolute z-dropdown min-w-[160px] max-h-[320px] overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg
         ${alignMap[align]}
         ${sideMap[side]}
         ${className}
