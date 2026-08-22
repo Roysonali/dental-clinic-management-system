@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type FC } from 'react';
+import { useEffect, useMemo, useRef, type FC } from 'react';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
@@ -91,18 +91,13 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
   // Track the previous patient id so we can cascade-clear dependent fields
   // when the patient changes. Using useWatch + useEffect avoids mutating
   // form state inside the onChange handler (which can race with validation).
-  const prevPatientRef = useMemo(() => ({ current: watchedPatientId }), []); // mutable ref
+  const prevPatientRef = useRef(watchedPatientId);
   useEffect(() => {
-    if (
-      prevPatientRef.current !== watchedPatientId &&
-      prevPatientRef.current !== '' &&
-      watchedPatientId !== ''
-    ) {
-      // Patient changed from one patient to another — clear dependent fields.
+    if (prevPatientRef.current !== watchedPatientId) {
       setValue('appointment_id', '');
       setValue('treatment_plan_id', '');
+      prevPatientRef.current = watchedPatientId;
     }
-    prevPatientRef.current = watchedPatientId;
   }, [watchedPatientId, setValue, prevPatientRef]);
 
   const doctorsQuery = useDoctors();
@@ -200,14 +195,18 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
               render={({ field }) => (
                 <Select
                   label="Treatment Plan"
-                  placeholder={planOptionsQuery.isLoading ? 'Loading plans…' : 'Optional'}
+                  placeholder={planOptionsQuery.isLoading ? 'Loading plans…' : 'Select treatment plan'}
                   options={planOptions}
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
                   onClear={() => field.onChange('')}
                   clearable
                   disabled={planOptionsQuery.isLoading}
-                  helperText="Optional — originating treatment plan"
+                  helperText={
+                    !planOptionsQuery.isLoading && planOptions.length === 0 && watchedPatientId
+                      ? 'No treatment plans found for this patient'
+                      : 'Optional — originating treatment plan'
+                  }
                 />
               )}
             />
@@ -223,7 +222,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                       ? 'Select a patient first'
                       : appointments.loading
                         ? 'Loading appointments…'
-                        : 'Optional'
+                        : 'Select appointment'
                   }
                   options={appointments.options}
                   value={field.value}
@@ -231,7 +230,13 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                   onClear={() => field.onChange('')}
                   clearable
                   disabled={watchedPatientId === '' || appointments.loading}
-                  helperText="Optional — appointments for the selected patient"
+                  helperText={
+                    watchedPatientId === ''
+                      ? 'Optional — appointments for the selected patient'
+                      : !appointments.loading && appointments.options.length === 0
+                        ? 'No appointments found for this patient'
+                        : 'Optional — appointments for the selected patient'
+                  }
                 />
               )}
             />
@@ -242,7 +247,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
               render={({ field }) => (
                 <Select
                   label="Doctor"
-                  placeholder={doctorsQuery.isLoading ? 'Loading doctors…' : 'Optional'}
+                  placeholder={doctorsQuery.isLoading ? 'Loading doctors…' : 'Select doctor'}
                   options={doctorOptions}
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
@@ -250,6 +255,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                   clearable
                   disabled={doctorsQuery.isLoading}
                   error={serverErrors.doctor_id}
+                  helperText="Optional — treating doctor"
                 />
               )}
             />
