@@ -173,3 +173,106 @@ def decode_access_token(
         )
 
     return payload  # type: ignore[return-value]
+
+
+def create_refresh_token(
+    data: dict[str, object],
+) -> str:
+    """Create a signed JWT refresh token.
+
+    The token includes::
+
+    * The original claims from ``data``
+    * ``exp`` (expiration) — from ``REFRESH_TOKEN_EXPIRE_MINUTES``
+    * ``iat`` (issued at) — current UTC time
+    * ``jti`` (JWT ID) — a unique hex string for token identification
+    * ``token_type`` — set to ``"refresh"``
+
+    Args:
+        data: Claims to embed in the token (typically ``{"sub": email}``).
+
+    Returns:
+        The encoded JWT string.
+    """
+    to_encode = data.copy()
+
+    now = datetime.now(timezone.utc)
+
+    expire = now + timedelta(
+        minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES,
+    )
+
+    to_encode.update(
+        {
+            "exp": expire,
+            "iat": now,
+            "jti": uuid.uuid4().hex,
+            "token_type": "refresh",
+        }
+    )
+
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.JWT_SECRET,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+    return encoded_jwt
+
+
+def decode_refresh_token(
+    token: str,
+) -> dict[str, object]:
+    """Decode and validate a JWT refresh token.
+
+    Verifies the signature, expiration (``exp``), and issued-at
+    (``iat``) claims. Rejects tokens whose ``token_type`` is not
+    ``"refresh"``.
+
+    Args:
+        token: The raw JWT string.
+
+    Returns:
+        The decoded payload as a dict.
+
+    Raises:
+        jwt.ExpiredSignatureError: If the token has expired.
+        jwt.JWTError: For any other decode or validation failure.
+    """
+    options = {
+        "verify_exp": True,
+        "verify_iat": True,
+        "require": ["exp", "iat"],
+        "leeway": _MAX_CLOCK_SKEW_SECONDS,
+    }
+
+    payload = jwt.decode(
+        token,
+        settings.JWT_SECRET,
+        algorithms=[settings.JWT_ALGORITHM],
+        options=options,
+    )
+
+    token_type: str | None = payload.get("token_type")
+
+    if token_type is not None and token_type != "refresh":
+        raise jwt.JWTError(
+            f"Unexpected token_type: {token_type!r}"
+        )
+
+    return payload  # type: ignore[return-value]
+
+
+def hash_token(token: str) -> str:
+    """Return a SHA-256 hex digest of a token.
+
+    Used to store refresh token hashes in the database instead of
+    raw tokens, so a database leak does not expose usable credentials.
+
+    Args:
+        token: The raw token string.
+
+    Returns:
+        64-character lowercase hex digest of ``token``.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

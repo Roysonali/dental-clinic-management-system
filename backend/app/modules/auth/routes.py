@@ -20,6 +20,8 @@ from app.modules.auth.schemas import (
     ForgotPasswordResponse,
     LoginResponse,
     PendingUserResponse,
+    RefreshRequest,
+    RefreshResponse,
     RegisterResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
@@ -32,6 +34,7 @@ from app.modules.auth.service import (
     authenticate_user,
     deactivate_user,
     fetch_pending_users,
+    refresh_access_token,
     register_user,
     request_password_reset,
     reset_password,
@@ -273,10 +276,11 @@ def reset_password_route(
     summary="Login",
     description=(
         "Authenticate with email and password. Returns a JWT access token "
-        "that must be included in subsequent requests via the "
-        "Authorization header as 'Bearer <token>'."
+        "and a refresh token. The access token must be included in "
+        "subsequent requests via the Authorization header as "
+        "'Bearer <token>'."
     ),
-    response_description="JWT access token and token type.",
+    response_description="JWT access token, refresh token, and token type.",
     responses={
         status.HTTP_401_UNAUTHORIZED: {
             "description": "Invalid email or password",
@@ -293,7 +297,7 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> LoginResponse:
-    access_token = authenticate_user(
+    access_token, refresh_token = authenticate_user(
         db,
         form_data.username,
         form_data.password,
@@ -301,6 +305,7 @@ def login(
 
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
     }
 
@@ -325,3 +330,32 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ) -> CurrentUserResponse:
     return current_user
+
+
+@router.post(
+    "/refresh",
+    response_model=RefreshResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Refresh Access Token",
+    description=(
+        "Obtain a new access token using a valid refresh token. "
+        "The refresh token must have been issued during login and must "
+        "not be expired or revoked."
+    ),
+    response_description="New access token and token type.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Invalid, expired, or revoked refresh token",
+        },
+    },
+)
+def refresh_token(
+    payload: RefreshRequest,
+    db: Session = Depends(get_db),
+) -> RefreshResponse:
+    new_access_token = refresh_access_token(db, payload.refresh_token)
+
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer",
+    }

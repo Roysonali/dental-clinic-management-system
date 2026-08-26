@@ -98,6 +98,78 @@ class PasswordResetToken(Base):
         )
 
 
+class RefreshToken(Base):
+    """A long-lived refresh token used to obtain new access tokens.
+
+    Only the SHA-256 digest of the raw token is stored. The raw token is
+    returned to the client once and is never persisted in the database.
+
+    Lifecycle:
+        * ``revoked_at`` — set when the token is explicitly revoked (logout,
+          password change) or when a new refresh token is issued (rotation).
+        * ``expires_at`` — hard deadline; expired tokens are rejected at
+          lookup time.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+        doc="Foreign key to the token owner",
+    )
+
+    token_hash = Column(
+        String(64),
+        nullable=False,
+        unique=True,
+        index=True,
+        doc="SHA-256 hex digest of the raw refresh token",
+    )
+
+    expires_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+        doc="UTC timestamp after which the token is rejected",
+    )
+
+    revoked_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="UTC timestamp when the token was revoked",
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        doc="UTC timestamp when the token was created",
+    )
+
+    user = relationship(
+        "User",
+        passive_deletes=True,
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<RefreshToken(id={self.id}, user_id={self.user_id}, "
+            f"expires_at={self.expires_at!r}, revoked_at={self.revoked_at!r})>"
+        )
+
+
 class Role(Base):
     """User role for RBAC (e.g. Admin, Doctor, Receptionist).
 

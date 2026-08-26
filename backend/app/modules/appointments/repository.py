@@ -170,6 +170,40 @@ class AppointmentRepository:
             is not None
         )
 
+    def list_by_patient(
+        self,
+        patient_id: UUID,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[Appointment], int]:
+        """Return paginated appointments for a specific patient."""
+
+        base = (
+            select(Appointment)
+            .where(Appointment.patient_id == patient_id)
+        )
+
+        total = (
+            self.db.execute(
+                select(func.count()).select_from(base.subquery())
+            ).scalar()
+        )
+
+        stmt = (
+            base
+            .order_by(Appointment.appointment_date.desc(), Appointment.start_time.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+        rows = (
+            self.db.execute(stmt)
+            .scalars()
+            .all()
+        )
+
+        return rows, total
+
     def get_latest_number_prefix(
         self,
         prefix: str,
@@ -182,9 +216,7 @@ class AppointmentRepository:
                     f"{prefix}%"
                 )
             )
-            .order_by(
-                Appointment.appointment_number.desc()
-            )
+            .order_by(Appointment.appointment_number.desc())
             .limit(1)
         )
 

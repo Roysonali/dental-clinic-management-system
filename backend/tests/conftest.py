@@ -27,7 +27,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database.session import get_db
 from app.modules.auth.routes import router as auth_router
-from app.modules.auth.models import User, Role, PasswordResetToken
+from app.modules.auth.models import User, Role, PasswordResetToken, RefreshToken
 from app.core.constants import USER_STATUS_ACTIVE, USER_STATUS_INACTIVE, USER_STATUS_PENDING, ROLE_ADMIN
 from app.core.security import hash_password, create_access_token
 from app.core.exception_handlers import register_exception_handlers
@@ -51,6 +51,7 @@ def app():
     User.__table__.create(bind=engine, checkfirst=True)
     Role.__table__.create(bind=engine, checkfirst=True)
     PasswordResetToken.__table__.create(bind=engine, checkfirst=True)
+    RefreshToken.__table__.create(bind=engine, checkfirst=True)
 
     application = FastAPI(title="DensCare Test")
     application.include_router(auth_router)
@@ -71,18 +72,20 @@ def app():
 def db():
     """Provide a DB session for direct queries in tests.
 
-    Creates the User, Role, and PasswordResetToken tables fresh, yields a
+    Creates the User, Role, PasswordResetToken, and RefreshToken tables fresh, yields a
     session, then tears down the tables so each test starts clean.
     """
     User.__table__.create(bind=engine, checkfirst=True)
     Role.__table__.create(bind=engine, checkfirst=True)
     PasswordResetToken.__table__.create(bind=engine, checkfirst=True)
+    RefreshToken.__table__.create(bind=engine, checkfirst=True)
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.rollback()
         session.close()
+        RefreshToken.__table__.drop(bind=engine, checkfirst=True)
         PasswordResetToken.__table__.drop(bind=engine, checkfirst=True)
         User.__table__.drop(bind=engine, checkfirst=True)
         Role.__table__.drop(bind=engine, checkfirst=True)

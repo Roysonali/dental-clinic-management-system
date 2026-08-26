@@ -386,6 +386,22 @@ class AppointmentService:
             )
         )
 
+    def list_by_patient(
+        self,
+        patient_id: UUID,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[Appointment], int]:
+        """Return paginated appointments for a specific patient."""
+
+        return (
+            self.repository.list_by_patient(
+                patient_id=patient_id,
+                skip=skip,
+                limit=limit,
+            )
+        )
+
     @staticmethod
     def _calculate_end_time(
         appointment_date: date,

@@ -17,6 +17,14 @@ export const appointmentQueryKeys = {
       params.skip ?? 0,
       params.limit ?? APPOINTMENT_LIST_PAGE_SIZE,
     ] as const,
+  patient: (patientId: string, params: AppointmentListParams) =>
+    [
+      'appointments',
+      'patient',
+      patientId,
+      params.skip ?? 0,
+      params.limit ?? APPOINTMENT_LIST_PAGE_SIZE,
+    ] as const,
   today: ['appointments', 'today'] as const,
   detail: (id: string) => ['appointments', 'detail', id] as const,
 };

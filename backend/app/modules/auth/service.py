@@ -13,9 +13,11 @@ from app.core.constants import USER_STATUS_INACTIVE
 from app.core.constants import USER_STATUS_PENDING
 from app.core.email import email_service
 from app.core.security import create_access_token
+from app.core.security import create_refresh_token as create_refresh_token_jwt
 from app.core.security import generate_password_reset_token
 from app.core.security import hash_password
 from app.core.security import hash_password_reset_token
+from app.core.security import hash_token
 from app.core.security import verify_password
 from app.modules.auth.exceptions import (
     ApprovalFailed,
@@ -23,6 +25,7 @@ from app.modules.auth.exceptions import (
     EmailAlreadyRegistered,
     InactiveAccount,
     InvalidCredentials,
+    InvalidRefreshToken,
     InvalidResetToken,
     PasswordResetFailed,
     PasswordResetRequestFailed,
@@ -37,15 +40,19 @@ from app.modules.users.repository import count_admin_users
 
 from app.modules.users.exceptions import LastAdminCannotBeModified
 from app.modules.auth.models import PasswordResetToken
+from app.modules.auth.models import RefreshToken
 from app.modules.auth.models import User
 from app.modules.auth.repository import create_password_reset_token
+from app.modules.auth.repository import create_refresh_token
 from app.modules.auth.repository import create_user
 from app.modules.auth.repository import get_password_reset_token_by_hash
 from app.modules.auth.repository import get_pending_users
+from app.modules.auth.repository import get_refresh_token_by_hash
 from app.modules.auth.repository import get_role_by_id
 from app.modules.auth.repository import get_user_by_email
 from app.modules.auth.repository import get_user_by_id
 from app.modules.auth.repository import mark_password_reset_token_used
+from app.modules.auth.repository import revoke_all_user_refresh_tokens
 from app.modules.auth.repository import revoke_user_password_reset_tokens
 from app.modules.auth.schemas import UserRegister
 
@@ -312,11 +319,12 @@ def authenticate_user(
     db: Session,
     email: str,
     password: str,
-) -> str:
+) -> tuple[str, str]:
     """Authenticate a user by email and password.
 
     Normalizes the email to lowercase so that login is case-insensitive,
-    then validates credentials. Returns a signed JWT access token on success.
+    then validates credentials. Returns a signed JWT access token and
+    refresh token on success.
 
     Args:
         db: Active database session.
@@ -324,7 +332,7 @@ def authenticate_user(
         password: Raw (unhashed) password.
 
     Returns:
-        A JWT access token string.
+        A tuple of (access_token, refresh_token) strings.
 
     Raises:
         InvalidCredentials: If the email or password is incorrect.
@@ -357,9 +365,31 @@ def authenticate_user(
         raise InactiveAccount()
 
     user.last_login_at = datetime.now(timezone.utc)
-    db.commit()
 
     access_token = create_access_token({"sub": user.email})
+    refresh_token = create_refresh_token_jwt({"sub": user.email})
+
+    # Store refresh token hash in database
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(
+        minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES,
+    )
+
+    try:
+        db_refresh_token = RefreshToken(
+            user_id=user.id,
+            token_hash=hash_token(refresh_token),
+            expires_at=expires_at,
+        )
+        create_refresh_token(db, db_refresh_token)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Failed to store refresh token: email=%s",
+            normalized_email,
+        )
+        raise
 
     logger.info(
         "User authenticated: email=%s, last_login=%s",
@@ -367,7 +397,89 @@ def authenticate_user(
         user.last_login_at,
     )
 
-    return access_token
+    return access_token, refresh_token
+
+
+def refresh_access_token(
+    db: Session,
+    refresh_token: str,
+) -> str:
+    """Refresh an access token using a valid refresh token.
+
+    Validates the refresh token, checks it hasn't been revoked or expired,
+    then issues a new access token.
+
+    Args:
+        db: Active database session.
+        refresh_token: The raw refresh token string.
+
+    Returns:
+        A new JWT access token string.
+
+    Raises:
+        InvalidRefreshToken: If the token is invalid, expired, or revoked.
+    """
+    try:
+        from app.core.security import decode_refresh_token
+        payload = decode_refresh_token(refresh_token)
+    except Exception:
+        logger.warning("Invalid refresh token format")
+        raise InvalidRefreshToken()
+
+    email: str | None = payload.get("sub")
+    jti: str | None = payload.get("jti")
+
+    if email is None or jti is None:
+        logger.warning("Refresh token missing required claims")
+        raise InvalidRefreshToken()
+
+    token_hash = hash_token(refresh_token)
+    db_token = get_refresh_token_by_hash(db, token_hash)
+
+    if db_token is None:
+        logger.warning(
+            "Refresh token not found in database: email=%s",
+            email,
+        )
+        raise InvalidRefreshToken()
+
+    if db_token.revoked_at is not None:
+        logger.warning(
+            "Refresh token has been revoked: email=%s",
+            email,
+        )
+        raise InvalidRefreshToken()
+
+    # Check expiration
+    expires_at = db_token.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at <= datetime.now(timezone.utc):
+        logger.warning(
+            "Refresh token has expired: email=%s",
+            email,
+        )
+        raise InvalidRefreshToken()
+
+    # Verify the user still exists and is active
+    user = get_user_by_email(db, email)
+    if not user or not user.is_active:
+        logger.warning(
+            "Refresh token user not found or inactive: email=%s",
+            email,
+        )
+        raise InvalidRefreshToken()
+
+    # Issue new access token
+    new_access_token = create_access_token({"sub": user.email})
+
+    logger.info(
+        "Access token refreshed: email=%s",
+        email,
+    )
+
+    return new_access_token
 
 
 def request_password_reset(

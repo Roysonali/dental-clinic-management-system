@@ -15,6 +15,7 @@ import { ActivityTimeline } from '../ActivityTimeline';
 import { QuickActionsCard } from '../QuickActionsCard';
 import { UpcomingAppointmentCard } from '../UpcomingAppointmentCard';
 import { TreatmentSummaryCard } from '../TreatmentSummaryCard';
+import { PatientAppointmentsTab } from '../PatientAppointmentsTab';
 import { PatientFormContainer } from './PatientFormContainer';
 import { PatientStatusDialog } from '../PatientStatusDialog';
 import type { PatientStatusIntent } from '../PatientStatusDialog';
@@ -74,12 +75,6 @@ const UNWIRED_TABS = [
     label: 'Treatment Plans',
     title: 'No treatment plans',
     description: 'Treatment plans for this patient will appear here once the Treatment module is connected.',
-  },
-  {
-    value: 'appointments',
-    label: 'Appointments',
-    title: 'No appointments',
-    description: 'Appointments for this patient will appear here once the Appointments module is connected.',
   },
   {
     value: 'billing',
@@ -211,6 +206,7 @@ export const PatientDetailsContainer: FC = () => {
         <Tabs defaultValue="overview">
           <Tabs.List>
             <Tabs.Trigger value="overview" label="Overview" />
+            <Tabs.Trigger value="appointments" label="Appointments" />
             {UNWIRED_TABS.map((tab) => (
               <Tabs.Trigger key={tab.value} value={tab.value} label={tab.label} />
             ))}
@@ -226,7 +222,7 @@ export const PatientDetailsContainer: FC = () => {
                   <EmergencyContactCard patient={patient} />
                   <ClinicalSummaryCard patient={patient} />
                 </div>
-                <UpcomingAppointmentCard />
+                <UpcomingAppointmentCard patientId={patient.id} />
               </div>
 
               {/* Right column */}
@@ -252,6 +248,11 @@ export const PatientDetailsContainer: FC = () => {
                 </div>
               </div>
             </div>
+          </Tabs.Content>
+
+          {/* ── Appointments (wired to Patient Appointments API) ── */}
+          <Tabs.Content value="appointments" lazy className="mt-6">
+            <PatientAppointmentsTab patientId={patient.id} />
           </Tabs.Content>
 
           {/* ── Tabs owned by other modules (intentional empty states) ── */}

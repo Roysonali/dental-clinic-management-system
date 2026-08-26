@@ -274,6 +274,44 @@ class LoginResponse(BaseModel):
         description="JWT access token for authenticated requests.",
         examples=["eyJhbGciOiJIUzI1NiIs..."],
     )
+    refresh_token: str = Field(
+        ...,
+        title="Refresh Token",
+        description="JWT refresh token for obtaining new access tokens.",
+        examples=["eyJhbGciOiJIUzI1NiIs..."],
+    )
+    token_type: str = Field(
+        ...,
+        title="Token Type",
+        description="Type of the token (always 'bearer').",
+        examples=["bearer"],
+    )
+
+
+class RefreshRequest(BaseModel):
+    """Request schema for refreshing an access token."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(
+        ...,
+        title="Refresh Token",
+        description="The refresh token obtained during login.",
+        examples=["eyJhbGciOiJIUzI1NiIs..."],
+    )
+
+
+class RefreshResponse(BaseModel):
+    """Response containing a new access token after refresh."""
+
+    model_config = ConfigDict(frozen=True)
+
+    access_token: str = Field(
+        ...,
+        title="Access Token",
+        description="New JWT access token for authenticated requests.",
+        examples=["eyJhbGciOiJIUzI1NiIs..."],
+    )
     token_type: str = Field(
         ...,
         title="Token Type",

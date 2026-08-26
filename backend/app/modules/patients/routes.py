@@ -26,6 +26,13 @@ from app.modules.patients.service import (
     PatientService,
 )
 
+from app.modules.appointments.service import (
+    AppointmentService,
+)
+from app.modules.appointments.schema import (
+    AppointmentListResponse,
+)
+
 from app.core.constants import (
     DOCTOR_ROLES,
     ROLE_ADMIN,
@@ -48,6 +55,14 @@ def get_patient_service(
     """FastAPI dependency that constructs a PatientService instance."""
 
     return PatientService(db)
+
+
+def get_appointment_service(
+    db: Session = Depends(get_db),
+) -> AppointmentService:
+    """FastAPI dependency that constructs an AppointmentService instance."""
+
+    return AppointmentService(db)
 
 
 # ==========================================================
@@ -358,3 +373,72 @@ def patient_profile(
     return service.get_patient_profile(
         patient_id
     )
+
+
+
+# ==========================================================
+# PATIENT APPOINTMENTS
+# ==========================================================
+
+@router.get(
+    "/{patient_id}/appointments",
+    response_model=AppointmentListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Patient Appointments",
+    description=(
+        "Retrieve a paginated list of appointments for a specific patient. "
+        "Supports skip/limit pagination."
+    ),
+    response_description="Paginated list of appointments belonging to the patient.",
+)
+def patient_appointments(
+
+    patient_id: UUID,
+
+    skip: int = Query(
+        default=0,
+        ge=0,
+        description="Zero-based offset.",
+    ),
+
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+        description="Number of records per page (max 100).",
+    ),
+
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        )
+    ),
+
+    patient_service: PatientService = Depends(
+        get_patient_service,
+    ),
+
+    appointment_service: AppointmentService = Depends(
+        get_appointment_service,
+    ),
+) -> AppointmentListResponse:
+
+    # Verify patient exists (raises 404 if not found)
+    patient_service.get_patient(patient_id)
+
+    rows, total = (
+        appointment_service.list_by_patient(
+            patient_id=patient_id,
+            skip=skip,
+            limit=limit,
+        )
+    )
+
+    return {
+        "items": rows,
+        "total": total,
+    }

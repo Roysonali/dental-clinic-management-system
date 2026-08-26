@@ -29,6 +29,18 @@ export const appointmentService = {
     return data;
   },
 
+  /** GET /patients/{patientId}/appointments?skip=&limit= */
+  async listByPatient(
+    patientId: string,
+    params: AppointmentListParams = {},
+  ): Promise<AppointmentListResponse> {
+    const { data } = await api.get<AppointmentListResponse>(
+      `/patients/${patientId}/appointments`,
+      { params },
+    );
+    return data;
+  },
+
   /** POST /appointments (201) */
   async create(payload: AppointmentCreatePayload): Promise<AppointmentResponse> {
     const { data } = await api.post<AppointmentResponse>('/appointments', payload);

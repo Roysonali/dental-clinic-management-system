@@ -66,7 +66,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   const login = useCallback(
     async (email: string, password: string, rememberMe: boolean) => {
       const response = await authService.login(email.trim().toLowerCase(), password);
-      persistAccessToken(response.access_token, rememberMe);
+      persistAccessToken(response.access_token, response.refresh_token, rememberMe);
       setToken(response.access_token);
 
       // Resolve the profile before returning so the caller can navigate

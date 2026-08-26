@@ -36,6 +36,10 @@ class Settings:
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
     )
 
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", "1440")
+    )
+
     # ── Password recovery ───────────────────────────────────────────────
     # Base URL of the frontend application used to build password-reset
     # links. The localhost default is for local development only — a
@@ -119,6 +123,11 @@ class Settings:
         if self.ACCESS_TOKEN_EXPIRE_MINUTES < 1:
             errors.append(
                 "ACCESS_TOKEN_EXPIRE_MINUTES must be >= 1"
+            )
+
+        if self.REFRESH_TOKEN_EXPIRE_MINUTES < 1:
+            errors.append(
+                "REFRESH_TOKEN_EXPIRE_MINUTES must be >= 1"
             )
 
         if self.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES < 1:

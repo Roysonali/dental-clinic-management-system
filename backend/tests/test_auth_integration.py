@@ -30,6 +30,7 @@ def test_login_success(client, active_user):
     r = client.post("/auth/login", data={"username": "active@example.com", "password": "Active@Pass1"}, headers={"Content-Type": "application/x-www-form-urlencoded"})
     assert r.status_code == 200
     assert "access_token" in r.json()
+    assert "refresh_token" in r.json()
     assert r.json()["token_type"] == "bearer"
 
 
