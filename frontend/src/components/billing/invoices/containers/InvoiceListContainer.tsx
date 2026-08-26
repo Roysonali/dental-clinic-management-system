@@ -26,6 +26,7 @@ import {
 } from '../../../../hooks/billing/useInvoiceMutations';
 import { useInvoiceCreateFlow } from '../../../../hooks/billing/useInvoiceCreateFlow';
 import { useDoctors } from '../../../../hooks/doctors/useDoctors';
+import { usePatient } from '../../../../hooks/patients/usePatient';
 import { parseApiError } from '../../../../services/apiError';
 import { ROUTES, INVOICE_CREATE_QUERY_PARAM } from '../../../../routes/routes';
 import { editFormValuesToUpdatePayload } from '../../../../utils/invoiceFormUtils';
@@ -97,8 +98,15 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
   // setState out of effects and opens the form on the first render when the
   // intent is present.
   const createRequested = searchParams.get(INVOICE_CREATE_QUERY_PARAM) === 'true';
+  const createPatientId = searchParams.get('patientId');
   const [createOpenLocal, setCreateOpenLocal] = useState(false);
   const createOpen = createRequested || createOpenProp || createOpenLocal;
+
+  // Fetch patient details for human-readable label when deep-linked.
+  const patientQuery = usePatient(createPatientId, !!createPatientId);
+  const selectedPatientLabel = patientQuery.data
+    ? `${patientQuery.data.full_name} (${patientQuery.data.patient_code})`
+    : null;
 
   const [issueTarget, setIssueTarget] = useState<InvoiceListItem | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
@@ -195,6 +203,7 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
     if (!createRequested) return;
     const next = new URLSearchParams(searchParams);
     next.delete(INVOICE_CREATE_QUERY_PARAM);
+    next.delete('patientId');
     setSearchParams(next, { replace: true });
   };
 
@@ -295,6 +304,8 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
     submitting: createFlow.submitting,
     serverErrors: createFlow.serverErrors,
     serverMessage: createFlow.serverMessage,
+    initialPatientId: createPatientId ?? '',
+    selectedPatientLabel,
   };
 
   return (

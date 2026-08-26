@@ -122,6 +122,7 @@ export const AppointmentListContainer: FC = () => {
   // stripped with `replace` when the form closes so the URL never re-opens
   // the drawer.
   const createRequested = searchParams.get(CREATE_QUERY_PARAM) === 'true';
+  const createPatientId = searchParams.get('patientId');
 
   const openCreate = () => setFormState({ mode: 'create' });
   const openEdit = (appointment: EnrichedAppointment) =>
@@ -131,6 +132,7 @@ export const AppointmentListContainer: FC = () => {
     if (createRequested) {
       const next = new URLSearchParams(searchParams);
       next.delete(CREATE_QUERY_PARAM);
+      next.delete('patientId');
       setSearchParams(next, { replace: true });
     }
   };
@@ -232,6 +234,7 @@ export const AppointmentListContainer: FC = () => {
         open={createRequested || formState !== null}
         mode={formState?.mode ?? 'create'}
         appointmentId={formState?.mode === 'edit' ? formState.appointment.id : null}
+        patientId={createPatientId}
         onClose={closeForm}
         onCreated={(appointment) => navigate(`${ROUTES.APPOINTMENTS}/${appointment.id}`)}
       />

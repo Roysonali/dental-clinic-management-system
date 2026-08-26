@@ -19,6 +19,7 @@ from app.modules.patients.schemas import (
     PatientListResponse,
     PatientProfileResponse,
     PatientResponse,
+    PatientSummaryResponse,
     PatientUpdate,
 )
 
@@ -374,6 +375,44 @@ def patient_profile(
         patient_id
     )
 
+
+# ==========================================================
+# PATIENT HUB SUMMARY
+# ==========================================================
+
+@router.get(
+    "/{patient_id}/summary",
+    response_model=PatientSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Patient Hub Summary",
+    description=(
+        "Aggregated overview for the Patient Hub. Returns entity counts, "
+        "recent items (appointments, records, treatment plans, invoices), "
+        "and a billing financial summary for the specified patient. "
+        "Designed to minimise initial-load requests for the patient detail page."
+    ),
+    response_description="Patient hub summary with counts, recent items, and billing overview.",
+)
+def patient_summary(
+
+    patient_id: UUID,
+
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        )
+    ),
+
+    service: PatientService = Depends(
+        get_patient_service,
+    ),
+) -> PatientSummaryResponse:
+
+    return service.get_patient_summary(patient_id)
 
 
 # ==========================================================

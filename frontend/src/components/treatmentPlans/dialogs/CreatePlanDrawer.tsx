@@ -20,6 +20,8 @@ interface CreatePlanDrawerProps {
   onClose: () => void;
   /** Pre-fill the patient when opened from the patient profile. */
   initialPatientId?: string;
+  /** Human-readable patient label to display in the picker (e.g. "Juan Dela Cruz (PAT-000001)"). */
+  selectedPatientLabel?: string;
   /** Doctor dropdown options (active doctors). */
   doctorOptions: { value: string; label: string }[];
   doctorsLoading?: boolean;
@@ -43,6 +45,7 @@ export const CreatePlanDrawer: FC<CreatePlanDrawerProps> = ({
   open,
   onClose,
   initialPatientId = '',
+  selectedPatientLabel,
   doctorOptions,
   doctorsLoading = false,
   doctorsError = false,
@@ -112,6 +115,7 @@ export const CreatePlanDrawer: FC<CreatePlanDrawerProps> = ({
                 error={fieldError('patient_id')}
                 required
                 wrapperClassName="md:col-span-2"
+                selectedLabel={selectedPatientLabel}
               />
             )}
           />

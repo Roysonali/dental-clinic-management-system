@@ -4,6 +4,7 @@ import type {
   PatientListParams,
   PatientListResponse,
   PatientResponse,
+  PatientSummaryResponse,
   PatientUpdatePayload,
 } from '../types/patient';
 
@@ -57,6 +58,12 @@ export const patientService = {
   /** PATCH /patients/{id}/deactivate */
   async deactivate(id: string): Promise<PatientResponse> {
     const { data } = await api.patch<PatientResponse>(`/patients/${id}/deactivate`);
+    return data;
+  },
+
+  /** GET /patients/{id}/summary */
+  async getSummary(id: string): Promise<PatientSummaryResponse> {
+    const { data } = await api.get<PatientSummaryResponse>(`/patients/${id}/summary`);
     return data;
   },
 };

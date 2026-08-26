@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import (
@@ -494,4 +495,102 @@ class PatientProfileResponse(
 ):
     """Full patient profile. Extends PatientResponse for future profile-specific fields."""
     pass
+
+
+# ======================================================================
+# Patient Summary (Hub Overview)
+# ======================================================================
+
+
+class PatientSummaryCounts(BaseModel):
+    """Entity counts for a patient."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total_appointments: int = Field(ge=0)
+    total_records: int = Field(ge=0)
+    total_treatment_plans: int = Field(ge=0)
+    total_invoices: int = Field(ge=0)
+    total_payments: int = Field(ge=0)
+
+
+class PatientSummaryBilling(BaseModel):
+    """Financial summary for a patient, sourced from the billing module."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total_invoiced: Decimal = Field(description="Sum of all invoice grand totals.")
+    total_paid: Decimal = Field(description="Sum of all non-refund payment allocations.")
+    total_outstanding: Decimal = Field(description="Remaining balance.")
+    total_credited: Decimal = Field(description="Sum of all credit note amounts.")
+
+
+class PatientSummaryAppointment(BaseModel):
+    """Lightweight appointment summary for the Patient Hub overview."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    appointment_number: str
+    appointment_date: date
+    start_time: str
+    end_time: str
+    status: str
+    appointment_type: str
+
+
+class PatientSummaryRecord(BaseModel):
+    """Lightweight patient record summary for the Patient Hub overview."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    status: str
+    chief_complaint: Optional[str] = None
+    created_at: datetime
+
+
+class PatientSummaryTreatmentPlan(BaseModel):
+    """Lightweight treatment plan summary for the Patient Hub overview."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    plan_code: str
+    status: str
+    created_at: datetime
+
+
+class PatientSummaryInvoice(BaseModel):
+    """Lightweight invoice summary for the Patient Hub overview."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    invoice_number: str
+    status: str
+    total_amount: Decimal = Field(
+        description="Grand total amount.",
+    )
+    outstanding_amount: Decimal = Field(
+        description="Outstanding balance.",
+    )
+    invoice_date: date
+
+
+class PatientSummaryResponse(BaseModel):
+    """Aggregated patient hub overview.
+
+    Combines entity counts, recent items, and financial summary
+    into a single response to minimize initial-load requests.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    counts: PatientSummaryCounts
+    recent_appointments: list[PatientSummaryAppointment]
+    recent_records: list[PatientSummaryRecord]
+    active_treatment_plans: list[PatientSummaryTreatmentPlan]
+    recent_invoices: list[PatientSummaryInvoice]
+    billing: PatientSummaryBilling | None = None
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from uuid import UUID
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.modules.patients.models import Patient
@@ -14,6 +16,13 @@ from app.modules.patients.mapper import (
 )
 from app.modules.patients.schemas import (
     PatientCreate,
+    PatientSummaryAppointment,
+    PatientSummaryBilling,
+    PatientSummaryCounts,
+    PatientSummaryInvoice,
+    PatientSummaryRecord,
+    PatientSummaryResponse,
+    PatientSummaryTreatmentPlan,
     PatientUpdate,
 )
 from app.modules.patients.exceptions import (
@@ -570,6 +579,187 @@ class PatientService:
             .to_profile_response(
                 patient
             )
+        )
+
+    # ------------------------------------------------------------------
+    # Patient Hub Summary
+    # ------------------------------------------------------------------
+
+    def get_patient_summary(
+        self,
+        patient_id: UUID,
+    ) -> PatientSummaryResponse:
+        """Aggregated overview for the Patient Hub.
+
+        Returns counts, recent items, and billing summary in a single
+        response to minimise initial-load requests.  All queries use
+        COUNT / LIMIT — no unnecessary ORM object loading.
+        """
+
+        # Verify patient exists
+        patient = self.repository.get_by_id(patient_id)
+        if not patient:
+            raise PatientNotFound()
+
+        # Lazy imports to avoid circular dependencies (billing ↔ patients)
+        from app.modules.appointments.model import Appointment
+        from app.modules.patient_records.models.patient_record import PatientRecord
+        from app.modules.treatment.models import TreatmentPlan
+        from app.modules.billing.models.invoice import Invoice
+        from app.modules.billing.models.payment import Payment
+
+        # ── Counts ──────────────────────────────────────────────
+        total_appointments = self.db.scalar(
+            select(func.count()).where(
+                Appointment.patient_id == patient_id
+            )
+        ) or 0
+
+        total_records = self.db.scalar(
+            select(func.count()).where(
+                PatientRecord.patient_id == patient_id,
+                PatientRecord.is_deleted == False,  # noqa: E712
+            )
+        ) or 0
+
+        total_treatment_plans = self.db.scalar(
+            select(func.count()).where(
+                TreatmentPlan.patient_id == patient_id
+            )
+        ) or 0
+
+        total_invoices = self.db.scalar(
+            select(func.count()).where(
+                Invoice.patient_id == patient_id
+            )
+        ) or 0
+
+        total_payments = self.db.scalar(
+            select(func.count()).where(
+                Payment.patient_id == patient_id
+            )
+        ) or 0
+
+        counts = PatientSummaryCounts(
+            total_appointments=total_appointments,
+            total_records=total_records,
+            total_treatment_plans=total_treatment_plans,
+            total_invoices=total_invoices,
+            total_payments=total_payments,
+        )
+
+        # ── Recent Appointments (3) ─────────────────────────────
+        recent_appt_rows = self.db.scalars(
+            select(Appointment)
+            .where(Appointment.patient_id == patient_id)
+            .order_by(Appointment.appointment_date.desc(), Appointment.start_time.desc())
+            .limit(3)
+        ).all()
+
+        recent_appointments = [
+            PatientSummaryAppointment(
+                id=str(a.id),
+                appointment_number=a.appointment_number,
+                appointment_date=a.appointment_date,
+                start_time=str(a.start_time),
+                end_time=str(a.end_time),
+                status=a.status.value if hasattr(a.status, 'value') else str(a.status),
+                appointment_type=a.appointment_type.value if hasattr(a.appointment_type, 'value') else str(a.appointment_type),
+            )
+            for a in recent_appt_rows
+        ]
+
+        # ── Recent Records (3) ──────────────────────────────────
+        recent_record_rows = self.db.scalars(
+            select(PatientRecord)
+            .where(
+                PatientRecord.patient_id == patient_id,
+                PatientRecord.is_deleted == False,  # noqa: E712
+            )
+            .order_by(PatientRecord.created_at.desc())
+            .limit(3)
+        ).all()
+
+        recent_records = [
+            PatientSummaryRecord(
+                id=str(r.id),
+                status=r.status.value if hasattr(r.status, 'value') else str(r.status),
+                chief_complaint=r.chief_complaint,
+                created_at=r.created_at,
+            )
+            for r in recent_record_rows
+        ]
+
+        # ── Active Treatment Plans (3) ──────────────────────────
+        active_tp_rows = self.db.scalars(
+            select(TreatmentPlan)
+            .where(
+                TreatmentPlan.patient_id == patient_id,
+                TreatmentPlan.is_active == True,  # noqa: E712
+            )
+            .order_by(TreatmentPlan.created_at.desc())
+            .limit(3)
+        ).all()
+
+        active_treatment_plans = [
+            PatientSummaryTreatmentPlan(
+                id=str(t.id),
+                plan_code=t.plan_code,
+                status=t.status.value if hasattr(t.status, 'value') else str(t.status),
+                created_at=t.created_at,
+            )
+            for t in active_tp_rows
+        ]
+
+        # ── Recent Invoices (3) ─────────────────────────────────
+        recent_invoice_rows = self.db.scalars(
+            select(Invoice)
+            .where(Invoice.patient_id == patient_id)
+            .order_by(Invoice.created_at.desc())
+            .limit(3)
+        ).all()
+
+        recent_invoices = [
+            PatientSummaryInvoice(
+                id=str(inv.id),
+                invoice_number=inv.invoice_number,
+                status=inv.status.value if hasattr(inv.status, 'value') else str(inv.status),
+                total_amount=inv.grand_total if hasattr(inv, 'grand_total') else Decimal("0.00"),
+                outstanding_amount=inv.outstanding_amount if hasattr(inv, 'outstanding_amount') else Decimal("0.00"),
+                invoice_date=inv.invoice_date,
+            )
+            for inv in recent_invoice_rows
+        ]
+
+        # ── Billing Summary ─────────────────────────────────────
+        # Delegate to existing billing service — no duplicated logic
+        billing_summary = None
+        try:
+            from app.modules.billing.services.financial_calculation_service import (
+                FinancialCalculationService,
+            )
+
+            fin_service = FinancialCalculationService(self.db)
+            patient_fin = fin_service.get_patient_summary(patient_id)
+            billing_summary = PatientSummaryBilling(
+                total_invoiced=patient_fin.total_invoiced,
+                total_paid=patient_fin.total_paid,
+                total_outstanding=patient_fin.total_outstanding,
+                total_credited=patient_fin.total_credited,
+            )
+        except Exception:
+            logger.debug(
+                "Billing summary unavailable for patient %s",
+                patient_id,
+            )
+
+        return PatientSummaryResponse(
+            counts=counts,
+            recent_appointments=recent_appointments,
+            recent_records=recent_records,
+            active_treatment_plans=active_treatment_plans,
+            recent_invoices=recent_invoices,
+            billing=billing_summary,
         )
     
     def _check_update_duplicates(

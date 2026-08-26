@@ -25,6 +25,8 @@ interface AppointmentFormContainerProps {
   mode: 'create' | 'edit';
   /** Appointment id to edit (edit mode); the full record is fetched on open */
   appointmentId?: string | null;
+  /** Patient id to pre-fill when creating from a patient context */
+  patientId?: string | null;
   /** Called to close the drawer */
   onClose: () => void;
   /** Called after a successful create (e.g. to navigate to the new record) */
@@ -42,6 +44,7 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
   open,
   mode,
   appointmentId,
+  patientId,
   onClose,
   onCreated,
 }) => {
@@ -137,7 +140,13 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
       submitting={submitting}
       loading={isEdit && appointmentQuery.isLoading}
       disabled={isEdit && appointmentQuery.isLoading}
-      initialValues={appointment ? appointmentToFormValues(appointment) : undefined}
+      initialValues={
+        appointment
+          ? appointmentToFormValues(appointment)
+          : patientId
+            ? { patient_id: patientId }
+            : undefined
+      }
       serverMessage={serverMessage}
       serverErrors={serverErrors}
       dentistOptions={dentistOptions}

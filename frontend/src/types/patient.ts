@@ -108,3 +108,69 @@ export interface PatientFormValues {
 
 /** Status filter used by the patient list toolbar. */
 export type PatientStatusFilter = 'all' | 'active' | 'inactive';
+
+/* ── Patient Hub Summary types ────────────────────────────── */
+
+/** Summary appointment item (GET /patients/{id}/summary). */
+export interface PatientSummaryAppointment {
+  id: string;
+  appointment_number: string;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  appointment_type: string;
+}
+
+/** Summary patient record item. */
+export interface PatientSummaryRecord {
+  id: string;
+  status: string;
+  chief_complaint: string | null;
+  created_at: string;
+}
+
+/** Summary treatment plan item. */
+export interface PatientSummaryTreatmentPlan {
+  id: string;
+  plan_code: string;
+  status: string;
+  created_at: string;
+}
+
+/** Summary invoice item. */
+export interface PatientSummaryInvoice {
+  id: string;
+  invoice_number: string;
+  status: string;
+  total_amount: string;
+  outstanding_amount: string;
+  invoice_date: string;
+}
+
+/** Entity counts for a patient. */
+export interface PatientSummaryCounts {
+  total_appointments: number;
+  total_records: number;
+  total_treatment_plans: number;
+  total_invoices: number;
+  total_payments: number;
+}
+
+/** Billing financial summary for a patient. */
+export interface PatientSummaryBilling {
+  total_invoiced: string;
+  total_paid: string;
+  total_outstanding: string;
+  total_credited: string;
+}
+
+/** Full patient hub summary response (GET /patients/{id}/summary). */
+export interface PatientSummaryResponse {
+  counts: PatientSummaryCounts;
+  recent_appointments: PatientSummaryAppointment[];
+  recent_records: PatientSummaryRecord[];
+  active_treatment_plans: PatientSummaryTreatmentPlan[];
+  recent_invoices: PatientSummaryInvoice[];
+  billing: PatientSummaryBilling | null;
+}

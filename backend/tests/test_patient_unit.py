@@ -374,3 +374,69 @@ class TestPatientServiceUnit:
         assert isinstance(result, PatientProfileResponse)
         assert result.created_by == 1
         assert result.updated_by is None
+
+
+class TestPatientSummaryUnit:
+    """Tests for the Patient Hub summary endpoint."""
+
+    @pytest.fixture
+    def service(self):
+        db = MagicMock()
+        svc = PatientService(db)
+        svc.repository = MagicMock(spec=PatientRepository)
+        return svc
+
+    def test_summary_not_found(self, service):
+        service.repository.get_by_id.return_value = None
+        with pytest.raises(PatientNotFound):
+            service.get_patient_summary(uuid4())
+
+    def test_summary_empty_patient(self, service):
+        """Patient with no related data returns zero counts and empty lists."""
+        patient = make_patient_orm()
+        service.repository.get_by_id.return_value = patient
+        service.db.scalar.return_value = 0
+        mock_scalars_result = MagicMock()
+        mock_scalars_result.all.return_value = []
+        service.db.scalars.return_value = mock_scalars_result
+
+        with patch(
+            "app.modules.billing.services.financial_calculation_service.FinancialCalculationService",
+            side_effect=Exception("no billing"),
+        ):
+            result = service.get_patient_summary(patient.id)
+
+        assert result.counts.total_appointments == 0
+        assert result.counts.total_records == 0
+        assert result.counts.total_treatment_plans == 0
+        assert result.counts.total_invoices == 0
+        assert result.counts.total_payments == 0
+        assert result.recent_appointments == []
+        assert result.recent_records == []
+        assert result.active_treatment_plans == []
+        assert result.recent_invoices == []
+        assert result.billing is None
+
+    def test_summary_schema_fields(self, service):
+        """Verify the summary response has the expected structure."""
+        from app.modules.patients.schemas import (
+            PatientSummaryResponse,
+            PatientSummaryCounts,
+        )
+        patient = make_patient_orm()
+        service.repository.get_by_id.return_value = patient
+        service.db.scalar.return_value = 5
+        mock_scalars_result = MagicMock()
+        mock_scalars_result.all.return_value = []
+        service.db.scalars.return_value = mock_scalars_result
+
+        with patch(
+            "app.modules.billing.services.financial_calculation_service.FinancialCalculationService",
+            side_effect=Exception("no billing"),
+        ):
+            result = service.get_patient_summary(patient.id)
+
+        assert isinstance(result, PatientSummaryResponse)
+        assert isinstance(result.counts, PatientSummaryCounts)
+        assert result.counts.total_appointments == 5
+        assert result.counts.total_records == 5

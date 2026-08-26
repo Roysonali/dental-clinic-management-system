@@ -12,11 +12,15 @@ import { formatISODate, formatTimeRange } from '../../utils/date';
 import { APPOINTMENT_TYPE_LABELS } from '../../constants/appointment';
 import { ROUTES } from '../../routes/routes';
 import { apiErrorMessage } from '../../services/apiError';
-import type { AppointmentResponse, EnrichedAppointment } from '../../types/appointment';
+import type { CreateActionType } from './PatientQuickActions';
+import type { EnrichedAppointment } from '../../types/appointment';
 
 interface PatientAppointmentsTabProps {
   /** Patient UUID — passed to GET /patients/{id}/appointments */
   patientId: string;
+  /** Callback to open the contextual create drawer. When provided, the empty-state CTA
+   *  uses this instead of navigating away from Patient Hub. */
+  onCreateAction?: (action: CreateActionType) => void;
 }
 
 /**
@@ -32,6 +36,7 @@ interface PatientAppointmentsTabProps {
  */
 export const PatientAppointmentsTab: FC<PatientAppointmentsTabProps> = ({
   patientId,
+  onCreateAction,
 }) => {
   const navigate = useNavigate();
 
@@ -85,7 +90,11 @@ export const PatientAppointmentsTab: FC<PatientAppointmentsTabProps> = ({
         emptyAction={
           <Button
             size="md"
-            onClick={() => navigate(ROUTES.APPOINTMENTS)}
+            onClick={() =>
+              onCreateAction
+                ? onCreateAction('appointment')
+                : navigate(`${ROUTES.APPOINTMENTS}?create=true&patientId=${patientId}`)
+            }
             leftIcon={<Icon icon={CalendarPlus} size="md" />}
             className="shrink-0 whitespace-nowrap"
           >
