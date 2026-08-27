@@ -304,8 +304,8 @@ export const InvoiceListContainer: FC<InvoiceListContainerProps> = ({
     submitting: createFlow.submitting,
     serverErrors: createFlow.serverErrors,
     serverMessage: createFlow.serverMessage,
-    initialPatientId: createPatientId ?? '',
-    selectedPatientLabel,
+    initialPatientId: createPatientId ?? undefined,
+    selectedPatientLabel: selectedPatientLabel ?? undefined,
   };
 
   return (

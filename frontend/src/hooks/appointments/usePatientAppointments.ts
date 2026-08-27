@@ -5,7 +5,6 @@ import type {
   AppointmentListParams,
   AppointmentListResponse,
 } from '../../types/appointment';
-import { APPOINTMENT_LIST_PAGE_SIZE } from '../../constants/appointment';
 
 /**
  * Paginated appointment list query scoped to a specific patient.

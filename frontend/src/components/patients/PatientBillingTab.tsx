@@ -50,7 +50,7 @@ export const PatientBillingTab: FC<PatientBillingTabProps> = ({ patientId, onCre
     patient_id: patientId,
     page: 1,
     page_size: 20,
-    sort_by: 'invoice_date',
+    sort_by: 'created_at',
     sort_order: 'desc',
   });
 

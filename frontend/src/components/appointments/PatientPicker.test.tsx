@@ -47,6 +47,9 @@ const mockQuickCreateResponse = (overrides: {
   patient: {
     id: 'p3',
     patient_code: 'PAT-000015',
+    first_name: 'New',
+    middle_name: null,
+    last_name: 'Person',
     full_name: 'New Person',
     date_of_birth: null,
     age: null,
