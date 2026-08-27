@@ -3,7 +3,10 @@ import type {
   PatientCreatePayload,
   PatientListParams,
   PatientListResponse,
+  PatientQuickCreatePayload,
+  PatientQuickCreateResponse,
   PatientResponse,
+  PatientSummaryResponse,
   PatientUpdatePayload,
 } from '../types/patient';
 
@@ -57,6 +60,18 @@ export const patientService = {
   /** PATCH /patients/{id}/deactivate */
   async deactivate(id: string): Promise<PatientResponse> {
     const { data } = await api.patch<PatientResponse>(`/patients/${id}/deactivate`);
+    return data;
+  },
+
+  /** POST /patients/quick-create (201) */
+  async quickCreate(payload: PatientQuickCreatePayload): Promise<PatientQuickCreateResponse> {
+    const { data } = await api.post<PatientQuickCreateResponse>('/patients/quick-create', payload);
+    return data;
+  },
+
+  /** GET /patients/{id}/summary */
+  async getSummary(id: string): Promise<PatientSummaryResponse> {
+    const { data } = await api.get<PatientSummaryResponse>(`/patients/${id}/summary`);
     return data;
   },
 };

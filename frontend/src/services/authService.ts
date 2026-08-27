@@ -5,6 +5,7 @@ import type {
   ForgotPasswordResponse,
   LoginResponse,
   PendingUserResponse,
+  RefreshResponse,
   RegisterRequest,
   RegisterResponse,
   ResetPasswordRequest,
@@ -18,9 +19,10 @@ import type {
  *
  * Endpoints mirror the backend `app/modules/auth/routes.py` exactly:
  * - POST   /auth/register              → 201 { message }                    (public)
- * - POST   /auth/login                 → 200 { access_token, token_type }   (public, form-encoded)
+ * - POST   /auth/login                 → 200 { access_token, refresh_token, token_type }   (public, form-encoded)
  * - POST   /auth/forgot-password       → 200 { message }                    (public)
  * - POST   /auth/reset-password        → 200 { message }                    (public)
+ * - POST   /auth/refresh               → 200 { access_token, token_type }   (public)
  * - GET    /auth/me                    → 200 current user profile           (Bearer)
  * - GET    /auth/users/pending         → 200 pending users                  (admin)
  * - PATCH  /auth/users/{id}/approve    → 200 { message }                    (admin)
@@ -43,6 +45,14 @@ export const authService = {
     body.append('password', password);
 
     const { data } = await api.post<LoginResponse>('/auth/login', body);
+    return data;
+  },
+
+  /** POST /auth/refresh — obtain a new access token. */
+  async refreshToken(refreshToken: string): Promise<RefreshResponse> {
+    const { data } = await api.post<RefreshResponse>('/auth/refresh', {
+      refresh_token: refreshToken,
+    });
     return data;
   },
 

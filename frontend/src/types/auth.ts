@@ -21,6 +21,13 @@ export interface LoginRequest {
 /** Login response from POST /auth/login */
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+/** Refresh token response from POST /auth/refresh */
+export interface RefreshResponse {
+  access_token: string;
   token_type: string;
 }
 

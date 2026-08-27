@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TreatmentPlanTable } from '../TreatmentPlanTable';
 import { TreatmentPlanToolbar } from '../TreatmentPlanToolbar';
 import { TreatmentPlanSummaryCards } from '../TreatmentPlanSummaryCards';
@@ -16,9 +16,10 @@ import { useTreatmentPlanNames } from '../../../hooks/treatmentPlans/useTreatmen
 import { useTreatmentDashboard } from '../../../hooks/treatmentPlans/useTreatmentDashboard';
 import { useDoctors } from '../../../hooks/doctors/useDoctors';
 import { useCreateTreatmentPlan } from '../../../hooks/treatmentPlans/useTreatmentPlanMutations';
+import { usePatient } from '../../../hooks/patients/usePatient';
 import { planFormValuesToRequest } from '../treatmentPlanFormUtils';
 import { parseApiError } from '../../../services/apiError';
-import { ROUTES } from '../../../routes/routes';
+import { ROUTES, CREATE_QUERY_PARAM } from '../../../routes/routes';
 import { TREATMENT_PLAN_PAGE_SIZE_OPTIONS } from '../../../constants/treatmentPlan';
 import type { EnrichedTreatmentPlan } from '../../../types/treatmentPlan';
 
@@ -36,6 +37,7 @@ const TOAST_DURATION_MS = 5000;
  */
 export const TreatmentPlanListContainer: FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobileViewport();
   const filters = useTreatmentPlanFilters();
 
@@ -43,6 +45,40 @@ export const TreatmentPlanListContainer: FC = () => {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<Toast | null>(null);
+
+  // Deep-link from Patient Hub: ?create=true&patientId={id}
+  const createRequested = searchParams.get(CREATE_QUERY_PARAM) === 'true';
+  const createPatientId = searchParams.get('patientId');
+
+  // Fetch patient details for human-readable label when deep-linked.
+  const patientQuery = usePatient(createPatientId, !!createPatientId);
+  const selectedPatientLabel = patientQuery.data
+    ? `${patientQuery.data.full_name} (${patientQuery.data.patient_code})`
+    : null;
+
+  const openCreate = () => {
+    setCreateError(null);
+    setCreateFieldErrors({});
+    setCreateOpen(true);
+  };
+
+  const closeCreate = () => {
+    setCreateOpen(false);
+    setCreateError(null);
+    setCreateFieldErrors({});
+    if (createRequested) {
+      const next = new URLSearchParams(searchParams);
+      next.delete(CREATE_QUERY_PARAM);
+      next.delete('patientId');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  // Auto-open the drawer when deep-linked with ?create=true
+  useEffect(() => {
+    if (createRequested && !createOpen) openCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   const plansQuery = useTreatmentPlans(filters.params);
   const dashboardQuery = useTreatmentDashboard();
@@ -89,7 +125,7 @@ export const TreatmentPlanListContainer: FC = () => {
     setCreateFieldErrors({});
     createMutation.mutate(planFormValuesToRequest(values), {
       onSuccess: (plan) => {
-        setCreateOpen(false);
+        closeCreate();
         showToast('success', `Plan ${plan.plan_code} created`, 'Now add items to the plan.');
         navigate(`${ROUTES.TREATMENT_PLANS}/${plan.id}`);
       },
@@ -123,7 +159,7 @@ export const TreatmentPlanListContainer: FC = () => {
           <MobilePageHeader
             title="Treatment Plans"
             addLabel="New treatment plan"
-            onAdd={() => setCreateOpen(true)}
+            onAdd={openCreate}
           />
           <MobileTreatmentPlanList
             plans={enriched}
@@ -189,7 +225,7 @@ export const TreatmentPlanListContainer: FC = () => {
         onSortOrderChange={filters.setSortOrder}
         hasActiveFilters={filters.hasActiveFilters}
         onClearFilters={filters.clearFilters}
-        onCreate={() => setCreateOpen(true)}
+        onCreate={openCreate}
       />
 
       <TreatmentPlanTable
@@ -227,17 +263,15 @@ export const TreatmentPlanListContainer: FC = () => {
 
       <CreatePlanDrawer
         open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setCreateError(null);
-          setCreateFieldErrors({});
-        }}
+        onClose={closeCreate}
         doctorOptions={doctorOptions}
         doctorsLoading={doctorsQuery.isLoading}
         onSubmit={handleCreate}
         submitting={createMutation.isPending}
         serverErrors={createFieldErrors}
         serverMessage={createError}
+        initialPatientId={createPatientId ?? ''}
+        selectedPatientLabel={selectedPatientLabel}
       />
 
       {toast && (

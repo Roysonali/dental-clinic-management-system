@@ -17,6 +17,18 @@ vi.mock('../../../services/patientService', () => ({
   },
 }));
 
+vi.mock('../../../services/appointmentService', () => ({
+  appointmentService: {
+    listByPatient: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+  },
+}));
+
+vi.mock('../../../services/doctorService', () => ({
+  doctorService: {
+    getByUserId: vi.fn().mockResolvedValue({ user_full_name: 'Dr. Test' }),
+  },
+}));
+
 const getMock = vi.mocked(patientService.get);
 
 const patient: PatientResponse = {

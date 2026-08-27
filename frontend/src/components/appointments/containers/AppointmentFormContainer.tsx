@@ -7,6 +7,7 @@ import {
 import { useAppointment } from '../../../hooks/appointments/useAppointment';
 import { useAppointmentNames } from '../../../hooks/appointments/useAppointmentNames';
 import { useDoctors } from '../../../hooks/doctors/useDoctors';
+import { usePatient } from '../../../hooks/patients/usePatient';
 import {
   appointmentToFormValues,
   formValuesToCreatePayload,
@@ -25,6 +26,8 @@ interface AppointmentFormContainerProps {
   mode: 'create' | 'edit';
   /** Appointment id to edit (edit mode); the full record is fetched on open */
   appointmentId?: string | null;
+  /** Patient id to pre-fill when creating from a patient context */
+  patientId?: string | null;
   /** Called to close the drawer */
   onClose: () => void;
   /** Called after a successful create (e.g. to navigate to the new record) */
@@ -42,6 +45,7 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
   open,
   mode,
   appointmentId,
+  patientId,
   onClose,
   onCreated,
 }) => {
@@ -63,6 +67,13 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
     useMemo(() => (appointment ? [appointment.patient_id] : []), [appointment]),
     useMemo(() => (appointment ? [appointment.dentist_id] : []), [appointment]),
   );
+
+  // Fetch patient details when pre-selecting from Patient Hub (create mode).
+  const prefillPatientQuery = usePatient(
+    patientId,
+    !isEdit && !!patientId && open,
+  );
+  const prefillPatient = prefillPatientQuery.data;
 
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
@@ -137,7 +148,13 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
       submitting={submitting}
       loading={isEdit && appointmentQuery.isLoading}
       disabled={isEdit && appointmentQuery.isLoading}
-      initialValues={appointment ? appointmentToFormValues(appointment) : undefined}
+      initialValues={
+        appointment
+          ? appointmentToFormValues(appointment)
+          : patientId
+            ? { patient_id: patientId }
+            : undefined
+      }
       serverMessage={serverMessage}
       serverErrors={serverErrors}
       dentistOptions={dentistOptions}
@@ -147,7 +164,9 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
       patientName={
         isEdit && appointment
           ? (names.data?.patientNames.get(appointment.patient_id) ?? null)
-          : null
+          : prefillPatient
+            ? `${prefillPatient.full_name} (${prefillPatient.patient_code})`
+            : null
       }
     />
   );

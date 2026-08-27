@@ -1,5 +1,6 @@
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { renderWithProviders } from '../../test/testUtils';
 import { PatientForm } from './PatientForm';
 import type { PatientFormValues } from '../../types/patient';
@@ -105,5 +106,63 @@ describe('PatientForm', () => {
     );
     expect(screen.getByLabelText(/first name/i)).toHaveValue('Maria');
     expect(screen.getByLabelText(/last name/i)).toHaveValue('Santos');
+  });
+
+  // ── AUD-02: Form reset regression tests ───────────────
+
+  it('does not reset user edits when parent rerenders (AUD-02)', async () => {
+    // Use a wrapper component to simulate parent rerenders via state
+    let forceUpdate: () => void;
+    function ParentWrapper() {
+      const [, setTick] = React.useState(0);
+      forceUpdate = () => setTick((t) => t + 1);
+      return (
+        <PatientForm
+          onSubmit={vi.fn()}
+          initialValues={{ first_name: 'Maria', last_name: 'Santos' }}
+        />
+      );
+    }
+    renderWithProviders(<ParentWrapper />);
+
+    // Verify initial values populated
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('Maria');
+
+    // User edits the field
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: 'Maria edited' },
+    });
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('Maria edited');
+
+    // Parent rerenders (unrelated state change)
+    act(() => {
+      forceUpdate();
+    });
+
+    // User's edit must remain intact
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('Maria edited');
+  });
+
+  it('preserves entered values after validation error (AUD-02)', async () => {
+    const onSubmit = vi.fn();
+    renderWithProviders(
+      <PatientForm onSubmit={onSubmit} />,
+    );
+
+    // Fill in valid data except phone (leave empty to trigger validation)
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Juan' } });
+    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: 'Cruz' } });
+    // Leave phone empty — will fail validation
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Patient' }));
+
+    // Wait for validation errors to appear
+    await waitFor(() => {
+      expect(screen.getAllByText(/required/i).length).toBeGreaterThan(0);
+    });
+
+    // Verify the user's entered values are still present
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('Juan');
+    expect(screen.getByLabelText(/last name/i)).toHaveValue('Cruz');
   });
 });

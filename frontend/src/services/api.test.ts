@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe('api response interceptor — 401 handling', () => {
-  it('invokes the unauthorized handler on a 401 from a protected endpoint', async () => {
+  it('invokes the unauthorized handler on a 401 from a protected endpoint when no refresh token is available', async () => {
     stubAdapter(401);
     const handler = vi.fn();
     registerUnauthorizedHandler(handler);
@@ -82,10 +82,10 @@ describe('api response interceptor — 401 handling', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('clears the persisted session when a 401 fires and the handler is the session-clearer', async () => {
+  it('clears the persisted session when a 401 fires and no refresh token is available', async () => {
     // Simulates the AuthProvider handler contract: on a protected-endpoint
     // 401, the registered handler clears the token from both storage tiers.
-    persistAccessToken('expired-token', true);
+    persistAccessToken('expired-token', 'expired-refresh', true);
     registerUnauthorizedHandler(() => {
       clearAccessToken();
     });
@@ -95,11 +95,13 @@ describe('api response interceptor — 401 handling', () => {
     // correctly), and the session was cleared in the meantime.
     await expect(api.get('/auth/me')).rejects.toThrow();
     expect(localStorage.getItem('denscare_access_token')).toBeNull();
+    expect(localStorage.getItem('denscare_refresh_token')).toBeNull();
     expect(sessionStorage.getItem('denscare_access_token')).toBeNull();
+    expect(sessionStorage.getItem('denscare_refresh_token')).toBeNull();
   });
 
   it('does NOT clear the session for a 401 on /auth/login (invalid credentials)', async () => {
-    persistAccessToken('valid-token', true);
+    persistAccessToken('valid-token', 'valid-refresh', true);
     const handler = vi.fn(() => {
       clearAccessToken();
     });
@@ -110,5 +112,6 @@ describe('api response interceptor — 401 handling', () => {
     expect(handler).not.toHaveBeenCalled();
     // The existing (valid) session must survive an invalid-credentials failure.
     expect(localStorage.getItem('denscare_access_token')).toBe('valid-token');
+    expect(localStorage.getItem('denscare_refresh_token')).toBe('valid-refresh');
   });
 });

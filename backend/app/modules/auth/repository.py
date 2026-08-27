@@ -9,6 +9,7 @@ from sqlalchemy.orm import Load
 from sqlalchemy.orm import Session
 
 from app.modules.auth.models import PasswordResetToken
+from app.modules.auth.models import RefreshToken
 from app.modules.auth.models import Role
 from app.modules.auth.models import User
 
@@ -255,3 +256,94 @@ def get_role_by_id(
         db.execute(stmt)
         .scalar_one_or_none()
     )
+
+
+def create_refresh_token(
+    db: Session,
+    refresh_token: RefreshToken,
+) -> RefreshToken:
+    """Stage a new refresh token record.
+
+    .. note::
+
+        Flushes but does **not** commit — the service layer owns the
+        transaction lifecycle.
+
+    Args:
+        db: Active database session.
+        refresh_token: Unsaved RefreshToken ORM instance.
+
+    Returns:
+        The persisted RefreshToken with an assigned id.
+    """
+    db.add(refresh_token)
+    db.flush()
+    db.refresh(refresh_token)
+    return refresh_token
+
+
+def get_refresh_token_by_hash(
+    db: Session,
+    token_hash: str,
+) -> Optional[RefreshToken]:
+    """Look up a refresh token by its SHA-256 digest.
+
+    Args:
+        db: Active database session.
+        token_hash: Hex digest of the raw refresh token.
+
+    Returns:
+        The matching RefreshToken, or None if not found.
+    """
+    stmt = (
+        select(RefreshToken)
+        .where(RefreshToken.token_hash == token_hash)
+    )
+
+    return (
+        db.execute(stmt)
+        .scalar_one_or_none()
+    )
+
+
+def revoke_refresh_token(
+    db: Session,
+    refresh_token: RefreshToken,
+    revoked_at: "datetime",
+) -> None:
+    """Mark a single refresh token as revoked.
+
+    Args:
+        db: Active database session.
+        refresh_token: The token to revoke.
+        revoked_at: Timestamp to record as the revocation time.
+    """
+    refresh_token.revoked_at = revoked_at
+
+
+def revoke_all_user_refresh_tokens(
+    db: Session,
+    user_id: int,
+    revoked_at: "datetime",
+) -> None:
+    """Revoke all outstanding (unrevoked) refresh tokens for a user.
+
+    Called on logout to invalidate all sessions.
+
+    Args:
+        db: Active database session.
+        user_id: The user whose tokens should be revoked.
+        revoked_at: Timestamp to record as the revocation time.
+    """
+    stmt = (
+        select(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    )
+
+    tokens = db.execute(stmt).scalars().all()
+
+    for token in tokens:
+        token.revoked_at = revoked_at

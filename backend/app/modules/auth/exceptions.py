@@ -162,3 +162,13 @@ class PasswordResetFailed(AuthException):
             code="PASSWORD_RESET_FAILED",
             message="Password reset failed. Please try again later.",
         )
+
+
+class InvalidRefreshToken(AuthException):
+    """Raised when a refresh token is missing, expired, revoked, or invalid."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            code="INVALID_REFRESH_TOKEN",
+            message="Invalid or expired refresh token",
+        )

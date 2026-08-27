@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import { type FC } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -122,12 +122,7 @@ export const PatientForm: FC<PatientFormProps> = ({
   serverMessage = null,
   disabled = false,
 }) => {
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-  } = useForm<PatientFormValues>({
+  const form = useForm<PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
     mode: 'onTouched',
     defaultValues: {
@@ -144,6 +139,8 @@ export const PatientForm: FC<PatientFormProps> = ({
       ...initialValues,
     },
   });
+
+  const { register, handleSubmit, control, formState: { errors } } = form;
 
   /** Merge client + server field errors for display. */
   const fieldError = (field: string) =>

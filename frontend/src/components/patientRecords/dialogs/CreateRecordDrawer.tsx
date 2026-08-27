@@ -30,6 +30,10 @@ interface CreateRecordDrawerProps {
   /** Set when the backend rejected creation with 409 (appointment already has a record). */
   conflictAppointmentId?: string | null;
   onViewConflictRecord?: (appointmentId: string) => void;
+  /** Pre-fill the patient when opened from the patient profile. */
+  initialPatientId?: string;
+  /** Human-readable patient label to display in the picker (e.g. "Juan Dela Cruz (PAT-000001)"). */
+  selectedPatientLabel?: string;
 }
 
 /**
@@ -52,6 +56,8 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
   serverMessage = null,
   conflictAppointmentId = null,
   onViewConflictRecord,
+  initialPatientId = '',
+  selectedPatientLabel,
 }) => {
   const {
     register,
@@ -72,8 +78,14 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
   // (values, validation errors, dirty + touched flags — including the
   // selected patient so the appointment selector starts disabled).
   useEffect(() => {
-    if (open) reset(defaultPatientRecordFormValues);
-  }, [open, reset]);
+    if (open) {
+      reset(
+        initialPatientId
+          ? { ...defaultPatientRecordFormValues, patient_id: initialPatientId }
+          : defaultPatientRecordFormValues,
+      );
+    }
+  }, [open, reset, initialPatientId]);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form's watch() is safe for gating the appointment selector on patient selection; the rule is intentionally conservative.
   const selectedPatientId = watch('patient_id');
@@ -157,6 +169,7 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
                   onChange={handlePatientChange}
                   error={fieldError('patient_id')}
                   required
+                  selectedLabel={selectedPatientLabel}
                 />
               )}
             />

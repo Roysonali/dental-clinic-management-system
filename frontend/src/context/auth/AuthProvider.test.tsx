@@ -111,6 +111,7 @@ describe('AuthProvider', () => {
     const user = userEvent.setup();
     loginMock.mockResolvedValue({
       access_token: 'jwt-token',
+      refresh_token: 'refresh-token',
       token_type: 'bearer',
     });
     getMeMock.mockResolvedValue(currentUser);

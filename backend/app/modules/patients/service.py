@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from uuid import UUID
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.modules.patients.models import Patient
@@ -14,8 +16,19 @@ from app.modules.patients.mapper import (
 )
 from app.modules.patients.schemas import (
     PatientCreate,
+    PatientQuickCreate,
+    PatientQuickCreateResponse,
+    PatientListItem,
+    PatientSummaryAppointment,
+    PatientSummaryBilling,
+    PatientSummaryCounts,
+    PatientSummaryInvoice,
+    PatientSummaryRecord,
+    PatientSummaryResponse,
+    PatientSummaryTreatmentPlan,
     PatientUpdate,
 )
+from app.core.constants import ProfileStatus
 from app.modules.patients.exceptions import (
     DuplicatePatientDetected,
     InvalidPatientOperation,
@@ -57,6 +70,24 @@ class PatientService:
             str(value)
             .strip().title()
         )
+
+    @staticmethod
+    def _compute_profile_status(
+        patient: Patient,
+    ) -> ProfileStatus:
+        """Determine profile completeness based on required clinical fields.
+
+        A patient is INCOMPLETE when date_of_birth or gender is None.
+        This is the single source of truth — called on create and update.
+        """
+
+        if (
+            patient.date_of_birth is None
+            or patient.gender is None
+        ):
+            return ProfileStatus.INCOMPLETE
+
+        return ProfileStatus.COMPLETE
 
     def _generate_patient_code(
         self,
@@ -254,6 +285,8 @@ class PatientService:
                address=self._normalize_text(payload.address),
                remarks=self._normalize_text(payload.remarks),
 
+                profile_status=ProfileStatus.COMPLETE,
+
                 created_by=(
                     created_by
                 ),
@@ -294,10 +327,109 @@ class PatientService:
             )
 
             raise PatientCreationFailed(
-                details=str(e)
+                details="An unexpected error occurred. Please try again."
             )
 
-   
+    # ------------------------------------------------------------------
+    # Quick Create (Phone-Call Workflow)
+    # ------------------------------------------------------------------
+
+    def quick_create_patient(
+        self,
+        payload: PatientQuickCreate,
+        created_by: int,
+    ) -> PatientQuickCreateResponse:
+        """Create a minimal patient record for the phone-call workflow.
+
+        Validates available fields with full rigor.
+        Detects potential duplicates (non-blocking) via phone and name+phone.
+        Sets profile_status to INCOMPLETE.
+        """
+
+        try:
+
+            first_name = self._normalize_text(payload.first_name)
+            last_name = self._normalize_text(payload.last_name)
+            phone = (
+                payload.primary_contact_number
+                .replace(" ", "")
+                .replace("-", "")
+                .strip()
+            )
+
+            # --------------------------------------------------
+            # T3: Backend potential-match detection (non-blocking)
+            # --------------------------------------------------
+            potential_matches: list[PatientListItem] = []
+            warnings: list[str] = []
+            seen_ids: set = set()
+
+            phone_matches = self.repository.find_by_phone(phone)
+            if phone_matches:
+                warnings.append(
+                    "A patient with this phone number already exists."
+                )
+                for p in phone_matches:
+                    if p.id not in seen_ids:
+                        seen_ids.add(p.id)
+                        potential_matches.append(
+                            PatientMapper.to_list_item(p)
+                        )
+
+            name_phone_matches = self.repository.find_by_name_and_phone(
+                first_name, last_name, phone
+            )
+            if name_phone_matches:
+                warnings.append(
+                    "A patient with this name and phone already exists."
+                )
+                for p in name_phone_matches:
+                    if p.id not in seen_ids:
+                        seen_ids.add(p.id)
+                        potential_matches.append(
+                            PatientMapper.to_list_item(p)
+                        )
+
+            # --------------------------------------------------
+            # Create patient
+            # --------------------------------------------------
+            patient = Patient(
+                patient_code=self._generate_patient_code(),
+                first_name=first_name,
+                middle_name=self._normalize_text(payload.middle_name),
+                last_name=last_name,
+                primary_contact_number=phone,
+                gender=payload.gender,
+                date_of_birth=None,
+                profile_status=ProfileStatus.INCOMPLETE,
+                is_active=True,
+                created_by=created_by,
+            )
+
+            patient = self.repository.create(patient)
+            self.db.commit()
+
+            logger.info(
+                "Quick-create patient: code=%s, id=%s",
+                patient.patient_code,
+                patient.id,
+            )
+
+            return PatientQuickCreateResponse(
+                patient=PatientMapper.to_response(patient),
+                potential_matches=potential_matches,
+                warnings=warnings,
+            )
+
+        except Exception as e:
+            self.db.rollback()
+            logger.exception(
+                "Quick-create patient failed: %s",
+                str(e),
+            )
+            raise PatientCreationFailed(
+                details="An unexpected error occurred. Please try again."
+            )
 
     def get_patient(
         self,
@@ -439,6 +571,13 @@ class PatientService:
                 )
             )
 
+            # --------------------------------------------------
+            # Recompute profile status
+            # --------------------------------------------------
+            patient.profile_status = (
+                self._compute_profile_status(patient)
+            )
+
             self.db.commit()
 
             logger.info(
@@ -476,8 +615,8 @@ class PatientService:
             )
 
             raise PatientUpdateFailed(
-            details=str(e)
-        )
+                details="An unexpected error occurred. Please try again."
+            )
 
 
     def change_patient_status(
@@ -570,6 +709,187 @@ class PatientService:
             .to_profile_response(
                 patient
             )
+        )
+
+    # ------------------------------------------------------------------
+    # Patient Hub Summary
+    # ------------------------------------------------------------------
+
+    def get_patient_summary(
+        self,
+        patient_id: UUID,
+    ) -> PatientSummaryResponse:
+        """Aggregated overview for the Patient Hub.
+
+        Returns counts, recent items, and billing summary in a single
+        response to minimise initial-load requests.  All queries use
+        COUNT / LIMIT — no unnecessary ORM object loading.
+        """
+
+        # Verify patient exists
+        patient = self.repository.get_by_id(patient_id)
+        if not patient:
+            raise PatientNotFound()
+
+        # Lazy imports to avoid circular dependencies (billing ↔ patients)
+        from app.modules.appointments.model import Appointment
+        from app.modules.patient_records.models.patient_record import PatientRecord
+        from app.modules.treatment.models import TreatmentPlan
+        from app.modules.billing.models.invoice import Invoice
+        from app.modules.billing.models.payment import Payment
+
+        # ── Counts ──────────────────────────────────────────────
+        total_appointments = self.db.scalar(
+            select(func.count()).where(
+                Appointment.patient_id == patient_id
+            )
+        ) or 0
+
+        total_records = self.db.scalar(
+            select(func.count()).where(
+                PatientRecord.patient_id == patient_id,
+                PatientRecord.is_deleted == False,  # noqa: E712
+            )
+        ) or 0
+
+        total_treatment_plans = self.db.scalar(
+            select(func.count()).where(
+                TreatmentPlan.patient_id == patient_id
+            )
+        ) or 0
+
+        total_invoices = self.db.scalar(
+            select(func.count()).where(
+                Invoice.patient_id == patient_id
+            )
+        ) or 0
+
+        total_payments = self.db.scalar(
+            select(func.count()).where(
+                Payment.patient_id == patient_id
+            )
+        ) or 0
+
+        counts = PatientSummaryCounts(
+            total_appointments=total_appointments,
+            total_records=total_records,
+            total_treatment_plans=total_treatment_plans,
+            total_invoices=total_invoices,
+            total_payments=total_payments,
+        )
+
+        # ── Recent Appointments (3) ─────────────────────────────
+        recent_appt_rows = self.db.scalars(
+            select(Appointment)
+            .where(Appointment.patient_id == patient_id)
+            .order_by(Appointment.appointment_date.desc(), Appointment.start_time.desc())
+            .limit(3)
+        ).all()
+
+        recent_appointments = [
+            PatientSummaryAppointment(
+                id=str(a.id),
+                appointment_number=a.appointment_number,
+                appointment_date=a.appointment_date,
+                start_time=str(a.start_time),
+                end_time=str(a.end_time),
+                status=a.status.value if hasattr(a.status, 'value') else str(a.status),
+                appointment_type=a.appointment_type.value if hasattr(a.appointment_type, 'value') else str(a.appointment_type),
+            )
+            for a in recent_appt_rows
+        ]
+
+        # ── Recent Records (3) ──────────────────────────────────
+        recent_record_rows = self.db.scalars(
+            select(PatientRecord)
+            .where(
+                PatientRecord.patient_id == patient_id,
+                PatientRecord.is_deleted == False,  # noqa: E712
+            )
+            .order_by(PatientRecord.created_at.desc())
+            .limit(3)
+        ).all()
+
+        recent_records = [
+            PatientSummaryRecord(
+                id=str(r.id),
+                status=r.status.value if hasattr(r.status, 'value') else str(r.status),
+                chief_complaint=r.chief_complaint,
+                created_at=r.created_at,
+            )
+            for r in recent_record_rows
+        ]
+
+        # ── Active Treatment Plans (3) ──────────────────────────
+        active_tp_rows = self.db.scalars(
+            select(TreatmentPlan)
+            .where(
+                TreatmentPlan.patient_id == patient_id,
+                TreatmentPlan.is_active == True,  # noqa: E712
+            )
+            .order_by(TreatmentPlan.created_at.desc())
+            .limit(3)
+        ).all()
+
+        active_treatment_plans = [
+            PatientSummaryTreatmentPlan(
+                id=str(t.id),
+                plan_code=t.plan_code,
+                status=t.status.value if hasattr(t.status, 'value') else str(t.status),
+                created_at=t.created_at,
+            )
+            for t in active_tp_rows
+        ]
+
+        # ── Recent Invoices (3) ─────────────────────────────────
+        recent_invoice_rows = self.db.scalars(
+            select(Invoice)
+            .where(Invoice.patient_id == patient_id)
+            .order_by(Invoice.created_at.desc())
+            .limit(3)
+        ).all()
+
+        recent_invoices = [
+            PatientSummaryInvoice(
+                id=str(inv.id),
+                invoice_number=inv.invoice_number,
+                status=inv.status.value if hasattr(inv.status, 'value') else str(inv.status),
+                total_amount=inv.grand_total if hasattr(inv, 'grand_total') else Decimal("0.00"),
+                outstanding_amount=inv.outstanding_amount if hasattr(inv, 'outstanding_amount') else Decimal("0.00"),
+                invoice_date=inv.invoice_date,
+            )
+            for inv in recent_invoice_rows
+        ]
+
+        # ── Billing Summary ─────────────────────────────────────
+        # Delegate to existing billing service — no duplicated logic
+        billing_summary = None
+        try:
+            from app.modules.billing.services.financial_calculation_service import (
+                FinancialCalculationService,
+            )
+
+            fin_service = FinancialCalculationService(self.db)
+            patient_fin = fin_service.get_patient_summary(patient_id)
+            billing_summary = PatientSummaryBilling(
+                total_invoiced=patient_fin.total_invoiced,
+                total_paid=patient_fin.total_paid,
+                total_outstanding=patient_fin.total_outstanding,
+                total_credited=patient_fin.total_credited,
+            )
+        except Exception:
+            logger.debug(
+                "Billing summary unavailable for patient %s",
+                patient_id,
+            )
+
+        return PatientSummaryResponse(
+            counts=counts,
+            recent_appointments=recent_appointments,
+            recent_records=recent_records,
+            active_treatment_plans=active_treatment_plans,
+            recent_invoices=recent_invoices,
+            billing=billing_summary,
         )
     
     def _check_update_duplicates(

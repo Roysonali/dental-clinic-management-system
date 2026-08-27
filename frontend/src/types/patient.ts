@@ -40,9 +40,15 @@ export interface PatientResponse {
   id: string;
   /** e.g. PAT-000001 */
   patient_code: string;
+  /** First name */
+  first_name: string;
+  /** Middle name (if any) */
+  middle_name: string | null;
+  /** Last name */
+  last_name: string;
   /** Computed by the backend (first + middle + last) */
   full_name: string;
-  date_of_birth: string;
+  date_of_birth: string | null;
   /** Computed by the backend */
   age: number | null;
   gender: string | null;
@@ -52,6 +58,8 @@ export interface PatientResponse {
   address: string | null;
   remarks: string | null;
   is_active: boolean;
+  /** Canonical profile lifecycle state */
+  profile_status?: 'complete' | 'incomplete';
   created_by: number | null;
   updated_by: number | null;
   created_at: string;
@@ -67,6 +75,8 @@ export interface PatientListItem {
   gender: string | null;
   primary_contact_number: string;
   is_active: boolean;
+  /** Canonical profile lifecycle state */
+  profile_status?: 'complete' | 'incomplete';
 }
 
 /** Paginated list response (PatientListResponse schema). */
@@ -106,5 +116,87 @@ export interface PatientFormValues {
   remarks: string;
 }
 
+/** Payload for POST /patients/quick-create. */
+export interface PatientQuickCreatePayload {
+  first_name: string;
+  middle_name?: string | null;
+  last_name: string;
+  primary_contact_number: string;
+  gender?: PatientGender | null;
+}
+
+/** Response for POST /patients/quick-create. */
+export interface PatientQuickCreateResponse {
+  patient: PatientResponse;
+  potential_matches: PatientListItem[];
+  warnings: string[];
+}
+
 /** Status filter used by the patient list toolbar. */
 export type PatientStatusFilter = 'all' | 'active' | 'inactive';
+
+/* ── Patient Hub Summary types ────────────────────────────── */
+
+/** Summary appointment item (GET /patients/{id}/summary). */
+export interface PatientSummaryAppointment {
+  id: string;
+  appointment_number: string;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  appointment_type: string;
+}
+
+/** Summary patient record item. */
+export interface PatientSummaryRecord {
+  id: string;
+  status: string;
+  chief_complaint: string | null;
+  created_at: string;
+}
+
+/** Summary treatment plan item. */
+export interface PatientSummaryTreatmentPlan {
+  id: string;
+  plan_code: string;
+  status: string;
+  created_at: string;
+}
+
+/** Summary invoice item. */
+export interface PatientSummaryInvoice {
+  id: string;
+  invoice_number: string;
+  status: string;
+  total_amount: string;
+  outstanding_amount: string;
+  invoice_date: string;
+}
+
+/** Entity counts for a patient. */
+export interface PatientSummaryCounts {
+  total_appointments: number;
+  total_records: number;
+  total_treatment_plans: number;
+  total_invoices: number;
+  total_payments: number;
+}
+
+/** Billing financial summary for a patient. */
+export interface PatientSummaryBilling {
+  total_invoiced: string;
+  total_paid: string;
+  total_outstanding: string;
+  total_credited: string;
+}
+
+/** Full patient hub summary response (GET /patients/{id}/summary). */
+export interface PatientSummaryResponse {
+  counts: PatientSummaryCounts;
+  recent_appointments: PatientSummaryAppointment[];
+  recent_records: PatientSummaryRecord[];
+  active_treatment_plans: PatientSummaryTreatmentPlan[];
+  recent_invoices: PatientSummaryInvoice[];
+  billing: PatientSummaryBilling | null;
+}

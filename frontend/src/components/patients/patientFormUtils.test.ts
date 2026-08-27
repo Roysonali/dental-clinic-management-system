@@ -9,6 +9,9 @@ import type { PatientFormValues, PatientResponse } from '../../types/patient';
 const patient: PatientResponse = {
   id: 'p1',
   patient_code: 'PAT-000001',
+  first_name: 'Juan',
+  middle_name: null,
+  last_name: 'Dela Cruz',
   full_name: 'Juan Dela Cruz',
   date_of_birth: '1990-05-15',
   age: 34,
@@ -41,6 +44,9 @@ const formValues: PatientFormValues = {
 describe('patientToFormValues', () => {
   it('maps a full patient response into editable form values', () => {
     expect(patientToFormValues(patient)).toEqual({
+      first_name: 'Juan',
+      middle_name: '',
+      last_name: 'Dela Cruz',
       date_of_birth: '1990-05-15',
       gender: 'male',
       primary_contact_number: '+639123456789',
@@ -62,6 +68,9 @@ describe('patientToFormValues', () => {
     };
 
     expect(patientToFormValues(sparse)).toEqual({
+      first_name: 'Juan',
+      middle_name: '',
+      last_name: 'Dela Cruz',
       date_of_birth: '1990-05-15',
       gender: '',
       primary_contact_number: '+639123456789',

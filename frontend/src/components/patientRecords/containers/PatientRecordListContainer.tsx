@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PatientRecordTable } from '../PatientRecordTable';
 import { CreateRecordDrawer } from '../dialogs/CreateRecordDrawer';
 import { Pagination } from '../../common/Pagination/Pagination';
@@ -12,10 +12,11 @@ import { usePatientRecords } from '../../../hooks/patientRecords/usePatientRecor
 import { usePatientRecordFilters } from '../../../hooks/patientRecords/usePatientRecordFilters';
 import { usePatientRecordNames } from '../../../hooks/patientRecords/usePatientRecordNames';
 import { useCreatePatientRecord } from '../../../hooks/patientRecords/usePatientRecordMutations';
+import { usePatient } from '../../../hooks/patients/usePatient';
 import { patientRecordService } from '../../../services/patientRecordService';
 import { recordFormValuesToCreateRequest } from '../../../utils/patientRecordFormUtils';
 import { parseApiError } from '../../../services/apiError';
-import { ROUTES } from '../../../routes/routes';
+import { ROUTES, CREATE_QUERY_PARAM } from '../../../routes/routes';
 import { PATIENT_RECORD_PAGE_SIZE_OPTIONS } from '../../../constants/patientRecord';
 import type { EnrichedPatientRecord, PatientRecordFormValues } from '../../../types/patientRecord';
 
@@ -34,6 +35,7 @@ const TOAST_DURATION_MS = 5000;
  */
 export const PatientRecordListContainer: FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobileViewport();
   const filters = usePatientRecordFilters();
 
@@ -42,6 +44,43 @@ export const PatientRecordListContainer: FC = () => {
   const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({});
   const [conflictAppointmentId, setConflictAppointmentId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+
+  // Deep-link from Patient Hub: ?create=true&patientId={id}
+  const createRequested = searchParams.get(CREATE_QUERY_PARAM) === 'true';
+  const createPatientId = searchParams.get('patientId');
+
+  // Fetch patient details for human-readable label when deep-linked.
+  const patientQuery = usePatient(createPatientId, !!createPatientId);
+  const selectedPatientLabel = patientQuery.data
+    ? `${patientQuery.data.full_name} (${patientQuery.data.patient_code})`
+    : null;
+
+  const openCreate = () => {
+    setCreateError(null);
+    setCreateFieldErrors({});
+    setConflictAppointmentId(null);
+    setCreateOpen(true);
+  };
+
+  const closeCreate = () => {
+    setCreateOpen(false);
+    setCreateError(null);
+    setCreateFieldErrors({});
+    setConflictAppointmentId(null);
+    // Strip create intent from URL so refresh doesn't re-open the drawer.
+    if (createRequested) {
+      const next = new URLSearchParams(searchParams);
+      next.delete(CREATE_QUERY_PARAM);
+      next.delete('patientId');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  // Auto-open the drawer when deep-linked with ?create=true
+  useEffect(() => {
+    if (createRequested && !createOpen) openCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   const recordsQuery = usePatientRecords(filters.params);
   const items = useMemo(() => recordsQuery.data?.items ?? [], [recordsQuery.data?.items]);
@@ -86,7 +125,7 @@ export const PatientRecordListContainer: FC = () => {
     setConflictAppointmentId(null);
     createMutation.mutate(recordFormValuesToCreateRequest(values), {
       onSuccess: (record) => {
-        setCreateOpen(false);
+        closeCreate();
         showToast('success', 'Record created', 'Now add clinical details and diagnoses.');
         navigate(`${ROUTES.PATIENT_RECORDS}/${record.id}`);
       },
@@ -110,11 +149,11 @@ export const PatientRecordListContainer: FC = () => {
   const handleViewConflictRecord = async (appointmentId: string) => {
     try {
       const record = await patientRecordService.getRecordByAppointment(appointmentId);
-      setCreateOpen(false);
+      closeCreate();
       navigate(`${ROUTES.PATIENT_RECORDS}/${record.id}`);
     } catch {
       // Best-effort: fall back to closing the drawer so the user can retry.
-      setCreateOpen(false);
+      closeCreate();
     }
   };
 
@@ -128,12 +167,7 @@ export const PatientRecordListContainer: FC = () => {
           <MobilePageHeader
             title="Patient Records"
             addLabel="Create record"
-            onAdd={() => {
-              setCreateError(null);
-              setCreateFieldErrors({});
-              setConflictAppointmentId(null);
-              setCreateOpen(true);
-            }}
+            onAdd={openCreate}
           />
           <MobilePatientRecordList
             records={enriched}
@@ -176,12 +210,7 @@ export const PatientRecordListContainer: FC = () => {
         onFinalizedChange={filters.setFinalized}
         hasActiveFilters={filters.hasActiveFilters}
         onClearFilters={filters.clearFilters}
-        onCreate={() => {
-          setCreateError(null);
-          setCreateFieldErrors({});
-          setConflictAppointmentId(null);
-          setCreateOpen(true);
-        }}
+        onCreate={openCreate}
       />
 
       <Pagination
@@ -210,18 +239,15 @@ export const PatientRecordListContainer: FC = () => {
 
       <CreateRecordDrawer
         open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setCreateError(null);
-          setCreateFieldErrors({});
-          setConflictAppointmentId(null);
-        }}
+        onClose={closeCreate}
         onSubmit={handleCreate}
         submitting={createMutation.isPending}
         serverErrors={createFieldErrors}
         serverMessage={createError}
         conflictAppointmentId={conflictAppointmentId}
         onViewConflictRecord={handleViewConflictRecord}
+        initialPatientId={createPatientId ?? ''}
+        selectedPatientLabel={selectedPatientLabel}
       />
 
       {toast && (

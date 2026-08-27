@@ -57,29 +57,60 @@ class TestRegisterUser:
 class TestAuthenticateUser:
     def test_successful_login(self):
         db = MagicMock()
-        u = _make_user(email="t@t.com",status=USER_STATUS_ACTIVE,is_active=True)
-        with patch("app.modules.auth.service.get_user_by_email",return_value=u), patch("app.modules.auth.service.verify_password",return_value=True), patch("app.modules.auth.service.create_access_token",return_value="jwt"):
-            t = authenticate_user(db, "t@t.com", "P1")
-        assert t == "jwt" and u.last_login_at is not None
+        u = _make_user(email="t@t.com", status=USER_STATUS_ACTIVE, is_active=True)
+        with (
+            patch("app.modules.auth.service.get_user_by_email", return_value=u),
+            patch("app.modules.auth.service.verify_password", return_value=True),
+            patch("app.modules.auth.service.create_access_token", return_value="jwt"),
+            patch("app.modules.auth.service.create_refresh_token_jwt", return_value="refresh_jwt"),
+            patch("app.modules.auth.service.hash_token", return_value="hash"),
+            patch("app.modules.auth.service.create_refresh_token") as mcr,
+        ):
+            result = authenticate_user(db, "t@t.com", "P1")
+        assert isinstance(result, tuple) and len(result) == 2
+        access_token, refresh_token = result
+        assert access_token == "jwt" and refresh_token == "refresh_jwt"
+        assert u.last_login_at is not None
         db.commit.assert_called_once()
+        mcr.assert_called_once()
+
     def test_unknown_email(self):
         db = MagicMock()
-        with patch("app.modules.auth.service.get_user_by_email",return_value=None):
-            with pytest.raises(InvalidCredentials): authenticate_user(db, "u@t.com", "P1")
+        with patch("app.modules.auth.service.get_user_by_email", return_value=None):
+            with pytest.raises(InvalidCredentials):
+                authenticate_user(db, "u@t.com", "P1")
+
     def test_wrong_password(self):
         db = MagicMock()
-        u = _make_user(email="t@t.com",status=USER_STATUS_ACTIVE,is_active=True)
-        with patch("app.modules.auth.service.get_user_by_email",return_value=u), patch("app.modules.auth.service.verify_password",return_value=False):
-            with pytest.raises(InvalidCredentials): authenticate_user(db, "t@t.com", "W")
+        u = _make_user(email="t@t.com", status=USER_STATUS_ACTIVE, is_active=True)
+        with (
+            patch("app.modules.auth.service.get_user_by_email", return_value=u),
+            patch("app.modules.auth.service.verify_password", return_value=False),
+        ):
+            with pytest.raises(InvalidCredentials):
+                authenticate_user(db, "t@t.com", "W")
+
     def test_inactive_account(self):
         db = MagicMock()
-        u = _make_user(email="i@t.com",status=USER_STATUS_INACTIVE,is_active=False)
-        with patch("app.modules.auth.service.get_user_by_email",return_value=u), patch("app.modules.auth.service.verify_password",return_value=True):
-            with pytest.raises(InactiveAccount): authenticate_user(db, "i@t.com", "P1")
+        u = _make_user(email="i@t.com", status=USER_STATUS_INACTIVE, is_active=False)
+        with (
+            patch("app.modules.auth.service.get_user_by_email", return_value=u),
+            patch("app.modules.auth.service.verify_password", return_value=True),
+        ):
+            with pytest.raises(InactiveAccount):
+                authenticate_user(db, "i@t.com", "P1")
+
     def test_case_insensitive_email(self):
         db = MagicMock()
-        u = _make_user(email="test@example.com",status=USER_STATUS_ACTIVE,is_active=True)
-        with patch("app.modules.auth.service.get_user_by_email",return_value=u) as mg, patch("app.modules.auth.service.verify_password",return_value=True), patch("app.modules.auth.service.create_access_token",return_value="t"):
+        u = _make_user(email="test@example.com", status=USER_STATUS_ACTIVE, is_active=True)
+        with (
+            patch("app.modules.auth.service.get_user_by_email", return_value=u) as mg,
+            patch("app.modules.auth.service.verify_password", return_value=True),
+            patch("app.modules.auth.service.create_access_token", return_value="t"),
+            patch("app.modules.auth.service.create_refresh_token_jwt", return_value="r"),
+            patch("app.modules.auth.service.hash_token", return_value="h"),
+            patch("app.modules.auth.service.create_refresh_token"),
+        ):
             authenticate_user(db, "TEST@EXAMPLE.COM", "P1")
         assert mg.call_args[0][1] == "test@example.com"
 

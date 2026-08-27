@@ -31,6 +31,10 @@ interface CreateInvoiceDrawerProps {
   submitting?: boolean;
   serverErrors?: Record<string, string>;
   serverMessage?: string | null;
+  /** Pre-fill the patient when opened from the patient profile. */
+  initialPatientId?: string;
+  /** Human-readable patient label to display in the picker (e.g. "Juan Dela Cruz (PAT-000001)"). */
+  selectedPatientLabel?: string;
 }
 
 /** Doctor dropdown options (active doctors) — provided by the container. */
@@ -64,6 +68,8 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
   submitting = false,
   serverErrors = {},
   serverMessage = null,
+  initialPatientId = '',
+  selectedPatientLabel,
 }) => {
   const {
     register,
@@ -80,8 +86,15 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
 
   // Fresh form each time the drawer opens (defaults recompute: today + 30d).
   useEffect(() => {
-    if (open) reset(defaultCreateInvoiceValues());
-  }, [open, reset]);
+    if (open) {
+      const defaults = defaultCreateInvoiceValues();
+      reset(
+        initialPatientId
+          ? { ...defaults, patient_id: initialPatientId }
+          : defaults,
+      );
+    }
+  }, [open, reset, initialPatientId]);
 
   // useWatch (not form.watch) so React Compiler can memoize the drawer.
   const watchedPatientId = useWatch({ control, name: 'patient_id' });
@@ -185,6 +198,7 @@ export const CreateInvoiceDrawer: FC<CreateInvoiceDrawerProps> = ({
                   error={fieldError('patient_id')}
                   required
                   wrapperClassName="md:col-span-2"
+                  selectedLabel={selectedPatientLabel}
                 />
               )}
             />

@@ -18,12 +18,22 @@ from app.modules.patients.schemas import (
     PatientCreate,
     PatientListResponse,
     PatientProfileResponse,
+    PatientQuickCreate,
+    PatientQuickCreateResponse,
     PatientResponse,
+    PatientSummaryResponse,
     PatientUpdate,
 )
 
 from app.modules.patients.service import (
     PatientService,
+)
+
+from app.modules.appointments.service import (
+    AppointmentService,
+)
+from app.modules.appointments.schema import (
+    AppointmentListResponse,
 )
 
 from app.core.constants import (
@@ -48,6 +58,14 @@ def get_patient_service(
     """FastAPI dependency that constructs a PatientService instance."""
 
     return PatientService(db)
+
+
+def get_appointment_service(
+    db: Session = Depends(get_db),
+) -> AppointmentService:
+    """FastAPI dependency that constructs an AppointmentService instance."""
+
+    return AppointmentService(db)
 
 
 # ==========================================================
@@ -85,6 +103,47 @@ def create_patient(
 ) -> PatientResponse:
 
     return service.create_patient(
+        payload,
+        current_user.id,
+    )
+
+
+# ==========================================================
+# QUICK CREATE PATIENT (Phone-Call Workflow)
+# ==========================================================
+
+@router.post(
+    "/quick-create",
+    response_model=PatientQuickCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Quick Create Patient",
+    description=(
+        "Create a minimal patient record for the phone-call workflow. "
+        "Accepts only name and phone (gender optional). "
+        "Performs potential-match detection (non-blocking) and returns "
+        "warnings alongside the newly created patient. "
+        "Sets profile_status to INCOMPLETE."
+    ),
+    response_description="Newly created patient with potential matches and warnings.",
+)
+def quick_create_patient(
+    payload: PatientQuickCreate,
+
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+            ]
+        )
+    ),
+
+    service: PatientService = Depends(
+        get_patient_service
+    ),
+) -> PatientQuickCreateResponse:
+
+    return service.quick_create_patient(
         payload,
         current_user.id,
     )
@@ -358,3 +417,110 @@ def patient_profile(
     return service.get_patient_profile(
         patient_id
     )
+
+
+# ==========================================================
+# PATIENT HUB SUMMARY
+# ==========================================================
+
+@router.get(
+    "/{patient_id}/summary",
+    response_model=PatientSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Patient Hub Summary",
+    description=(
+        "Aggregated overview for the Patient Hub. Returns entity counts, "
+        "recent items (appointments, records, treatment plans, invoices), "
+        "and a billing financial summary for the specified patient. "
+        "Designed to minimise initial-load requests for the patient detail page."
+    ),
+    response_description="Patient hub summary with counts, recent items, and billing overview.",
+)
+def patient_summary(
+
+    patient_id: UUID,
+
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        )
+    ),
+
+    service: PatientService = Depends(
+        get_patient_service,
+    ),
+) -> PatientSummaryResponse:
+
+    return service.get_patient_summary(patient_id)
+
+
+# ==========================================================
+# PATIENT APPOINTMENTS
+# ==========================================================
+
+@router.get(
+    "/{patient_id}/appointments",
+    response_model=AppointmentListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Patient Appointments",
+    description=(
+        "Retrieve a paginated list of appointments for a specific patient. "
+        "Supports skip/limit pagination."
+    ),
+    response_description="Paginated list of appointments belonging to the patient.",
+)
+def patient_appointments(
+
+    patient_id: UUID,
+
+    skip: int = Query(
+        default=0,
+        ge=0,
+        description="Zero-based offset.",
+    ),
+
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+        description="Number of records per page (max 100).",
+    ),
+
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        )
+    ),
+
+    patient_service: PatientService = Depends(
+        get_patient_service,
+    ),
+
+    appointment_service: AppointmentService = Depends(
+        get_appointment_service,
+    ),
+) -> AppointmentListResponse:
+
+    # Verify patient exists (raises 404 if not found)
+    patient_service.get_patient(patient_id)
+
+    rows, total = (
+        appointment_service.list_by_patient(
+            patient_id=patient_id,
+            skip=skip,
+            limit=limit,
+        )
+    )
+
+    return {
+        "items": rows,
+        "total": total,
+    }

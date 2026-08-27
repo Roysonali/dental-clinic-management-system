@@ -20,7 +20,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database.base import Base
-from app.core.constants import GenderEnum
+from app.core.constants import GenderEnum, ProfileStatus
 
 
 class Patient(Base):
@@ -62,7 +62,7 @@ class Patient(Base):
 
     date_of_birth = Column(
         Date,
-        nullable=False,
+        nullable=True,
     )
 
     gender = Column(
@@ -70,7 +70,7 @@ class Patient(Base):
             GenderEnum,
             name="gender_enum",
         ),
-        nullable=False,
+        nullable=True,
     )
 
     primary_contact_number = Column(
@@ -96,6 +96,17 @@ class Patient(Base):
     remarks = Column(
         Text,
         nullable=True,
+    )
+
+    profile_status = Column(
+        Enum(
+            ProfileStatus,
+            name="profile_status_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=False,
+        default=ProfileStatus.COMPLETE,
     )
 
     is_active = Column(
@@ -179,6 +190,13 @@ class Patient(Base):
             "ix_patients_name",
             "last_name",
             "first_name",
+        ),
+
+        # Index for querying patients by profile_status (e.g. incomplete profiles).
+        # Matches ix_patients_profile_status created by migration d5e6f7a8b9c0.
+        Index(
+            "ix_patients_profile_status",
+            "profile_status",
         ),
     )
 

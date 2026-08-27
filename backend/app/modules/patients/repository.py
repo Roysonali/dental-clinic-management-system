@@ -496,6 +496,33 @@ class PatientRepository:
             .first()
         )
 
+    def find_by_name_and_phone(
+        self,
+        first_name: str,
+        last_name: str,
+        phone: str,
+    ) -> list[Patient]:
+        """
+        Find all patients matching both name and phone.
+
+        Used for potential-match detection during quick-create.
+        """
+
+        stmt = (
+            select(Patient)
+            .where(
+                Patient.first_name == first_name,
+                Patient.last_name == last_name,
+                Patient.primary_contact_number == phone,
+            )
+        )
+
+        return (
+            self.db.execute(stmt)
+            .scalars()
+            .all()
+        )
+
     def find_by_name_dob(
         self,
         first_name: str,
