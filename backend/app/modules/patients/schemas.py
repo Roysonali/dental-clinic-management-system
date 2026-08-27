@@ -385,6 +385,25 @@ class PatientResponse(
         examples=["PAT-000001"],
     )
 
+    first_name: str = Field(
+        title="First Name",
+        description="Patient's legal first name.",
+        examples=["Juan"],
+    )
+
+    middle_name: Optional[str] = Field(
+        default=None,
+        title="Middle Name",
+        description="Patient's middle name (if any).",
+        examples=["Reyes"],
+    )
+
+    last_name: str = Field(
+        title="Last Name",
+        description="Patient's legal last name or surname.",
+        examples=["Dela Cruz"],
+    )
+
     full_name: str = Field(
         title="Full Name",
         description="Computed full name combining first, middle, and last names.",

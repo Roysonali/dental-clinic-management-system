@@ -92,10 +92,11 @@ register_exception_handlers(app)
 frontend_urls = os.getenv("FRONTEND_URLS", "")
 allowed_origins = [url.strip() for url in frontend_urls.split(",") if url.strip()]
 
+# Development server origins — always allow-listed for local development.
+# Production / staging origins MUST come from FRONTEND_URLS env var.
 allowed_origins += [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://denscare-frontend.vercel.app",
 ]
 
 app.add_middleware(

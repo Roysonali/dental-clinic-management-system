@@ -493,6 +493,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                   onChange={(e) => setCreateForm((p) => ({ ...p, gender: e.target.value }))}
                   className="w-full appearance-none rounded-lg border border-neutral-300 bg-white px-3 py-2.5 pr-10 text-body text-neutral-800 transition-colors duration-150 hover:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 >
+                  <option value="">Select gender</option>
                   {genderOptions.map((g) => (
                     <option key={g.value} value={g.value}>
                       {g.label}

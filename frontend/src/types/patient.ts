@@ -40,6 +40,12 @@ export interface PatientResponse {
   id: string;
   /** e.g. PAT-000001 */
   patient_code: string;
+  /** First name */
+  first_name: string;
+  /** Middle name (if any) */
+  middle_name: string | null;
+  /** Last name */
+  last_name: string;
   /** Computed by the backend (first + middle + last) */
   full_name: string;
   date_of_birth: string | null;

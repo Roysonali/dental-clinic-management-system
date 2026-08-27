@@ -10,16 +10,12 @@ function optional(value: string | null | undefined): string | null {
   return value == null || value.trim() === '' ? null : value.trim();
 }
 
-/**
- * Map a full patient response into editable form values.
- *
- * NOTE (backend contract): `PatientResponse` does NOT return the individual
- * first/middle/last name fields — only the computed `full_name`. The name
- * fields therefore cannot be pre-filled and must be re-entered on edit. This
- * is documented in the backend compatibility report as a contract gap.
- */
+/** Map a full patient response into editable form values. */
 export function patientToFormValues(patient: PatientResponse): Partial<PatientFormValues> {
   return {
+    first_name: patient.first_name ?? '',
+    middle_name: patient.middle_name ?? '',
+    last_name: patient.last_name ?? '',
     date_of_birth: patient.date_of_birth ?? '',
     gender: patient.gender ?? '',
     primary_contact_number: patient.primary_contact_number,

@@ -324,4 +324,52 @@ describe('PatientPicker', () => {
       expect(screen.getByText('Incomplete')).toBeInTheDocument();
     });
   });
+
+  // ── AUD-05: Gender placeholder regression tests ──────────────
+
+  it('shows "Select gender" placeholder initially (AUD-05)', async () => {
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 10 });
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '9999999999' } });
+    fireEvent.click(await screen.findByText('Create New Patient'));
+
+    const genderSelect = screen.getByLabelText('Gender') as HTMLSelectElement;
+    // Placeholder option should be selected (empty value)
+    expect(genderSelect.value).toBe('');
+    expect(screen.getByText('Select gender')).toBeInTheDocument();
+  });
+
+  it('no gender selected results in no accidental "Male" in payload (AUD-05)', async () => {
+    quickCreateMock.mockResolvedValue(mockQuickCreateResponse());
+    await openQuickCreate('9999999999');
+
+    fireEvent.change(screen.getByLabelText('First Name *'), { target: { value: 'New' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Person' } });
+    // Do NOT change gender — leave on placeholder
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    await waitFor(() => {
+      expect(quickCreateMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = quickCreateMock.mock.calls[0][0] as unknown as Record<string, unknown>;
+    // Gender should be undefined (omitted), not 'male'
+    expect(payload.gender === undefined || payload.gender === null || payload.gender === '').toBe(true);
+    expect(payload.gender).not.toBe('male');
+  });
+
+  it('gender selected results in correct payload value (AUD-05)', async () => {
+    quickCreateMock.mockResolvedValue(mockQuickCreateResponse());
+    await openQuickCreate('9999999999');
+
+    fireEvent.change(screen.getByLabelText('First Name *'), { target: { value: 'New' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Person' } });
+    fireEvent.change(screen.getByLabelText('Gender'), { target: { value: 'female' } });
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    await waitFor(() => {
+      expect(quickCreateMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = quickCreateMock.mock.calls[0][0] as unknown as Record<string, unknown>;
+    expect(payload.gender).toBe('female');
+  });
 });

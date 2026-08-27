@@ -83,6 +83,12 @@ class PatientMapper:
 
             patient_code=patient.patient_code,
 
+            first_name=patient.first_name,
+
+            middle_name=patient.middle_name,
+
+            last_name=patient.last_name,
+
             full_name=cls.build_full_name(
                 patient
             ),

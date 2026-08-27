@@ -327,7 +327,7 @@ class PatientService:
             )
 
             raise PatientCreationFailed(
-                details=str(e)
+                details="An unexpected error occurred. Please try again."
             )
 
     # ------------------------------------------------------------------
@@ -427,7 +427,9 @@ class PatientService:
                 "Quick-create patient failed: %s",
                 str(e),
             )
-            raise PatientCreationFailed(details=str(e))
+            raise PatientCreationFailed(
+                details="An unexpected error occurred. Please try again."
+            )
 
     def get_patient(
         self,
@@ -613,8 +615,8 @@ class PatientService:
             )
 
             raise PatientUpdateFailed(
-            details=str(e)
-        )
+                details="An unexpected error occurred. Please try again."
+            )
 
 
     def change_patient_status(

@@ -1,10 +1,10 @@
 """fix profile_status_enum casing to lowercase
 
-The PostgreSQL enum was created with uppercase labels (COMPLETE, INCOMPLETE)
-from SQLAlchemy's default behavior (using Python member names). The Python
-ProfileStatus enum uses lowercase values ("complete", "incomplete"), causing
-a LookupError when reading rows. This migration recreates the enum with
-lowercase labels.
+The PostgreSQL enum may have been created with uppercase labels
+(COMPLETE, INCOMPLETE) from SQLAlchemy's default behavior (using Python
+member names).  This migration safely renames the enum labels to
+lowercase using ALTER TYPE ... RENAME VALUE, which preserves existing
+column values and never drops/recreates columns or types.
 
 Revision ID: e7f8a9b0c1d3
 Revises: d5e6f7a8b9c0
@@ -15,7 +15,6 @@ Create Date: 2026-08-27
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
@@ -26,71 +25,65 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 1. Drop the old index on profile_status
-    op.drop_index("ix_patients_profile_status", table_name="patients")
-
-    # 2. Drop the column (this removes the column from the table but NOT the enum type)
-    op.drop_column("patients", "profile_status")
-
-    # 3. Drop the old enum type (uppercase labels)
-    op.execute("DROP TYPE IF EXISTS profile_status_enum;")
-
-    # 4. Recreate the enum type with lowercase labels
+    # Rename uppercase enum labels to lowercase if they exist.
+    # This is a no-op when labels are already lowercase.
+    # ALTER TYPE ... RENAME VALUE is a metadata-only operation —
+    # it never drops columns, types, or indexes, and never resets data.
     op.execute(
-        "CREATE TYPE profile_status_enum AS ENUM ('complete', 'incomplete');"
-    )
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_enum e
+                JOIN pg_type t ON e.enumtypid = t.oid
+                WHERE t.typname = 'profile_status_enum'
+                  AND e.enumlabel = 'COMPLETE'
+            ) THEN
+                ALTER TYPE profile_status_enum RENAME VALUE 'COMPLETE' TO 'complete';
+            END IF;
 
-    # 5. Recreate the column with the corrected enum
-    op.add_column(
-        "patients",
-        sa.Column(
-            "profile_status",
-            sa.Enum(
-                "complete",
-                "incomplete",
-                name="profile_status_enum",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default="complete",
-        ),
-    )
-
-    # 6. Recreate the index
-    op.create_index(
-        "ix_patients_profile_status",
-        "patients",
-        ["profile_status"],
-        unique=False,
+            IF EXISTS (
+                SELECT 1
+                FROM pg_enum e
+                JOIN pg_type t ON e.enumtypid = t.oid
+                WHERE t.typname = 'profile_status_enum'
+                  AND e.enumlabel = 'INCOMPLETE'
+            ) THEN
+                ALTER TYPE profile_status_enum RENAME VALUE 'INCOMPLETE' TO 'incomplete';
+            END IF;
+        END
+        $$;
+        """
     )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_patients_profile_status", table_name="patients")
-    op.drop_column("patients", "profile_status")
-    op.execute("DROP TYPE IF EXISTS profile_status_enum;")
-
-    # Restore the old uppercase enum (for downgrade compatibility)
+    # Rename lowercase labels back to uppercase (for downgrade compatibility).
     op.execute(
-        "CREATE TYPE profile_status_enum AS ENUM ('COMPLETE', 'INCOMPLETE');"
-    )
-    op.add_column(
-        "patients",
-        sa.Column(
-            "profile_status",
-            sa.Enum(
-                "COMPLETE",
-                "INCOMPLETE",
-                name="profile_status_enum",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default="COMPLETE",
-        ),
-    )
-    op.create_index(
-        "ix_patients_profile_status",
-        "patients",
-        ["profile_status"],
-        unique=False,
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_enum e
+                JOIN pg_type t ON e.enumtypid = t.oid
+                WHERE t.typname = 'profile_status_enum'
+                  AND e.enumlabel = 'complete'
+            ) THEN
+                ALTER TYPE profile_status_enum RENAME VALUE 'complete' TO 'COMPLETE';
+            END IF;
+
+            IF EXISTS (
+                SELECT 1
+                FROM pg_enum e
+                JOIN pg_type t ON e.enumtypid = t.oid
+                WHERE t.typname = 'profile_status_enum'
+                  AND e.enumlabel = 'incomplete'
+            ) THEN
+                ALTER TYPE profile_status_enum RENAME VALUE 'incomplete' TO 'INCOMPLETE';
+            END IF;
+        END
+        $$;
+        """
     )

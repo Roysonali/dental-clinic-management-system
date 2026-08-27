@@ -21,6 +21,7 @@ from app.modules.patients.exceptions import (
     InvalidPatientOperation,
     PatientCreationFailed,
     PatientNotFound,
+    PatientUpdateFailed,
 )
 from app.modules.patients.schemas import (
     PatientBase,
@@ -763,4 +764,109 @@ class TestUpdatePatientProfileStatus:
         result = service.update_patient(incomplete_patient.id, payload, updated_by=1)
 
         assert result.profile_status == ProfileStatus.INCOMPLETE
+
+
+# ======================================================================
+# AUD-04: Exception Leakage Tests
+# ======================================================================
+
+
+class TestExceptionLeakagePrevention:
+    """Verify that internal exception details are NOT exposed to clients."""
+
+    @pytest.fixture
+    def service(self):
+        db = MagicMock()
+        svc = PatientService(db)
+        svc.repository = MagicMock(spec=PatientRepository)
+        return svc
+
+    def test_create_failure_hides_internal_details(self, service):
+        """PatientCreationFailed must not contain raw exception text."""
+        payload = PatientCreate(**make_valid_patient_data())
+        service.repository.find_exact_duplicate.return_value = None
+        service.repository.find_by_phone.return_value = []
+        service.repository.find_by_email.return_value = []
+        service.repository.find_by_name_dob.return_value = []
+        service.repository.get_next_patient_sequence.side_effect = (
+            Exception("relation 'patients' does not exist at character 42")
+        )
+
+        with pytest.raises(PatientCreationFailed) as exc_info:
+            service.create_patient(payload, created_by=1)
+
+        details = exc_info.value.details
+        assert "relation" not in details.lower()
+        assert "character" not in details.lower()
+        assert "does not exist" not in details.lower()
+        assert "unexpected error" in details.lower()
+
+    def test_quick_create_failure_hides_internal_details(self, service):
+        """PatientCreationFailed from quick-create must not expose SQL errors."""
+        payload = PatientQuickCreate(**make_quick_create_data())
+        service.repository.find_by_phone.return_value = []
+        service.repository.find_by_name_and_phone.return_value = []
+        service.repository.get_next_patient_sequence.side_effect = (
+            Exception("could not connect to server: Connection refused")
+        )
+
+        with pytest.raises(PatientCreationFailed) as exc_info:
+            service.quick_create_patient(payload, created_by=1)
+
+        details = exc_info.value.details
+        assert "connection refused" not in details.lower()
+        assert "could not connect" not in details.lower()
+        assert "unexpected error" in details.lower()
+
+    def test_update_failure_hides_internal_details(self, service):
+        """PatientUpdateFailed must not expose internal error details."""
+        patient = make_patient_orm()
+        service.repository.get_by_id.return_value = patient
+        service.repository.find_exact_duplicate_for_update.return_value = None
+        service.repository.find_by_phone_for_update.return_value = None
+        service.repository.find_by_email_for_update.return_value = None
+        service.repository.find_by_name_dob_for_update.return_value = None
+        service.repository.update.side_effect = (
+            Exception("deadlock detected")
+        )
+
+        with pytest.raises(PatientUpdateFailed) as exc_info:
+            service.update_patient(
+                patient.id,
+                PatientUpdate(first_name="Test"),
+                updated_by=1,
+            )
+
+        details = exc_info.value.details
+        assert "deadlock" not in details.lower()
+        assert "unexpected error" in details.lower()
+
+
+class TestMigrationSafety:
+    """Verify the migration script is safe and non-destructive."""
+
+    def test_fix_profile_status_enum_uses_alter_type(self):
+        """The migration must use ALTER TYPE RENAME VALUE, not DROP/CREATE."""
+        from pathlib import Path
+
+        migration_path = (
+            Path(__file__).resolve().parent.parent
+            / "alembic"
+            / "versions"
+            / "e7f8a9b0c1d3_fix_profile_status_enum_casing.py"
+        )
+        content = migration_path.read_text()
+
+        # Must use the safe ALTER TYPE approach
+        assert "ALTER TYPE" in content
+        assert "RENAME VALUE" in content
+
+        # Must NOT drop columns, types, or indexes
+        assert "DROP COLUMN" not in content
+        assert "DROP TYPE" not in content
+        assert "DROP INDEX" not in content
+
+        # Must NOT recreate columns or indexes
+        assert "add_column" not in content
+        assert "create_index" not in content
 

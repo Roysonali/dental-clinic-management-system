@@ -191,6 +191,13 @@ class Patient(Base):
             "last_name",
             "first_name",
         ),
+
+        # Index for querying patients by profile_status (e.g. incomplete profiles).
+        # Matches ix_patients_profile_status created by migration d5e6f7a8b9c0.
+        Index(
+            "ix_patients_profile_status",
+            "profile_status",
+        ),
     )
 
     def __repr__(self) -> str:
