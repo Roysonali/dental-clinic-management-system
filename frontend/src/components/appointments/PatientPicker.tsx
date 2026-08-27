@@ -98,6 +98,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
   const [mode, setMode] = useState<PickerMode>('search');
   const [createForm, setCreateForm] = useState({
     first_name: '',
+    middle_name: '',
     last_name: '',
     primary_contact_number: '',
     gender: '',
@@ -172,7 +173,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
 
       // Reset create form and mode
       setMode('search');
-      setCreateForm({ first_name: '', last_name: '', primary_contact_number: '', gender: '' });
+      setCreateForm({ first_name: '', middle_name: '', last_name: '', primary_contact_number: '', gender: '' });
       setCreateErrors({});
       setCreateServerError(null);
       setQuery('');
@@ -205,7 +206,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
     setT1HadMatches(false);
     setT3Warnings([]);
     setT3Matches([]);
-    setCreateForm({ first_name: '', last_name: '', primary_contact_number: '', gender: '' });
+    setCreateForm({ first_name: '', middle_name: '', last_name: '', primary_contact_number: '', gender: '' });
   };
 
   const openQuickCreate = useCallback(() => {
@@ -235,6 +236,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
     // No T1 matches — proceed directly
     createMutation.mutate({
       first_name: createForm.first_name.trim(),
+      middle_name: createForm.middle_name.trim() || undefined,
       last_name: createForm.last_name.trim(),
       primary_contact_number: createForm.primary_contact_number.trim(),
       gender: (createForm.gender as PatientQuickCreatePayload['gender']) || undefined,
@@ -244,6 +246,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
   const handleConfirmCreate = useCallback(() => {
     createMutation.mutate({
       first_name: createForm.first_name.trim(),
+      middle_name: createForm.middle_name.trim() || undefined,
       last_name: createForm.last_name.trim(),
       primary_contact_number: createForm.primary_contact_number.trim(),
       gender: (createForm.gender as PatientQuickCreatePayload['gender']) || undefined,
@@ -278,7 +281,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
       >
         {/* ── T3 warnings banner ──────────────────────────── */}
         {t3Warnings.length > 0 && (
-          <div className="mb-2 rounded-lg border border-warning/30 bg-warning/10 p-3">
+          <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
             <div className="flex items-start gap-2">
               <Icon icon={AlertTriangle} size="sm" className="mt-0.5 text-warning" />
               <div className="min-w-0 flex-1">
@@ -338,37 +341,41 @@ export const PatientPicker: FC<PatientPickerProps> = ({
           </div>
         ) : mode === 'quick-create' || mode === 'confirming' ? (
           /* ── Quick-create form ──────────────────────────── */
-          <div className="rounded-lg border border-neutral-300 bg-white p-3">
-            <div className="mb-2 flex items-center gap-2">
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-5">
+            {/* Header */}
+            <div className="mb-1 flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleBackToSearch}
-                className="rounded p-0.5 text-neutral-400 transition-colors hover:text-neutral-700"
+                className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 aria-label="Back to search"
               >
                 <Icon icon={ArrowLeft} size="sm" />
               </button>
-              <span className="text-body-sm font-medium text-neutral-700">Quick Patient Registration</span>
+              <h4 className="min-w-0 flex-1 text-body-sm font-semibold text-neutral-800">Quick Patient Registration</h4>
             </div>
 
+            {/* Divider */}
+            <div className="my-3 border-t border-neutral-200" />
+
             {createServerError && (
-              <div role="alert" className="mb-2 rounded border border-danger/25 bg-danger/10 p-2">
-                <p className="text-caption text-danger">{createServerError}</p>
+              <div role="alert" className="mb-4 rounded-lg border border-danger/25 bg-danger/10 p-3">
+                <p className="text-body-sm text-danger">{createServerError}</p>
               </div>
             )}
 
             {/* T2 confirmation dialog */}
             {mode === 'confirming' && (
-              <div className="mb-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
+              <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 p-4">
                 <p className="mb-1 text-body-sm font-medium text-neutral-800">Potential Duplicates Found</p>
-                <p className="mb-2 text-caption text-neutral-600">
+                <p className="mb-3 text-body-sm text-neutral-600">
                   Patients matching your search already exist. Are you sure you want to create a new patient?
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={handleBackToSearch}
-                    className="rounded-lg border border-neutral-300 px-3 py-1.5 text-caption font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                    className="rounded-lg border border-neutral-300 px-4 py-2 text-body-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
                   >
                     Cancel
                   </button>
@@ -379,7 +386,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                       setQuery('');
                       setOpen(true);
                     }}
-                    className="rounded-lg border border-primary-300 bg-primary-50 px-3 py-1.5 text-caption font-medium text-primary-700 transition-colors hover:bg-primary-100"
+                    className="rounded-lg border border-primary-300 bg-primary-50 px-4 py-2 text-body-sm font-medium text-primary-700 transition-colors hover:bg-primary-100"
                   >
                     Select Existing
                   </button>
@@ -387,7 +394,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                     type="button"
                     onClick={handleConfirmCreate}
                     disabled={createMutation.isPending}
-                    className="rounded-lg bg-primary-500 px-3 py-1.5 text-caption font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
+                    className="rounded-lg bg-primary-500 px-4 py-2 text-body-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
                   >
                     {createMutation.isPending ? 'Creating…' : 'Create Anyway'}
                   </button>
@@ -395,73 +402,97 @@ export const PatientPicker: FC<PatientPickerProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
+            {/* Form fields — responsive 2-col / 1-col */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Row 1: First Name + Last Name */}
               <div>
-                <label htmlFor={`${inputId}-fn`} className="mb-0.5 block text-caption font-medium text-neutral-700">
-                  First Name *
+                <label htmlFor={`${inputId}-fn`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
+                  First Name <span className="text-danger">*</span>
                 </label>
                 <input
                   id={`${inputId}-fn`}
                   type="text"
                   value={createForm.first_name}
                   onChange={(e) => setCreateForm((p) => ({ ...p, first_name: e.target.value }))}
-                  className={`w-full rounded-lg border px-2.5 py-1.5 text-body-sm ${
-                    createErrors.first_name ? 'border-danger' : 'border-neutral-300'
+                  className={`w-full rounded-lg border px-3 py-2.5 text-body transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-neutral-400 ${
+                    createErrors.first_name
+                      ? 'border-danger focus:ring-danger/20 focus:border-danger'
+                      : 'border-neutral-300'
                   }`}
-                  placeholder="Abc"
+                  placeholder="Juan"
                   autoFocus
                 />
                 {createErrors.first_name && (
-                  <p className="mt-0.5 text-caption text-danger">{createErrors.first_name}</p>
+                  <p className="mt-1 text-caption text-danger">{createErrors.first_name}</p>
                 )}
               </div>
               <div>
-                <label htmlFor={`${inputId}-ln`} className="mb-0.5 block text-caption font-medium text-neutral-700">
-                  Last Name *
+                <label htmlFor={`${inputId}-ln`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
+                  Last Name <span className="text-danger">*</span>
                 </label>
                 <input
                   id={`${inputId}-ln`}
                   type="text"
                   value={createForm.last_name}
                   onChange={(e) => setCreateForm((p) => ({ ...p, last_name: e.target.value }))}
-                  className={`w-full rounded-lg border px-2.5 py-1.5 text-body-sm ${
-                    createErrors.last_name ? 'border-danger' : 'border-neutral-300'
+                  className={`w-full rounded-lg border px-3 py-2.5 text-body transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-neutral-400 ${
+                    createErrors.last_name
+                      ? 'border-danger focus:ring-danger/20 focus:border-danger'
+                      : 'border-neutral-300'
                   }`}
-                  placeholder="Dhf"
+                  placeholder="Dela Cruz"
                 />
                 {createErrors.last_name && (
-                  <p className="mt-0.5 text-caption text-danger">{createErrors.last_name}</p>
+                  <p className="mt-1 text-caption text-danger">{createErrors.last_name}</p>
                 )}
               </div>
+
+              {/* Row 2: Middle Name (full width) */}
+              <div className="sm:col-span-2">
+                <label htmlFor={`${inputId}-mn`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
+                  Middle Name
+                </label>
+                <input
+                  id={`${inputId}-mn`}
+                  type="text"
+                  value={createForm.middle_name}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, middle_name: e.target.value }))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-body transition-colors duration-150 hover:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  placeholder="Reyes"
+                />
+              </div>
+
+              {/* Row 3: Phone + Gender */}
               <div>
-                <label htmlFor={`${inputId}-phone`} className="mb-0.5 block text-caption font-medium text-neutral-700">
-                  Phone *
+                <label htmlFor={`${inputId}-phone`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
+                  Phone <span className="text-danger">*</span>
                 </label>
                 <input
                   id={`${inputId}-phone`}
                   type="tel"
                   value={createForm.primary_contact_number}
                   onChange={(e) => setCreateForm((p) => ({ ...p, primary_contact_number: e.target.value }))}
-                  className={`w-full rounded-lg border px-2.5 py-1.5 text-body-sm ${
-                    createErrors.primary_contact_number ? 'border-danger' : 'border-neutral-300'
+                  className={`w-full rounded-lg border px-3 py-2.5 text-body transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-neutral-400 ${
+                    createErrors.primary_contact_number
+                      ? 'border-danger focus:ring-danger/20 focus:border-danger'
+                      : 'border-neutral-300'
                   }`}
                   placeholder="+639123456789"
                 />
                 {createErrors.primary_contact_number && (
-                  <p className="mt-0.5 text-caption text-danger">{createErrors.primary_contact_number}</p>
+                  <p className="mt-1 text-caption text-danger">{createErrors.primary_contact_number}</p>
                 )}
               </div>
               <div>
-                <label htmlFor={`${inputId}-gender`} className="mb-0.5 block text-caption font-medium text-neutral-700">
+                <label htmlFor={`${inputId}-gender`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
                   Gender
                 </label>
                 <select
                   id={`${inputId}-gender`}
                   value={createForm.gender}
                   onChange={(e) => setCreateForm((p) => ({ ...p, gender: e.target.value }))}
-                  className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-body-sm"
+                  className="w-full appearance-none rounded-lg border border-neutral-300 bg-white px-3 py-2.5 pr-10 text-body text-neutral-800 transition-colors duration-150 hover:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 >
-                  <option value="">Optional</option>
                   {genderOptions.map((g) => (
                     <option key={g.value} value={g.value}>
                       {g.label}
@@ -471,11 +502,12 @@ export const PatientPicker: FC<PatientPickerProps> = ({
               </div>
             </div>
 
-            <div className="mt-3 flex justify-end gap-2">
+            {/* Actions */}
+            <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={handleBackToSearch}
-                className="rounded-lg border border-neutral-300 px-3 py-1.5 text-caption font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                className="rounded-lg border border-neutral-300 px-4 py-2 text-body-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 Cancel
               </button>
@@ -483,7 +515,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                 type="button"
                 onClick={handleCreateSubmit}
                 disabled={createMutation.isPending}
-                className="flex items-center gap-1.5 rounded-lg bg-primary-500 px-3 py-1.5 text-caption font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-primary-500 px-4 py-2 text-body-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
               >
                 {createMutation.isPending ? (
                   <>
