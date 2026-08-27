@@ -407,7 +407,7 @@ export const PatientDetailsContainer: FC = () => {
         serverErrors={createFieldErrors}
         serverMessage={createError}
         initialPatientId={patient.id}
-        selectedPatientLabel={patientLabel}
+        selectedPatientLabel={patientLabel ?? undefined}
       />
 
       <CreatePlanDrawer
@@ -418,7 +418,7 @@ export const PatientDetailsContainer: FC = () => {
         serverErrors={createFieldErrors}
         serverMessage={createError}
         initialPatientId={patient.id}
-        selectedPatientLabel={patientLabel}
+        selectedPatientLabel={patientLabel ?? undefined}
         doctorOptions={doctorOptions}
         doctorsLoading={doctorsQuery.isLoading}
         doctorsError={doctorsQuery.isError}
@@ -432,7 +432,7 @@ export const PatientDetailsContainer: FC = () => {
         serverErrors={createFieldErrors}
         serverMessage={createError}
         initialPatientId={patient.id}
-        selectedPatientLabel={patientLabel}
+        selectedPatientLabel={patientLabel ?? undefined}
       />
     </ContentContainer>
   );

@@ -48,6 +48,9 @@ const prescription: PrescriptionResponse = {
 const patient: PatientResponse = {
   id: 'p1',
   patient_code: 'PAT-000012',
+  first_name: 'Test',
+  middle_name: null,
+  last_name: 'Patient-Two',
   full_name: 'Test Patient-Two',
   date_of_birth: '1998-03-14',
   age: 28,

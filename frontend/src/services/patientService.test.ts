@@ -23,6 +23,9 @@ const patchMock = vi.mocked(api.patch);
 const patient: PatientResponse = {
   id: 'p1',
   patient_code: 'PAT-000001',
+  first_name: 'Juan',
+  middle_name: null,
+  last_name: 'Dela Cruz',
   full_name: 'Juan Dela Cruz',
   date_of_birth: '1990-05-15',
   age: 34,

@@ -270,8 +270,8 @@ export const TreatmentPlanListContainer: FC = () => {
         submitting={createMutation.isPending}
         serverErrors={createFieldErrors}
         serverMessage={createError}
-        initialPatientId={createPatientId ?? ''}
-        selectedPatientLabel={selectedPatientLabel}
+        initialPatientId={createPatientId ?? undefined}
+        selectedPatientLabel={selectedPatientLabel ?? undefined}
       />
 
       {toast && (

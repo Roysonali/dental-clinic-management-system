@@ -246,8 +246,8 @@ export const PatientRecordListContainer: FC = () => {
         serverMessage={createError}
         conflictAppointmentId={conflictAppointmentId}
         onViewConflictRecord={handleViewConflictRecord}
-        initialPatientId={createPatientId ?? ''}
-        selectedPatientLabel={selectedPatientLabel}
+        initialPatientId={createPatientId ?? undefined}
+        selectedPatientLabel={selectedPatientLabel ?? undefined}
       />
 
       {toast && (
