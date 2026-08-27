@@ -54,6 +54,18 @@ class GenderEnum(str, Enum):
     other = "other"
 
 
+class ProfileStatus(str, Enum):
+    """Canonical patient profile lifecycle state.
+
+    COMPLETE   — all required clinical fields are present.
+    INCOMPLETE — one or more required fields (DOB, gender) are missing,
+                 typically after a phone-call quick-create.
+    """
+
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+
+
 # ==========================================================
 # APPOINTMENT MODULE
 # ==========================================================

@@ -20,7 +20,7 @@ function optional(value: string | null | undefined): string | null {
  */
 export function patientToFormValues(patient: PatientResponse): Partial<PatientFormValues> {
   return {
-    date_of_birth: patient.date_of_birth,
+    date_of_birth: patient.date_of_birth ?? '',
     gender: patient.gender ?? '',
     primary_contact_number: patient.primary_contact_number,
     emergency_contact_number: patient.emergency_contact_number ?? '',

@@ -42,7 +42,7 @@ export interface PatientResponse {
   patient_code: string;
   /** Computed by the backend (first + middle + last) */
   full_name: string;
-  date_of_birth: string;
+  date_of_birth: string | null;
   /** Computed by the backend */
   age: number | null;
   gender: string | null;
@@ -52,6 +52,8 @@ export interface PatientResponse {
   address: string | null;
   remarks: string | null;
   is_active: boolean;
+  /** Canonical profile lifecycle state */
+  profile_status?: 'complete' | 'incomplete';
   created_by: number | null;
   updated_by: number | null;
   created_at: string;
@@ -67,6 +69,8 @@ export interface PatientListItem {
   gender: string | null;
   primary_contact_number: string;
   is_active: boolean;
+  /** Canonical profile lifecycle state */
+  profile_status?: 'complete' | 'incomplete';
 }
 
 /** Paginated list response (PatientListResponse schema). */
@@ -104,6 +108,22 @@ export interface PatientFormValues {
   email: string;
   address: string;
   remarks: string;
+}
+
+/** Payload for POST /patients/quick-create. */
+export interface PatientQuickCreatePayload {
+  first_name: string;
+  middle_name?: string | null;
+  last_name: string;
+  primary_contact_number: string;
+  gender?: PatientGender | null;
+}
+
+/** Response for POST /patients/quick-create. */
+export interface PatientQuickCreateResponse {
+  patient: PatientResponse;
+  potential_matches: PatientListItem[];
+  warnings: string[];
 }
 
 /** Status filter used by the patient list toolbar. */

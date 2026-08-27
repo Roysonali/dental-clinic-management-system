@@ -16,6 +16,9 @@ from app.modules.patients.mapper import (
 )
 from app.modules.patients.schemas import (
     PatientCreate,
+    PatientQuickCreate,
+    PatientQuickCreateResponse,
+    PatientListItem,
     PatientSummaryAppointment,
     PatientSummaryBilling,
     PatientSummaryCounts,
@@ -25,6 +28,7 @@ from app.modules.patients.schemas import (
     PatientSummaryTreatmentPlan,
     PatientUpdate,
 )
+from app.core.constants import ProfileStatus
 from app.modules.patients.exceptions import (
     DuplicatePatientDetected,
     InvalidPatientOperation,
@@ -66,6 +70,24 @@ class PatientService:
             str(value)
             .strip().title()
         )
+
+    @staticmethod
+    def _compute_profile_status(
+        patient: Patient,
+    ) -> ProfileStatus:
+        """Determine profile completeness based on required clinical fields.
+
+        A patient is INCOMPLETE when date_of_birth or gender is None.
+        This is the single source of truth — called on create and update.
+        """
+
+        if (
+            patient.date_of_birth is None
+            or patient.gender is None
+        ):
+            return ProfileStatus.INCOMPLETE
+
+        return ProfileStatus.COMPLETE
 
     def _generate_patient_code(
         self,
@@ -263,6 +285,8 @@ class PatientService:
                address=self._normalize_text(payload.address),
                remarks=self._normalize_text(payload.remarks),
 
+                profile_status=ProfileStatus.COMPLETE,
+
                 created_by=(
                     created_by
                 ),
@@ -306,7 +330,104 @@ class PatientService:
                 details=str(e)
             )
 
-   
+    # ------------------------------------------------------------------
+    # Quick Create (Phone-Call Workflow)
+    # ------------------------------------------------------------------
+
+    def quick_create_patient(
+        self,
+        payload: PatientQuickCreate,
+        created_by: int,
+    ) -> PatientQuickCreateResponse:
+        """Create a minimal patient record for the phone-call workflow.
+
+        Validates available fields with full rigor.
+        Detects potential duplicates (non-blocking) via phone and name+phone.
+        Sets profile_status to INCOMPLETE.
+        """
+
+        try:
+
+            first_name = self._normalize_text(payload.first_name)
+            last_name = self._normalize_text(payload.last_name)
+            phone = (
+                payload.primary_contact_number
+                .replace(" ", "")
+                .replace("-", "")
+                .strip()
+            )
+
+            # --------------------------------------------------
+            # T3: Backend potential-match detection (non-blocking)
+            # --------------------------------------------------
+            potential_matches: list[PatientListItem] = []
+            warnings: list[str] = []
+            seen_ids: set = set()
+
+            phone_matches = self.repository.find_by_phone(phone)
+            if phone_matches:
+                warnings.append(
+                    "A patient with this phone number already exists."
+                )
+                for p in phone_matches:
+                    if p.id not in seen_ids:
+                        seen_ids.add(p.id)
+                        potential_matches.append(
+                            PatientMapper.to_list_item(p)
+                        )
+
+            name_phone_matches = self.repository.find_by_name_and_phone(
+                first_name, last_name, phone
+            )
+            if name_phone_matches:
+                warnings.append(
+                    "A patient with this name and phone already exists."
+                )
+                for p in name_phone_matches:
+                    if p.id not in seen_ids:
+                        seen_ids.add(p.id)
+                        potential_matches.append(
+                            PatientMapper.to_list_item(p)
+                        )
+
+            # --------------------------------------------------
+            # Create patient
+            # --------------------------------------------------
+            patient = Patient(
+                patient_code=self._generate_patient_code(),
+                first_name=first_name,
+                middle_name=self._normalize_text(payload.middle_name),
+                last_name=last_name,
+                primary_contact_number=phone,
+                gender=payload.gender,
+                date_of_birth=None,
+                profile_status=ProfileStatus.INCOMPLETE,
+                is_active=True,
+                created_by=created_by,
+            )
+
+            patient = self.repository.create(patient)
+            self.db.commit()
+
+            logger.info(
+                "Quick-create patient: code=%s, id=%s",
+                patient.patient_code,
+                patient.id,
+            )
+
+            return PatientQuickCreateResponse(
+                patient=PatientMapper.to_response(patient),
+                potential_matches=potential_matches,
+                warnings=warnings,
+            )
+
+        except Exception as e:
+            self.db.rollback()
+            logger.exception(
+                "Quick-create patient failed: %s",
+                str(e),
+            )
+            raise PatientCreationFailed(details=str(e))
 
     def get_patient(
         self,
@@ -446,6 +567,13 @@ class PatientService:
                     updates,
                     updated_by=updated_by,
                 )
+            )
+
+            # --------------------------------------------------
+            # Recompute profile status
+            # --------------------------------------------------
+            patient.profile_status = (
+                self._compute_profile_status(patient)
             )
 
             self.db.commit()

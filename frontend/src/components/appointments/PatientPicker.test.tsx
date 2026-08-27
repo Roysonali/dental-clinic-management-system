@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../test/testUtils';
 import { PatientPicker } from './PatientPicker';
 import { patientService } from '../../services/patientService';
 
 vi.mock('../../services/patientService', () => ({
-  patientService: { list: vi.fn(), get: vi.fn() },
+  patientService: {
+    list: vi.fn(),
+    get: vi.fn(),
+    quickCreate: vi.fn(),
+  },
 }));
 
 const listMock = vi.mocked(patientService.list);
+const quickCreateMock = vi.mocked(patientService.quickCreate);
 
 const patients = [
   {
@@ -19,6 +25,7 @@ const patients = [
     gender: 'male' as const,
     primary_contact_number: '+639123456789',
     is_active: true,
+    profile_status: 'complete' as const,
   },
   {
     id: 'p2',
@@ -28,21 +35,61 @@ const patients = [
     gender: 'female' as const,
     primary_contact_number: '+639987654321',
     is_active: true,
+    profile_status: 'complete' as const,
   },
 ];
+
+const mockQuickCreateResponse = (overrides: {
+  patient?: Record<string, unknown>;
+  potential_matches?: typeof patients;
+  warnings?: string[];
+} = {}) => ({
+  patient: {
+    id: 'p3',
+    patient_code: 'PAT-000015',
+    full_name: 'New Person',
+    date_of_birth: null,
+    age: null,
+    gender: null,
+    primary_contact_number: '9999999999',
+    emergency_contact_number: null,
+    email: null,
+    address: null,
+    remarks: null,
+    is_active: true,
+    profile_status: 'incomplete' as const,
+    created_by: 1,
+    updated_by: null,
+    created_at: '2025-01-15T10:30:00Z',
+    updated_at: '2025-01-15T10:30:00Z',
+    ...(overrides.patient ?? {}),
+  },
+  potential_matches: [...(overrides.potential_matches ?? [])],
+  warnings: [...(overrides.warnings ?? [])],
+});
+
+async function openQuickCreate(phone: string) {
+  listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 10 });
+  renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: phone } });
+  fireEvent.click(await screen.findByText('Create New Patient'));
+  await screen.findByLabelText('First Name *');
+}
 
 describe('PatientPicker', () => {
   beforeEach(() => {
     listMock.mockReset();
+    quickCreateMock.mockReset();
   });
+
+  // ── Existing regression tests ──────────────────────────
 
   it('searches patients after a debounce and shows results', async () => {
     listMock.mockResolvedValue({ items: patients, total: 2, page: 1, page_size: 10 });
     const onChange = vi.fn();
     renderWithProviders(<PatientPicker value="" onChange={onChange} />);
 
-    const input = screen.getByRole('combobox');
-    fireEvent.change(input, { target: { value: 'juan' } });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'juan' } });
 
     await waitFor(() => expect(listMock).toHaveBeenCalledWith(
       expect.objectContaining({ search: 'juan', page_size: 10 }),
@@ -95,5 +142,186 @@ describe('PatientPicker', () => {
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'zzz' } });
     expect(await screen.findByText('No patients found.')).toBeInTheDocument();
+  });
+
+  // ── Quick-create tests ─────────────────────────────────
+
+  it('shows Create New Patient button when no results found', async () => {
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 10 });
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '9999999999' } });
+    expect(await screen.findByText('Create New Patient')).toBeInTheDocument();
+  });
+
+  it('shows Create New Patient button when results exist', async () => {
+    listMock.mockResolvedValue({ items: patients, total: 2, page: 1, page_size: 10 });
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'juan' } });
+    expect(await screen.findByText('Create New Patient')).toBeInTheDocument();
+  });
+
+  it('opens quick-create form when Create New Patient is clicked', async () => {
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 10 });
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '9999999999' } });
+    fireEvent.click(await screen.findByText('Create New Patient'));
+
+    expect(screen.getByText('Quick Patient Registration')).toBeInTheDocument();
+    expect(screen.getByLabelText('First Name *')).toBeInTheDocument();
+    expect(screen.getByLabelText('Last Name *')).toBeInTheDocument();
+    expect(screen.getByLabelText('Phone *')).toBeInTheDocument();
+  });
+
+  it('prefills phone from search query', async () => {
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 10 });
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '9999999999' } });
+    fireEvent.click(await screen.findByText('Create New Patient'));
+
+    const phoneInput = screen.getByLabelText('Phone *') as HTMLInputElement;
+    expect(phoneInput.value).toBe('9999999999');
+  });
+
+  it('validates required fields before submission', async () => {
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 10 });
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'newpatient' } });
+    fireEvent.click(await screen.findByText('Create New Patient'));
+
+    fireEvent.change(screen.getByLabelText('Phone *'), { target: { value: '' } });
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    expect(await screen.findByText('First name is required')).toBeInTheDocument();
+    expect(screen.getByText('Last name is required')).toBeInTheDocument();
+    expect(screen.getByText('Phone number is required')).toBeInTheDocument();
+  });
+
+  it('creates patient and auto-selects on success', async () => {
+    quickCreateMock.mockResolvedValue(mockQuickCreateResponse());
+    await openQuickCreate('9999999999');
+
+    fireEvent.change(screen.getByLabelText('First Name *'), { target: { value: 'New' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Person' } });
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    await waitFor(() => {
+      expect(quickCreateMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = quickCreateMock.mock.calls[0][0] as unknown as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      first_name: 'New',
+      last_name: 'Person',
+      primary_contact_number: '9999999999',
+    });
+  });
+
+  it('shows T2 confirmation when T1 found matches', async () => {
+    // Use a valid phone number so that the quick-create form phone field passes validation
+    const phonePatient = { ...patients[0], primary_contact_number: '09991234567' };
+    listMock.mockResolvedValue({ items: [phonePatient], total: 1, page: 1, page_size: 10 });
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '09991234567' } });
+    await screen.findByText('Juan Dela Cruz');
+
+    fireEvent.click(screen.getByText('Create New Patient'));
+    await screen.findByLabelText('First Name *');
+
+    fireEvent.change(screen.getByLabelText('First Name *'), { target: { value: 'Abc' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Dhf' } });
+    // Phone is pre-filled with '09991234567' from search query — valid
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Potential Duplicates Found')).toBeInTheDocument();
+    });
+    // Two Cancel buttons exist: one in T2 dialog, one at the bottom of the form
+    expect(screen.getAllByText('Cancel').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Select Existing')).toBeInTheDocument();
+    expect(screen.getByText('Create Anyway')).toBeInTheDocument();
+  });
+
+  it('skips T2 when T1 found no matches', async () => {
+    quickCreateMock.mockResolvedValue(mockQuickCreateResponse());
+    await openQuickCreate('9999999999');
+
+    fireEvent.change(screen.getByLabelText('First Name *'), { target: { value: 'New' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Person' } });
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    await waitFor(() => {
+      expect(quickCreateMock).toHaveBeenCalled();
+    });
+    expect(screen.queryByText('Potential Duplicates Found')).not.toBeInTheDocument();
+  });
+
+  it('displays T3 warnings after creation', async () => {
+    quickCreateMock.mockResolvedValue(mockQuickCreateResponse({
+      potential_matches: [patients[0]],
+      warnings: ['A patient with this phone number already exists.'],
+    }));
+
+    renderWithProviders(<PatientPicker value="" onChange={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '9876543210' } });
+    fireEvent.click(await screen.findByText('Create New Patient'));
+
+    fireEvent.change(screen.getByLabelText('First Name *'), { target: { value: 'New' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Person' } });
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Potential matches found')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Juan Dela Cruz (PAT-000001)')).toBeInTheDocument();
+  });
+
+  it('shows error on network failure', async () => {
+    quickCreateMock.mockRejectedValue(new Error('Network error'));
+    await openQuickCreate('9999999999');
+
+    fireEvent.change(screen.getByLabelText('First Name *'), { target: { value: 'New' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Person' } });
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    expect(await screen.findByText('Failed to create patient. Please try again.')).toBeInTheDocument();
+  });
+
+  it('shows incomplete tag after quick-create', async () => {
+    quickCreateMock.mockResolvedValue(mockQuickCreateResponse());
+
+    // Use a stateful wrapper so controlled value updates after onChange
+    let pickerValue = '';
+    function StatefulPicker() {
+      const [val, setVal] = useState(pickerValue);
+      return (
+        <PatientPicker
+          value={val}
+          onChange={(v) => { pickerValue = v; setVal(v); }}
+        />
+      );
+    }
+
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 10 });
+    renderWithProviders(<StatefulPicker />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '9999999999' } });
+    fireEvent.click(await screen.findByText('Create New Patient'));
+
+    const fnInput = await screen.findByLabelText('First Name *');
+    fireEvent.change(fnInput, { target: { value: 'Incomplete' } });
+    fireEvent.change(screen.getByLabelText('Last Name *'), { target: { value: 'Person' } });
+    fireEvent.click(screen.getByText('Create & Continue'));
+
+    await waitFor(() => {
+      expect(quickCreateMock).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Incomplete')).toBeInTheDocument();
+    });
   });
 });

@@ -12,7 +12,7 @@ from pydantic import (
     field_validator,
 )
 
-from app.core.constants import GenderEnum
+from app.core.constants import GenderEnum, ProfileStatus
 
 
 class PatientValidators:
@@ -49,7 +49,8 @@ class PatientValidators:
         return value
 
     @field_validator(
-        "date_of_birth"
+        "date_of_birth",
+        check_fields=False,
     )
     @classmethod
     def validate_dob(cls, value: date | None) -> date | None:
@@ -74,6 +75,7 @@ class PatientValidators:
         "address",
         "remarks",
         mode="before",
+        check_fields=False,
     )
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
@@ -86,6 +88,7 @@ class PatientValidators:
     @field_validator(
         "email",
         mode="before",
+        check_fields=False,
     )
     @classmethod
     def normalize_email(cls, value: str | None) -> str | None:
@@ -99,6 +102,7 @@ class PatientValidators:
         "primary_contact_number",
         "emergency_contact_number",
         mode="before",
+        check_fields=False,
     )
     @classmethod
     def normalize_phone(cls, value: str | None) -> str | None:
@@ -208,6 +212,62 @@ class PatientCreate(
 ):
     """Schema for creating a new patient. Inherits all validations from PatientBase."""
     pass
+
+
+class PatientQuickCreate(
+    PatientValidators,
+    BaseModel
+):
+    """Minimal patient creation for the phone-call workflow.
+
+    Inherits normalize_names and normalize_phone from PatientValidators.
+    Does NOT accept date_of_birth (not required during phone-call booking).
+    Gender is optional — may not be known during a phone call.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid"
+    )
+
+    first_name: str = Field(
+        min_length=2,
+        max_length=100,
+        title="First Name",
+        description="Patient's first name.",
+        examples=["Abc"],
+    )
+
+    middle_name: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        title="Middle Name",
+        description="Patient's middle name (if any).",
+        examples=["Reyes"],
+    )
+
+    last_name: str = Field(
+        min_length=2,
+        max_length=100,
+        title="Last Name",
+        description="Patient's last name or surname.",
+        examples=["Dhf"],
+    )
+
+    primary_contact_number: str = Field(
+        min_length=10,
+        max_length=15,
+        pattern=r"^\+?[0-9]{10,15}$",
+        title="Primary Contact Number",
+        description="Primary phone number. Digits only, optional leading +.",
+        examples=["+639123456789"],
+    )
+
+    gender: Optional[GenderEnum] = Field(
+        default=None,
+        title="Gender",
+        description="Patient's gender identity (optional during quick-create).",
+        examples=["male"],
+    )
 
 
 class PatientUpdate(
@@ -331,9 +391,10 @@ class PatientResponse(
         examples=["Juan Reyes Dela Cruz"],
     )
 
-    date_of_birth: date = Field(
+    date_of_birth: Optional[date] = Field(
+        default=None,
         title="Date of Birth",
-        description="Patient's date of birth.",
+        description="Patient's date of birth. Null for quick-created patients.",
         examples=["1990-05-15"],
     )
 
@@ -389,6 +450,12 @@ class PatientResponse(
         title="Is Active",
         description="Whether the patient record is currently active.",
         examples=[True],
+    )
+
+    profile_status: ProfileStatus = Field(
+        title="Profile Status",
+        description="Canonical profile lifecycle state (complete or incomplete).",
+        examples=[ProfileStatus.COMPLETE],
     )
 
     created_by: Optional[int] = Field(
@@ -469,6 +536,12 @@ class PatientListItem(
         examples=[True],
     )
 
+    profile_status: ProfileStatus = Field(
+        title="Profile Status",
+        description="Canonical profile lifecycle state.",
+        examples=[ProfileStatus.COMPLETE],
+    )
+
 
 class PatientListResponse(
     BaseModel
@@ -495,6 +568,20 @@ class PatientProfileResponse(
 ):
     """Full patient profile. Extends PatientResponse for future profile-specific fields."""
     pass
+
+
+class PatientQuickCreateResponse(BaseModel):
+    """Response for the quick-create endpoint.
+
+    Includes the newly created patient, any potential duplicate matches
+    detected at creation time (non-blocking), and human-readable warnings.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    patient: PatientResponse
+    potential_matches: list[PatientListItem]
+    warnings: list[str]
 
 
 # ======================================================================

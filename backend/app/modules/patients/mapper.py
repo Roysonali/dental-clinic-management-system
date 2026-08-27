@@ -10,6 +10,7 @@ from app.modules.patients.schemas import (
     PatientProfileResponse,
     PatientResponse,
 )
+from app.core.constants import ProfileStatus
 
 
 class PatientMapper:
@@ -114,6 +115,12 @@ class PatientMapper:
 
             is_active=patient.is_active,
 
+            profile_status=(
+                patient.profile_status
+                if patient.profile_status
+                else ProfileStatus.COMPLETE
+            ),
+
             created_by=patient.created_by,
 
             updated_by=patient.updated_by,
@@ -152,13 +159,15 @@ class PatientMapper:
                 patient.gender.value
                 if patient.gender
                 else None
-            ),
-
-            primary_contact_number=(
+            ),            primary_contact_number=(
                 patient.primary_contact_number
             ),
-
             is_active=patient.is_active,
+            profile_status=(
+                patient.profile_status
+                if patient.profile_status
+                else ProfileStatus.COMPLETE
+            ),
         )
 
     # ==========================================

@@ -18,6 +18,8 @@ from app.modules.patients.schemas import (
     PatientCreate,
     PatientListResponse,
     PatientProfileResponse,
+    PatientQuickCreate,
+    PatientQuickCreateResponse,
     PatientResponse,
     PatientSummaryResponse,
     PatientUpdate,
@@ -101,6 +103,47 @@ def create_patient(
 ) -> PatientResponse:
 
     return service.create_patient(
+        payload,
+        current_user.id,
+    )
+
+
+# ==========================================================
+# QUICK CREATE PATIENT (Phone-Call Workflow)
+# ==========================================================
+
+@router.post(
+    "/quick-create",
+    response_model=PatientQuickCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Quick Create Patient",
+    description=(
+        "Create a minimal patient record for the phone-call workflow. "
+        "Accepts only name and phone (gender optional). "
+        "Performs potential-match detection (non-blocking) and returns "
+        "warnings alongside the newly created patient. "
+        "Sets profile_status to INCOMPLETE."
+    ),
+    response_description="Newly created patient with potential matches and warnings.",
+)
+def quick_create_patient(
+    payload: PatientQuickCreate,
+
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+            ]
+        )
+    ),
+
+    service: PatientService = Depends(
+        get_patient_service
+    ),
+) -> PatientQuickCreateResponse:
+
+    return service.quick_create_patient(
         payload,
         current_user.id,
     )
