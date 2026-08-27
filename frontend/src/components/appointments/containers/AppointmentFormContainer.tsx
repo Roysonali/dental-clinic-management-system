@@ -7,6 +7,7 @@ import {
 import { useAppointment } from '../../../hooks/appointments/useAppointment';
 import { useAppointmentNames } from '../../../hooks/appointments/useAppointmentNames';
 import { useDoctors } from '../../../hooks/doctors/useDoctors';
+import { usePatient } from '../../../hooks/patients/usePatient';
 import {
   appointmentToFormValues,
   formValuesToCreatePayload,
@@ -66,6 +67,13 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
     useMemo(() => (appointment ? [appointment.patient_id] : []), [appointment]),
     useMemo(() => (appointment ? [appointment.dentist_id] : []), [appointment]),
   );
+
+  // Fetch patient details when pre-selecting from Patient Hub (create mode).
+  const prefillPatientQuery = usePatient(
+    patientId,
+    !isEdit && !!patientId && open,
+  );
+  const prefillPatient = prefillPatientQuery.data;
 
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
@@ -156,7 +164,9 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
       patientName={
         isEdit && appointment
           ? (names.data?.patientNames.get(appointment.patient_id) ?? null)
-          : null
+          : prefillPatient
+            ? `${prefillPatient.full_name} (${prefillPatient.patient_code})`
+            : null
       }
     />
   );

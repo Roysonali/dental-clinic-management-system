@@ -130,7 +130,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                 </span>
               </>
             ) : (
-              <span className="flex-1 text-neutral-400">Patient #{value}</span>
+              <span className="flex-1 text-neutral-400">Select a patient</span>
             )}
             {!disabled && (
               <button
