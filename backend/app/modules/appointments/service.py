@@ -6,6 +6,7 @@ from datetime import (
     timedelta,
     timezone,
 )
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -30,6 +31,12 @@ from app.modules.appointments.repository import (
 from app.modules.appointments.schema import (
     AppointmentCreate,
     AppointmentUpdate,
+    CalendarAppointmentResponse,
+    CalendarAppointmentListResponse,
+)
+
+from app.modules.patients.mapper import (
+    PatientMapper,
 )
 
 from app.modules.appointments.validators import (
@@ -402,7 +409,60 @@ class AppointmentService:
             )
         )
 
-    @staticmethod
+    def calendar(
+        self,
+        start: date,
+        end: date,
+        dentist_id: Optional[int] = None,
+        status: Optional[str] = None,
+    ) -> CalendarAppointmentListResponse:
+        """
+        Return appointments within a bounded date range for calendar rendering.
+
+        Range semantics: [start, end) — inclusive start, exclusive end.
+        Maximum allowed range: 90 days.
+        """
+
+        max_range_days = 90
+
+        if start >= end:
+            raise AppointmentValidationException(
+                "Invalid date range: 'start' must be before 'end'."
+            )
+
+        if (end - start).days > max_range_days:
+            raise AppointmentValidationException(
+                f"Date range exceeds maximum of {max_range_days} days."
+            )
+
+        appointments = self.repository.list_by_date_range(
+            start=start,
+            end=end,
+            dentist_id=dentist_id,
+            status=status,
+        )
+
+        items = [
+            CalendarAppointmentResponse(
+                id=apt.id,
+                appointment_number=apt.appointment_number,
+                patient_id=apt.patient_id,
+                patient_name=PatientMapper.build_full_name(apt.patient),
+                dentist_id=apt.dentist_id,
+                dentist_name=apt.dentist.full_name,
+                appointment_date=apt.appointment_date,
+                start_time=apt.start_time,
+                end_time=apt.end_time,
+                duration_minutes=apt.duration_minutes,
+                appointment_type=apt.appointment_type,
+                status=apt.status,
+                reason_for_visit=apt.reason_for_visit,
+            )
+            for apt in appointments
+        ]
+
+        return CalendarAppointmentListResponse(items=items)
+
     def _calculate_end_time(
         appointment_date: date,
         start_time: time,

@@ -1,4 +1,4 @@
-import { useState, useId, useCallback, type FC } from 'react';
+import { useState, useId, useCallback, useEffect, type FC } from 'react';
 import { Search, X, ArrowLeft, Plus, AlertTriangle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -48,6 +48,23 @@ function validateQuickCreate(values: {
   return errors;
 }
 
+/**
+ * Strip characters that are not digits or a leading +.
+ * Ensures the phone value matches the PATIENT_PHONE_PATTERN contract:
+ * ^\+?[0-9]{10,15}$
+ */
+function sanitizePhoneInput(value: string): string {
+  // Allow only digits and +
+  let cleaned = value.replace(/[^0-9+]/g, '');
+  // + may only appear at the very start — strip it otherwise
+  if (cleaned.startsWith('+')) {
+    cleaned = '+' + cleaned.slice(1).replace(/\+/g, '');
+  } else {
+    cleaned = cleaned.replace(/\+/g, '');
+  }
+  return cleaned;
+}
+
 /* ── Props ──────────────────────────────────────────────────────────── */
 
 interface PatientPickerProps {
@@ -69,6 +86,8 @@ interface PatientPickerProps {
   required?: boolean;
   /** Additional wrapper classes (e.g. grid span) */
   wrapperClassName?: string;
+  /** Notify parent when quick-create mode changes (for layout adjustments) */
+  onCreatingChange?: (creating: boolean) => void;
 }
 
 /* ── Component ──────────────────────────────────────────────────────── */
@@ -83,6 +102,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
   helperText,
   required = false,
   wrapperClassName = '',
+  onCreatingChange,
 }) => {
   const inputId = useId();
   const queryClient = useQueryClient();
@@ -108,6 +128,12 @@ export const PatientPicker: FC<PatientPickerProps> = ({
 
   /* ── T1 matches tracking (for T2 confirmation) ─────── */
   const [t1HadMatches, setT1HadMatches] = useState(false);
+
+  /* ── Notify parent when quick-create mode changes ──── */
+  const creating = mode === 'quick-create' || mode === 'confirming';
+  useEffect(() => {
+    onCreatingChange?.(creating);
+  }, [creating, onCreatingChange]);
 
   /* ── T3 warnings after creation ────────────────────── */
   const [t3Warnings, setT3Warnings] = useState<string[]>([]);
@@ -213,7 +239,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
     // Pre-fill phone from search query
     setCreateForm((prev) => ({
       ...prev,
-      primary_contact_number: prev.primary_contact_number || debouncedQuery.trim(),
+      primary_contact_number: prev.primary_contact_number || sanitizePhoneInput(debouncedQuery.trim()),
     }));
     // Track whether T1 had matches for T2 confirmation
     setT1HadMatches(results.length > 0);
@@ -447,8 +473,8 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                 )}
               </div>
 
-              {/* Row 2: Middle Name (full width) */}
-              <div className="sm:col-span-2">
+              {/* Row 2: Middle Name + Phone */}
+              <div>
                 <label htmlFor={`${inputId}-mn`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
                   Middle Name
                 </label>
@@ -461,8 +487,6 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                   placeholder="Reyes"
                 />
               </div>
-
-              {/* Row 3: Phone + Gender */}
               <div>
                 <label htmlFor={`${inputId}-phone`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
                   Phone <span className="text-danger">*</span>
@@ -470,8 +494,10 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                 <input
                   id={`${inputId}-phone`}
                   type="tel"
+                  inputMode="tel"
+                  pattern="^\+?[0-9]{10,15}$"
                   value={createForm.primary_contact_number}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, primary_contact_number: e.target.value }))}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, primary_contact_number: sanitizePhoneInput(e.target.value) }))}
                   className={`w-full rounded-lg border px-3 py-2.5 text-body transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-neutral-400 ${
                     createErrors.primary_contact_number
                       ? 'border-danger focus:ring-danger/20 focus:border-danger'
@@ -483,7 +509,9 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                   <p className="mt-1 text-caption text-danger">{createErrors.primary_contact_number}</p>
                 )}
               </div>
-              <div>
+
+              {/* Row 3: Gender (full width on sm+) */}
+              <div className="sm:col-span-2">
                 <label htmlFor={`${inputId}-gender`} className="mb-1.5 block text-body-sm font-medium text-neutral-700">
                   Gender
                 </label>
@@ -595,7 +623,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                      setCreateForm((p) => ({ ...p, primary_contact_number: debouncedQuery.trim() }));
+                      setCreateForm((p) => ({ ...p, primary_contact_number: sanitizePhoneInput(debouncedQuery.trim()) }));
                       openQuickCreate();
                     }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm font-medium text-primary-600 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:bg-primary-50"
@@ -641,7 +669,7 @@ export const PatientPicker: FC<PatientPickerProps> = ({
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                      setCreateForm((p) => ({ ...p, primary_contact_number: debouncedQuery.trim() }));
+                      setCreateForm((p) => ({ ...p, primary_contact_number: sanitizePhoneInput(debouncedQuery.trim()) }));
                       openQuickCreate();
                     }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm font-medium text-primary-600 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:bg-primary-50"

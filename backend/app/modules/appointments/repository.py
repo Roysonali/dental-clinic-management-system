@@ -5,7 +5,7 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.modules.appointments.model import Appointment
 
@@ -261,4 +261,59 @@ class AppointmentRepository:
             )
             .first()
             is not None
+        )
+
+    def list_by_date_range(
+        self,
+        start: date,
+        end: date,
+        dentist_id: Optional[int] = None,
+        status: Optional[str] = None,
+    ) -> list[Appointment]:
+        """
+        Return appointments within a bounded date range.
+
+        Range semantics: [start, end) — inclusive start, exclusive end.
+
+        Uses selectinload for patient and dentist relationships to
+        avoid N+1 queries when resolving display names.
+
+        The query uses the existing ix_appointments_date index for
+        the primary range filter, and ix_appointments_dentist_schedule
+        when filtering by dentist.
+        """
+
+        stmt = (
+            select(Appointment)
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.dentist),
+            )
+            .where(
+                Appointment.appointment_date >= start,
+                Appointment.appointment_date < end,
+            )
+        )
+
+        if dentist_id is not None:
+            stmt = stmt.where(
+                Appointment.dentist_id == dentist_id,
+            )
+
+        if status is not None:
+            stmt = stmt.where(
+                Appointment.status == status,
+            )
+
+        stmt = stmt.order_by(
+            Appointment.appointment_date.asc(),
+            Appointment.start_time.asc(),
+        )
+
+        return (
+            self.db.execute(
+                stmt
+            )
+            .scalars()
+            .all()
         )

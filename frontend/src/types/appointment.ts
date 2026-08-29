@@ -140,3 +140,46 @@ export interface EnrichedAppointment extends AppointmentResponse {
   patient_name: string | null;
   dentist_name: string | null;
 }
+
+/* ── Calendar types ─────────────────────────────────────────────── */
+
+/**
+ * Single calendar appointment (CalendarAppointmentResponse schema).
+ * Returned by GET /appointments/calendar — includes pre-resolved patient and
+ * dentist display names so the calendar avoids N+1 API calls.
+ *
+ * Time fields are `HH:MM:SS` (24h) strings; `appointment_date` is `YYYY-MM-DD`.
+ * All times represent clinic wall-clock time (no timezone conversion).
+ */
+export interface CalendarAppointmentResponse {
+  id: string;
+  appointment_number: string;
+  patient_id: string;
+  patient_name: string;
+  dentist_id: number;
+  dentist_name: string;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  appointment_type: AppointmentType;
+  status: AppointmentStatus;
+  reason_for_visit: string;
+}
+
+/** Calendar list response (CalendarAppointmentListResponse schema). */
+export interface CalendarAppointmentListResponse {
+  items: CalendarAppointmentResponse[];
+}
+
+/** Query parameters for GET /appointments/calendar. */
+export interface CalendarAppointmentParams {
+  /** Inclusive start date (YYYY-MM-DD) */
+  start: string;
+  /** Exclusive end date (YYYY-MM-DD) */
+  end: string;
+  /** Optional dentist ID filter */
+  dentist_id?: number;
+  /** Optional status filter (AppointmentStatus value) */
+  status?: AppointmentStatus;
+}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import List
-
 from uuid import UUID
 
 from fastapi import (
@@ -18,6 +18,10 @@ from app.database.session import (
     get_db,
 )
 
+from app.modules.appointments.enums import (
+    AppointmentStatus,
+)
+
 from app.modules.appointments.exceptions import (
     AppointmentConflictException,
     AppointmentNotFoundException,
@@ -30,6 +34,7 @@ from app.modules.appointments.schema import (
     AppointmentListResponse,
     AppointmentResponse,
     AppointmentUpdate,
+    CalendarAppointmentListResponse,
 )
 
 from app.modules.appointments.service import (
@@ -213,6 +218,58 @@ def get_today_appointments(
 
 
 @router.get(
+    "/calendar",
+    response_model=CalendarAppointmentListResponse,
+)
+def get_calendar_appointments(
+    start: date = Query(
+        ...,
+        description="Start date (inclusive)",
+    ),
+    end: date = Query(
+        ...,
+        description="End date (exclusive)",
+    ),
+    dentist_id: int | None = Query(
+        default=None,
+        gt=0,
+        description="Optional dentist ID filter",
+    ),
+    status_filter: AppointmentStatus | None = Query(
+        default=None,
+        alias="status",
+        description="Optional status filter",
+    ),
+    service: AppointmentService = Depends(
+        get_service,
+    ),
+    current_user: User = Depends(
+        require_roles(
+            [
+                ROLE_ADMIN,
+                ROLE_RECEPTIONIST,
+                *DOCTOR_ROLES,
+            ]
+        ),
+    ),
+):
+
+    try:
+
+        return service.calendar(
+            start=start,
+            end=end,
+            dentist_id=dentist_id,
+            status=status_filter.value if status_filter else None,
+        )
+
+    except Exception as exc:
+        _handle_service_exception(
+            exc,
+        )
+
+
+@router.get(
     "/{appointment_id}",
     response_model=AppointmentResponse,
 )
@@ -266,7 +323,6 @@ def update_appointment(
 ):
 
     try:
-
         appointment = service.get(
             appointment_id,
         )
@@ -304,7 +360,6 @@ def cancel_appointment(
 ):
 
     try:
-
         appointment = service.get(
             appointment_id,
         )
@@ -318,4 +373,3 @@ def cancel_appointment(
         _handle_service_exception(
             exc,
         )
-

@@ -157,3 +157,51 @@ class AppointmentListResponse(BaseModel):
     total: int
 
     items: list[AppointmentResponse]
+
+
+class CalendarAppointmentResponse(BaseModel):
+    """
+    Single calendar appointment response.
+
+    Optimized for calendar rendering — includes patient and dentist
+    display names resolved via JOINs, and excludes audit fields
+    not needed by the calendar UI.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    id: UUID
+
+    appointment_number: str
+
+    patient_id: UUID
+
+    patient_name: str
+
+    dentist_id: int
+
+    dentist_name: str
+
+    appointment_date: date
+
+    start_time: time
+
+    end_time: time
+
+    duration_minutes: int
+
+    appointment_type: AppointmentType
+
+    status: AppointmentStatus
+
+    reason_for_visit: str
+
+
+class CalendarAppointmentListResponse(BaseModel):
+    """
+    Calendar list response.
+    """
+
+    items: list[CalendarAppointmentResponse]

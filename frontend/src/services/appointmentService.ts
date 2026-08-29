@@ -5,6 +5,8 @@ import type {
   AppointmentListResponse,
   AppointmentResponse,
   AppointmentUpdatePayload,
+  CalendarAppointmentListResponse,
+  CalendarAppointmentParams,
 } from '../types/appointment';
 
 /**
@@ -71,6 +73,12 @@ export const appointmentService = {
   /** PATCH /appointments/{id}/cancel */
   async cancel(id: string): Promise<AppointmentResponse> {
     const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/cancel`);
+    return data;
+  },
+
+  /** GET /appointments/calendar?start=&end=&dentist_id=&status= */
+  async calendar(params: CalendarAppointmentParams): Promise<CalendarAppointmentListResponse> {
+    const { data } = await api.get<CalendarAppointmentListResponse>('/appointments/calendar', { params });
     return data;
   },
 };

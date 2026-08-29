@@ -375,4 +375,57 @@ describe('PatientPicker', () => {
     const payload = quickCreateMock.mock.calls[0][0] as unknown as Record<string, unknown>;
     expect(payload.gender).toBe('female');
   });
+
+  // ── Phone input sanitization tests ──────────────────────
+
+  it('strips alphabetic characters from phone input', async () => {
+    await openQuickCreate('9999999999');
+    const phoneInput = screen.getByLabelText('Phone *') as HTMLInputElement;
+
+    fireEvent.change(phoneInput, { target: { value: 'abc1234567' } });
+    expect(phoneInput.value).toBe('1234567');
+  });
+
+  it('strips special characters from phone input', async () => {
+    await openQuickCreate('9999999999');
+    const phoneInput = screen.getByLabelText('Phone *') as HTMLInputElement;
+
+    fireEvent.change(phoneInput, { target: { value: '98-765-43210' } });
+    expect(phoneInput.value).toBe('9876543210');
+  });
+
+  it('allows leading + and strips subsequent + signs', async () => {
+    await openQuickCreate('9999999999');
+    const phoneInput = screen.getByLabelText('Phone *') as HTMLInputElement;
+
+    fireEvent.change(phoneInput, { target: { value: '+919876543210' } });
+    expect(phoneInput.value).toBe('+919876543210');
+
+    fireEvent.change(phoneInput, { target: { value: '++919876543210' } });
+    expect(phoneInput.value).toBe('+919876543210');
+  });
+
+  it('rejects + not at start', async () => {
+    await openQuickCreate('9999999999');
+    const phoneInput = screen.getByLabelText('Phone *') as HTMLInputElement;
+
+    fireEvent.change(phoneInput, { target: { value: '91+9876543210' } });
+    expect(phoneInput.value).toBe('919876543210');
+  });
+
+  it('handles paste of mixed invalid content', async () => {
+    await openQuickCreate('9999999999');
+    const phoneInput = screen.getByLabelText('Phone *') as HTMLInputElement;
+
+    fireEvent.change(phoneInput, { target: { value: 'abc+919876xyz' } });
+    expect(phoneInput.value).toBe('+919876');
+  });
+
+  it('uses type tel and inputMode tel for phone field', async () => {
+    await openQuickCreate('9999999999');
+    const phoneInput = screen.getByLabelText('Phone *') as HTMLInputElement;
+
+    expect(phoneInput.type).toBe('tel');
+    expect(phoneInput.inputMode).toBe('tel');
+  });
 });

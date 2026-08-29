@@ -51,12 +51,12 @@ const appointment: AppointmentResponse = {
   updated_at: '2026-07-07T08:00:00Z',
 };
 
-function renderDetails() {
+function renderDetails(route: string = '/appointments/a1') {
   return renderWithProviders(
     <Routes>
       <Route path="/appointments/:appointmentId" element={<AppointmentDetailsContainer />} />
     </Routes>,
-    { route: '/appointments/a1' },
+    { route },
   );
 }
 
@@ -116,12 +116,25 @@ describe('AppointmentDetailsContainer', () => {
     });
   });
 
-  it('renders a back link to the appointments list', async () => {
+  it('renders a back link to the appointments list by default', async () => {
     getMock.mockResolvedValue(appointment);
     renderDetails();
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /Back to Appointments/ })).toBeInTheDocument();
+      const backLink = screen.getByRole('link', { name: /Back to Appointments/ });
+      expect(backLink).toBeInTheDocument();
+      expect(backLink).toHaveAttribute('href', '/appointments');
+    });
+  });
+
+  it('renders a back link to the calendar when opened from calendar', async () => {
+    getMock.mockResolvedValue(appointment);
+    renderDetails('/appointments/a1?from=calendar');
+
+    await waitFor(() => {
+      const backLink = screen.getByRole('link', { name: /Back to Appointments/ });
+      expect(backLink).toBeInTheDocument();
+      expect(backLink).toHaveAttribute('href', '/appointments/calendar');
     });
   });
 
