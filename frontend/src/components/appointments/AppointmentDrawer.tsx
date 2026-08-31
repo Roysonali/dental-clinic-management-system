@@ -6,6 +6,7 @@ import { Icon } from '../common/Icon/Icon';
 import { AppointmentForm } from './AppointmentForm';
 import { Spinner } from '../common/Spinner/Spinner';
 import type { AppointmentFormValues } from '../../types/appointment';
+import type { DoctorResponse } from '../../types/doctor';
 
 interface AppointmentDrawerProps {
   /** Open state */
@@ -38,6 +39,8 @@ interface AppointmentDrawerProps {
   patientEditable: boolean;
   /** Patient display name for the fixed-patient label (edit mode) */
   patientName?: string | null;
+  /** Full doctor records for date-specific availability checking */
+  doctorListItems?: DoctorResponse[];
 }
 
 /**
@@ -63,6 +66,7 @@ export const AppointmentDrawer: FC<AppointmentDrawerProps> = ({
   dentistsError = false,
   patientEditable,
   patientName,
+  doctorListItems,
 }) => {
   const title = mode === 'edit' ? 'Edit Appointment' : 'New Appointment';
   const submitText = mode === 'edit' ? 'Save Changes' : 'Schedule Appointment';
@@ -112,6 +116,7 @@ export const AppointmentDrawer: FC<AppointmentDrawerProps> = ({
             dentistsError={dentistsError}
             patientEditable={patientEditable}
             patientName={patientName}
+            doctorListItems={doctorListItems}
           />
         )}
       </Drawer.Body>

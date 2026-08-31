@@ -13,6 +13,7 @@ import { DoctorDetailsPage } from '../pages/doctors/DoctorDetailsPage';
 import { UserListPage } from '../pages/users/UserListPage';
 import { UserDetailsPage } from '../pages/users/UserDetailsPage';
 import { AppointmentListPage } from '../pages/appointments/AppointmentListPage';
+import { AppointmentCalendarPage } from '../pages/appointments/AppointmentCalendarPage';
 import { AppointmentDetailsPage } from '../pages/appointments/AppointmentDetailsPage';
 import { PendingUsersPage } from '../pages/admin/PendingUsersPage';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -205,6 +206,10 @@ const AppRouter = () => {
             <Route
               path={ROUTES.APPOINTMENTS}
               element={<AppointmentListPage />}
+            />
+            <Route
+              path={ROUTES.APPOINTMENTS_CALENDAR}
+              element={<AppointmentCalendarPage />}
             />
             <Route
               path={`${ROUTES.APPOINTMENTS}/:appointmentId`}

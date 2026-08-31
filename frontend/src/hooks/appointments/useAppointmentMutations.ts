@@ -4,6 +4,7 @@ import { appointmentQueryKeys } from './useAppointments';
 import type {
   AppointmentCreatePayload,
   AppointmentResponse,
+  AppointmentStatus,
   AppointmentUpdatePayload,
 } from '../../types/appointment';
 
@@ -46,6 +47,17 @@ export function useCancelAppointment() {
   const queryClient = useQueryClient();
   return useMutation<AppointmentResponse, Error, string>({
     mutationFn: (id) => appointmentService.cancel(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.all });
+    },
+  });
+}
+
+/** PATCH /appointments/{id}/status — transition appointment status. */
+export function useUpdateAppointmentStatus() {
+  const queryClient = useQueryClient();
+  return useMutation<AppointmentResponse, Error, { id: string; status: AppointmentStatus }>({
+    mutationFn: ({ id, status }) => appointmentService.updateStatus(id, status),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.all });
     },

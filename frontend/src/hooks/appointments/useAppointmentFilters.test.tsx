@@ -13,6 +13,33 @@ describe('useAppointmentFilters', () => {
     expect(result.current.params).toEqual({ skip: 0, limit: 20 });
   });
 
+  it('includes search in params when set', async () => {
+    const { result } = renderHook(() => useAppointmentFilters());
+
+    act(() => result.current.setSearchInput('toothache'));
+    // Wait for debounce
+    await waitFor(() => expect(result.current.debouncedSearch).toBe('toothache'));
+
+    expect(result.current.params).toEqual({ skip: 0, limit: 20, search: 'toothache' });
+  });
+
+  it('includes status in params when not all', () => {
+    const { result } = renderHook(() => useAppointmentFilters());
+
+    act(() => result.current.setStatus('Confirmed'));
+
+    expect(result.current.params).toEqual({ skip: 0, limit: 20, status: 'Confirmed' });
+  });
+
+  it('omits search and status from params when defaults', () => {
+    const { result } = renderHook(() => useAppointmentFilters());
+
+    // Defaults: no search, status='all' — these should NOT appear in params
+    expect(result.current.params).toEqual({ skip: 0, limit: 20 });
+    expect(result.current.params).not.toHaveProperty('search');
+    expect(result.current.params).not.toHaveProperty('status');
+  });
+
   it('computes skip/limit from page and page size', () => {
     const { result } = renderHook(() => useAppointmentFilters());
 

@@ -20,6 +20,7 @@ export const ROUTES = {
   DOCTORS: '/doctors',
   USERS: '/users',
   APPOINTMENTS: '/appointments',
+  APPOINTMENTS_CALENDAR: '/appointments/calendar',
   TREATMENT_PLANS: '/treatment-plans',
   PROCEDURES: '/procedures',
   PATIENT_RECORDS: '/patient-records',

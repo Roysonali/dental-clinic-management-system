@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays } from 'lucide-react';
 import { AppointmentStatusBadge } from './AppointmentStatusBadge';
 import { Badge } from '../common/Badge/Badge';
@@ -24,10 +24,14 @@ export const AppointmentDetailsHeader: FC<AppointmentDetailsHeaderProps> = ({
   appointment,
   actions,
 }) => {
+  const [searchParams] = useSearchParams();
+  const fromCalendar = searchParams.get('from') === 'calendar';
+  const backTo = fromCalendar ? ROUTES.APPOINTMENTS_CALENDAR : ROUTES.APPOINTMENTS;
+
   return (
     <div>
       <Link
-        to={ROUTES.APPOINTMENTS}
+        to={backTo}
         className="mb-4 inline-flex items-center gap-1.5 text-body-sm font-medium text-neutral-500 transition-colors duration-150 hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
       >
         <ArrowLeft size={16} aria-hidden="true" />

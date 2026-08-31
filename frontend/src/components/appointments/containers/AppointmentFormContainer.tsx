@@ -28,6 +28,8 @@ interface AppointmentFormContainerProps {
   appointmentId?: string | null;
   /** Patient id to pre-fill when creating from a patient context */
   patientId?: string | null;
+  /** Optional form field pre-fill values (e.g. date/time from calendar click). Merged with patientId pre-fill. */
+  initialFormValues?: Partial<AppointmentFormValues>;
   /** Called to close the drawer */
   onClose: () => void;
   /** Called after a successful create (e.g. to navigate to the new record) */
@@ -46,6 +48,7 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
   mode,
   appointmentId,
   patientId,
+  initialFormValues,
   onClose,
   onCreated,
 }) => {
@@ -151,9 +154,10 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
       initialValues={
         appointment
           ? appointmentToFormValues(appointment)
-          : patientId
-            ? { patient_id: patientId }
-            : undefined
+          : {
+              ...(patientId ? { patient_id: patientId } : {}),
+              ...initialFormValues,
+            }
       }
       serverMessage={serverMessage}
       serverErrors={serverErrors}
@@ -168,6 +172,7 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
             ? `${prefillPatient.full_name} (${prefillPatient.patient_code})`
             : null
       }
+      doctorListItems={doctorsQuery.data?.items ?? []}
     />
   );
 };

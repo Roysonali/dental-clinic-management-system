@@ -16,6 +16,7 @@ vi.mock('../../../services/appointmentService', () => ({
     update: vi.fn(),
     cancel: vi.fn(),
     today: vi.fn(),
+    updateStatus: vi.fn(),
   },
 }));
 
@@ -45,18 +46,20 @@ const appointment: AppointmentResponse = {
   status: 'Scheduled',
   reason_for_visit: 'Toothache on upper right molar',
   notes: 'Patient prefers morning slots.',
+  patient_name: 'Juan Dela Cruz',
+  dentist_name: 'Dr. Jose Rizal',
   created_by: 1,
   updated_by: null,
   created_at: '2026-07-07T08:00:00Z',
   updated_at: '2026-07-07T08:00:00Z',
 };
 
-function renderDetails() {
+function renderDetails(route: string = '/appointments/a1') {
   return renderWithProviders(
     <Routes>
       <Route path="/appointments/:appointmentId" element={<AppointmentDetailsContainer />} />
     </Routes>,
-    { route: '/appointments/a1' },
+    { route },
   );
 }
 
@@ -109,19 +112,30 @@ describe('AppointmentDetailsContainer', () => {
     expect(screen.getByText('Appointment Details')).toBeInTheDocument();
     expect(screen.getByText('Toothache on upper right molar')).toBeInTheDocument();
     expect(screen.getByText('Patient prefers morning slots.')).toBeInTheDocument();
-    // Names resolve best-effort via the enrichment query — wait for them.
-    await waitFor(() => {
-      expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument();
-      expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument();
-    });
+    // Names are now returned directly from the backend response.
+    expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument();
+    expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument();
   });
 
-  it('renders a back link to the appointments list', async () => {
+  it('renders a back link to the appointments list by default', async () => {
     getMock.mockResolvedValue(appointment);
     renderDetails();
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /Back to Appointments/ })).toBeInTheDocument();
+      const backLink = screen.getByRole('link', { name: /Back to Appointments/ });
+      expect(backLink).toBeInTheDocument();
+      expect(backLink).toHaveAttribute('href', '/appointments');
+    });
+  });
+
+  it('renders a back link to the calendar when opened from calendar', async () => {
+    getMock.mockResolvedValue(appointment);
+    renderDetails('/appointments/a1?from=calendar');
+
+    await waitFor(() => {
+      const backLink = screen.getByRole('link', { name: /Back to Appointments/ });
+      expect(backLink).toBeInTheDocument();
+      expect(backLink).toHaveAttribute('href', '/appointments/calendar');
     });
   });
 
@@ -186,5 +200,134 @@ describe('AppointmentDetailsContainer', () => {
     expect(
       screen.queryByRole('button', { name: 'Cancel Appointment' }),
     ).not.toBeInTheDocument();
+  });
+
+  // ── Lifecycle action visibility tests ──────────────────────────────
+
+  it('does NOT render a generic "Cancelled" button for Scheduled appointments', async () => {
+    getMock.mockResolvedValue(appointment); // status: Scheduled
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    // Should NOT have a plain "Cancelled" button
+    expect(
+      screen.queryByRole('button', { name: /^Cancelled$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders dedicated "Cancel Appointment" for Scheduled appointments', async () => {
+    getMock.mockResolvedValue(appointment); // status: Scheduled
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('button', { name: 'Cancel Appointment' }),
+    ).toBeInTheDocument();
+  });
+
+  it('Scheduled shows Confirm and No Show but not Check In', async () => {
+    getMock.mockResolvedValue(appointment); // status: Scheduled
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    // Scheduled → Confirmed shows "Confirm" label
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
+    // Scheduled → No Show shows "Mark No Show"
+    expect(screen.getByRole('button', { name: 'Mark No Show' })).toBeInTheDocument();
+    // "Check In" is NOT valid from Scheduled (only from Confirmed)
+    expect(
+      screen.queryByRole('button', { name: 'Check In' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('Confirmed shows Check In and Mark No Show', async () => {
+    getMock.mockResolvedValue({ ...appointment, status: 'Confirmed' });
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Check In' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark No Show' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel Appointment' })).toBeInTheDocument();
+    // Confirm is NOT valid from Confirmed
+    expect(
+      screen.queryByRole('button', { name: 'Confirm' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('Checked In shows Start Treatment only', async () => {
+    getMock.mockResolvedValue({ ...appointment, status: 'Checked In' });
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Start Treatment' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel Appointment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check In' })).not.toBeInTheDocument();
+  });
+
+  it('In Treatment shows Complete only', async () => {
+    getMock.mockResolvedValue({ ...appointment, status: 'In Treatment' });
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Complete' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Treatment' })).not.toBeInTheDocument();
+  });
+
+  it('Completed has no lifecycle actions and no Edit', async () => {
+    getMock.mockResolvedValue({ ...appointment, status: 'Completed' });
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel Appointment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('Cancelled has no lifecycle actions and no Edit', async () => {
+    getMock.mockResolvedValue({ ...appointment, status: 'Cancelled' });
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel Appointment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('No Show has no lifecycle actions and no Edit', async () => {
+    getMock.mockResolvedValue({ ...appointment, status: 'No Show' });
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel Appointment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('Edit button shows for non-terminal statuses', async () => {
+    getMock.mockResolvedValue(appointment); // status: Scheduled
+    renderDetails();
+
+    await waitFor(() => {
+      expect(screen.getByText('Appointment Details')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 });

@@ -21,7 +21,6 @@ from uuid import UUID
 
 from app.modules.doctors.constants import (
     ERR_SCHEDULE_CROSS_DOCTOR,
-    ERR_SCHEDULE_DUPLICATE_DAY,
     ERR_SCHEDULE_END_BEFORE_START,
     ERR_SCHEDULE_MAX_EXCEEDED,
     MAX_SCHEDULE_ENTRIES_PER_DOCTOR,
@@ -43,7 +42,7 @@ class ScheduleValidator:
     Example usage::
 
         ScheduleValidator.assert_time_ordering(payload.start_time, payload.end_time)
-        ScheduleValidator.assert_weekday_unique(sched_repo, doctor_id, payload.day_of_week)
+        ScheduleValidator.assert_no_session_overlap(sessions)
     """
 
     # ==================================================================
@@ -65,34 +64,36 @@ class ScheduleValidator:
             raise InvalidDoctorOperation(ERR_SCHEDULE_END_BEFORE_START)
 
     # ==================================================================
-    # Weekday Uniqueness
+    # Session Overlap Detection
     # ==================================================================
 
     @staticmethod
-    def assert_weekday_unique(
-        schedule_repo: ScheduleRepositoryProtocol,
-        doctor_id: UUID,
-        day_of_week: int,
-        exclude_schedule_id: Optional[UUID] = None,
+    def assert_no_session_overlap(
+        sessions: list[tuple[time, time]],
     ) -> None:
-        """Verify that no schedule entry already exists for this weekday.
+        """Verify that no two sessions overlap.
+
+        Sessions may share the same day; this checks that their
+        time ranges do not intersect.
 
         Args:
-            schedule_repo: Repository with a ``get_schedule_for_day(
-                doctor_id, day_of_week)`` method returning an optional
-                ``DoctorSchedule``.
-            doctor_id: UUID of the doctor.
-            day_of_week: Target day (0=Monday through 5=Saturday).
-            exclude_schedule_id: Optional schedule ID to exclude from
-                the check (for updates).
+            sessions: List of (start, end) tuples.
 
         Raises:
-            InvalidDoctorOperation: If the day already has a schedule entry.
+            InvalidDoctorOperation: If any two sessions overlap.
         """
-        existing = schedule_repo.get_schedule_for_day(doctor_id, day_of_week)
-        if existing is not None:
-            if exclude_schedule_id is None or existing.id != exclude_schedule_id:
-                raise InvalidDoctorOperation(ERR_SCHEDULE_DUPLICATE_DAY)
+        for i, (s1_start, s1_end) in enumerate(sessions):
+            for s2_start, s2_end in sessions[i + 1:]:
+                if s1_start < s2_end and s2_start < s1_end:
+                    raise InvalidDoctorOperation(
+                        (
+                            f"Schedule sessions overlap: "
+                            f"{s1_start.strftime('%H:%M')}-"
+                            f"{s1_end.strftime('%H:%M')} and "
+                            f"{s2_start.strftime('%H:%M')}-"
+                            f"{s2_end.strftime('%H:%M')}."
+                        )
+                    )
 
     # ==================================================================
     # Ownership Validation
@@ -145,21 +146,24 @@ class ScheduleValidator:
     def validate_replace_list(schedules: list[ScheduleCreate]) -> None:
         """Validate a complete replacement schedule list.
 
-        Checks both time ordering and duplicate day conflicts within
-        the input list (does **not** query the database).  The caller
-        is responsible for checking the database-level weekday
-        uniqueness separately.
+        Checks time ordering and detects overlapping sessions for
+        the same day.  Multiple sessions per day are allowed
+        (split shifts) as long as they don't overlap.
 
         Args:
             schedules: List of ``ScheduleCreate`` entries to validate.
 
         Raises:
             InvalidDoctorOperation: If any entry has ``end_time <= start_time``.
-            InvalidDoctorOperation: If any two entries share the same day.
+            InvalidDoctorOperation: If sessions on the same day overlap.
         """
-        seen_days: set[int] = set()
+        # Group sessions by day
+        day_sessions: dict[int, list[tuple[time, time]]] = {}
         for entry in schedules:
             ScheduleValidator.assert_time_ordering(entry.start_time, entry.end_time)
-            if entry.day_of_week in seen_days:
-                raise InvalidDoctorOperation(ERR_SCHEDULE_DUPLICATE_DAY)
-            seen_days.add(entry.day_of_week)
+            day_sessions.setdefault(entry.day_of_week, []).append(
+                (entry.start_time, entry.end_time),
+            )
+        # Check overlap within each day
+        for _day, sessions in day_sessions.items():
+            ScheduleValidator.assert_no_session_overlap(sessions)

@@ -12,6 +12,8 @@ import {
   APPOINTMENT_TYPE_OPTIONS,
 } from '../../constants/appointment';
 import type { AppointmentFormValues } from '../../types/appointment';
+import type { DoctorResponse } from '../../types/doctor';
+import { useDoctorAvailabilityCheck } from '../../hooks/doctors/useDoctorAvailabilityCheck';
 
 /* ── Zod schema — mirrors backend AppointmentCreate/Update + constants ─ */
 
@@ -119,6 +121,12 @@ interface AppointmentFormProps {
   patientEditable: boolean;
   /** Patient display name for the fixed-patient label (edit mode) */
   patientName?: string | null;
+  /** Whether the PatientPicker is in quick-create mode (for full-width layout) */
+  creatingPatient?: boolean;
+  /** Callback when PatientPicker enters/leaves quick-create mode */
+  onCreatingPatientChange?: (creating: boolean) => void;
+  /** Full doctor records for date-specific availability checking */
+  doctorListItems?: DoctorResponse[];
 }
 
 const DURATION_OPTIONS = APPOINTMENT_DURATION_OPTIONS.map((d) => ({
@@ -152,11 +160,15 @@ export const AppointmentForm: FC<AppointmentFormProps> = ({
   dentistsError = false,
   patientEditable,
   patientName,
+  creatingPatient = false,
+  onCreatingPatientChange,
+  doctorListItems = [],
 }) => {
   const {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
   } = useForm<AppointmentFormValues>({
     resolver: zodResolver(appointmentFormSchema),
@@ -178,6 +190,17 @@ export const AppointmentForm: FC<AppointmentFormProps> = ({
   const fieldError = (field: keyof AppointmentFormValues) =>
     errors[field]?.message ?? serverErrors[field];
 
+  // Watch dentist and date for proactive availability checking.
+  const watchedDentistId = watch('dentist_id');
+  const watchedDate = watch('appointment_date');
+
+  const { availabilityWarning, isLoading: availabilityLoading } =
+    useDoctorAvailabilityCheck(
+      watchedDentistId || null,
+      watchedDate || '',
+      doctorListItems,
+    );
+
   return (
     <div className="flex flex-col gap-4">
       {serverMessage && (
@@ -188,8 +211,8 @@ export const AppointmentForm: FC<AppointmentFormProps> = ({
 
       <ValidationSummary errors={errors} title="Please review the following fields:" />
 
-      <Form grid columns={2} spacing="md" onSubmit={handleSubmit(onSubmit)}>
-        {/* ── Schedule ──────────────────────────────────────── */}
+      <Form grid={!creatingPatient} columns={2} spacing="md" onSubmit={handleSubmit(onSubmit)}>
+        {/* ── Patient field (always rendered) ──────────────── */}
         <Controller
           control={control}
           name="patient_id"
@@ -206,108 +229,125 @@ export const AppointmentForm: FC<AppointmentFormProps> = ({
                   : undefined
               }
               required
-              wrapperClassName="md:col-span-2"
+              wrapperClassName={creatingPatient ? '' : 'md:col-span-2'}
+              onCreatingChange={onCreatingPatientChange}
             />
           )}
         />
-        {dentistsError && (
-          <div
-            role="alert"
-            className="rounded-lg border border-warning/30 bg-warning/10 p-3 md:col-span-2"
-          >
-            <p className="text-body-sm text-warning">
-              The dentist list couldn&apos;t be loaded — this requires Admin or
-              Receptionist access. If you&apos;re booking for yourself, ask a
-              receptionist to schedule the appointment, or try again later.
-            </p>
-          </div>
+
+        {/* ── Remaining fields hidden during quick-create ─── */}
+        {!creatingPatient && (
+          <>
+            {dentistsError && (
+              <div
+                role="alert"
+                className="rounded-lg border border-warning/30 bg-warning/10 p-3 md:col-span-2"
+              >
+                <p className="text-body-sm text-warning">
+                  The dentist list couldn&apos;t be loaded — this requires Admin or
+                  Receptionist access. If you&apos;re booking for yourself, ask a
+                  receptionist to schedule the appointment, or try again later.
+                </p>
+              </div>
+            )}
+            {availabilityWarning && !availabilityLoading && (
+              <div
+                role="status"
+                className="rounded-lg border border-warning/30 bg-warning/10 p-3 md:col-span-2"
+              >
+                <p className="text-body-sm text-warning">
+                  ⚠ {availabilityWarning}
+                </p>
+              </div>
+            )}
+            <Select
+              label="Dentist"
+              required
+              placeholder={
+                dentistsLoading ? 'Loading dentists…' : 'Select dentist'
+              }
+              disabled={disabled || dentistsLoading}
+              options={dentistOptions}
+              error={fieldError('dentist_id')}
+              {...register('dentist_id')}
+            />
+            <Select
+              label="Appointment Type"
+              required
+              placeholder="Select type"
+              disabled={disabled}
+              options={TYPE_OPTIONS}
+              error={fieldError('appointment_type')}
+              {...register('appointment_type')}
+            />
+            <Controller
+              control={control}
+              name="appointment_date"
+              render={({ field }) => (
+                <DatePicker
+                  label="Appointment Date"
+                  required
+                  disabled={disabled}
+                  error={fieldError('appointment_date')}
+                  value={field.value}
+                  onChange={field.onChange}
+                  minDate={todayLocalISO()}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="start_time"
+              render={({ field }) => (
+                <TimePicker
+                  label="Start Time"
+                  required
+                  disabled={disabled}
+                  error={fieldError('start_time')}
+                  value={field.value}
+                  onChange={field.onChange}
+                  stepMinutes={15}
+                  format="12h"
+                />
+              )}
+            />
+            <Select
+              label="Duration"
+              required
+              placeholder="Select duration"
+              disabled={disabled}
+              options={DURATION_OPTIONS}
+              error={fieldError('duration_minutes')}
+              {...register('duration_minutes')}
+            />
+
+            {/* ── Details ─────────────────────────────────────── */}
+            <Textarea
+              label="Reason for Visit"
+              placeholder="e.g. Toothache on upper right molar, 2 weeks"
+              required
+              disabled={disabled}
+              className="md:col-span-2"
+              error={fieldError('reason_for_visit')}
+              {...register('reason_for_visit')}
+            />
+            <Textarea
+              label="Notes"
+              placeholder="Additional instructions for the clinic staff…"
+              disabled={disabled}
+              className="md:col-span-2"
+              error={fieldError('notes')}
+              {...register('notes')}
+            />
+
+            <FormActions
+              onCancel={onCancel}
+              submitting={submitting}
+              submitText={submitText}
+              className="md:col-span-2"
+            />
+          </>
         )}
-        <Select
-          label="Dentist"
-          required
-          placeholder={
-            dentistsLoading ? 'Loading dentists…' : 'Select dentist'
-          }
-          disabled={disabled || dentistsLoading}
-          options={dentistOptions}
-          error={fieldError('dentist_id')}
-          {...register('dentist_id')}
-        />
-        <Select
-          label="Appointment Type"
-          required
-          placeholder="Select type"
-          disabled={disabled}
-          options={TYPE_OPTIONS}
-          error={fieldError('appointment_type')}
-          {...register('appointment_type')}
-        />
-        <Controller
-          control={control}
-          name="appointment_date"
-          render={({ field }) => (
-            <DatePicker
-              label="Appointment Date"
-              required
-              disabled={disabled}
-              error={fieldError('appointment_date')}
-              value={field.value}
-              onChange={field.onChange}
-              minDate={todayLocalISO()}
-            />
-          )}
-        />
-        <Controller
-          control={control}
-          name="start_time"
-          render={({ field }) => (
-            <TimePicker
-              label="Start Time"
-              required
-              disabled={disabled}
-              error={fieldError('start_time')}
-              value={field.value}
-              onChange={field.onChange}
-              stepMinutes={15}
-              format="12h"
-            />
-          )}
-        />
-        <Select
-          label="Duration"
-          required
-          placeholder="Select duration"
-          disabled={disabled}
-          options={DURATION_OPTIONS}
-          error={fieldError('duration_minutes')}
-          {...register('duration_minutes')}
-        />
-
-        {/* ── Details ─────────────────────────────────────────── */}
-        <Textarea
-          label="Reason for Visit"
-          placeholder="e.g. Toothache on upper right molar, 2 weeks"
-          required
-          disabled={disabled}
-          className="md:col-span-2"
-          error={fieldError('reason_for_visit')}
-          {...register('reason_for_visit')}
-        />
-        <Textarea
-          label="Notes"
-          placeholder="Additional instructions for the clinic staff…"
-          disabled={disabled}
-          className="md:col-span-2"
-          error={fieldError('notes')}
-          {...register('notes')}
-        />
-
-        <FormActions
-          onCancel={onCancel}
-          submitting={submitting}
-          submitText={submitText}
-          className="md:col-span-2"
-        />
       </Form>
     </div>
   );

@@ -11,10 +11,8 @@ import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { APPOINTMENT_PAGE_SIZE_OPTIONS } from '../../../constants/appointment';
 import { useAppointments } from '../../../hooks/appointments/useAppointments';
 import { useAppointmentFilters } from '../../../hooks/appointments/useAppointmentFilters';
-import { useAppointmentNames } from '../../../hooks/appointments/useAppointmentNames';
 import { useCancelAppointment } from '../../../hooks/appointments/useAppointmentMutations';
 import { apiErrorMessage, parseApiError } from '../../../services/apiError';
-import { formatISODate, formatTimeRange } from '../../../utils/date';
 import { ROUTES, CREATE_QUERY_PARAM } from '../../../routes/routes';
 import type { EnrichedAppointment } from '../../../types/appointment';
 
@@ -54,61 +52,31 @@ export const AppointmentListContainer: FC = () => {
     [appointmentsQuery.data?.items],
   );
 
-  const patientIds = useMemo(
-    () => Array.from(new Set(items.map((a) => a.patient_id))).sort(),
-    [items],
-  );
-  const dentistIds = useMemo(
-    () => Array.from(new Set(items.map((a) => a.dentist_id))).sort((a, b) => a - b),
-    [items],
-  );
-
-  const names = useAppointmentNames(patientIds, dentistIds);
-
+  // Backend now returns patient_name and dentist_name via eager-loaded
+  // relationships, eliminating N+1 API calls. Map them into EnrichedAppointment.
   const enriched = useMemo<EnrichedAppointment[]>(
     () =>
       items.map((a) => ({
         ...a,
-        patient_name: names.data?.patientNames.get(a.patient_id) ?? null,
-        dentist_name: names.data?.dentistNames.get(a.dentist_id) ?? null,
+        patient_name: a.patient_name ?? null,
+        dentist_name: a.dentist_name ?? null,
       })),
-    [items, names.data],
+    [items],
   );
 
-  /* ── Client-side search + status filtering (backend has no filter params) ── */
-  const visibleRows = useMemo(() => {
-    const query = filters.debouncedSearch.trim().toLowerCase();
-    return enriched.filter((a) => {
-      if (filters.status !== 'all' && a.status !== filters.status) return false;
-      if (!query) return true;
-      const haystack = [
-        a.appointment_number,
-        a.patient_name ?? `Patient #${a.patient_id}`,
-        a.dentist_name ?? `Dentist #${a.dentist_id}`,
-        a.appointment_type,
-        a.status,
-        formatISODate(a.appointment_date),
-        formatTimeRange(a.start_time, a.end_time),
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [enriched, filters.debouncedSearch, filters.status]);
+  // Server-side filtering: the backend handles search/status/date filters,
+  // so no client-side filtering is needed.
+  const visibleRows = enriched;
 
   const total = appointmentsQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / filters.pageSize));
   const queryError = appointmentsQuery.error
     ? apiErrorMessage(appointmentsQuery.error)
     : null;
-  const namesLoading = names.isLoading && items.length > 0;
 
-  // Client-side filtering only ever sees the current backend page, so the
-  // footer pagination (summary + page controls + rows-per-page) is hidden
-  // while a search/status filter is active — otherwise the total would be
-  // misleading and paging would silently re-filter the next page's data.
-  const isFilterActive =
-    filters.debouncedSearch.trim() !== '' || filters.status !== 'all';
+  // Server-side filtering: pagination always reflects the full filtered
+  // dataset, so pagination controls are always visible.
+  const isFilterActive = false;
 
   const clearFilters = () => {
     filters.setSearchInput('');
@@ -180,7 +148,7 @@ export const AppointmentListContainer: FC = () => {
         <>
           <AppointmentTable
             appointments={visibleRows}
-            namesLoading={namesLoading}
+            namesLoading={false}
             loading={appointmentsQuery.isLoading}
             error={queryError}
             onRetry={() => void appointmentsQuery.refetch()}

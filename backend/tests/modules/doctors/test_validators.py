@@ -309,27 +309,37 @@ class TestScheduleValidator:
         except InvalidDoctorOperation as exc:
             assert exc.message == ERR_SCHEDULE_END_BEFORE_START
 
-    def test_weekday_unique_ok(self):
-        repo = MagicMock()
-        repo.get_schedule_for_day.return_value = None
-        ScheduleValidator.assert_weekday_unique(repo, "DOC", 2)
+    def test_no_session_overlap_ok(self):
+        """Non-overlapping sessions on the same day should pass."""
+        sessions = [
+            (time(9, 0), time(12, 0)),
+            (time(17, 0), time(21, 0)),
+        ]
+        ScheduleValidator.assert_no_session_overlap(sessions)
 
-    def test_weekday_unique_duplicate(self):
-        repo = MagicMock()
-        repo.get_schedule_for_day.return_value = make_schedule("DOC", "EXISTING")
+    def test_no_session_overlap_detects_overlap(self):
+        """Overlapping sessions should raise."""
+        sessions = [
+            (time(9, 0), time(13, 0)),
+            (time(12, 0), time(17, 0)),
+        ]
         try:
-            ScheduleValidator.assert_weekday_unique(repo, "DOC", 2)
+            ScheduleValidator.assert_no_session_overlap(sessions)
             raise AssertionError("expected InvalidDoctorOperation")
-        except InvalidDoctorOperation as exc:
-            assert exc.message == ERR_SCHEDULE_DUPLICATE_DAY
+        except InvalidDoctorOperation:
+            pass
 
-    def test_weekday_unique_excludes_self(self):
-        repo = MagicMock()
-        repo.get_schedule_for_day.return_value = make_schedule("DOC", "SAME-ID")
-        ScheduleValidator.assert_weekday_unique(
-            repo, "DOC", 2, exclude_schedule_id="SAME-ID"
-        )
-        repo.get_schedule_for_day.assert_called_once_with("DOC", 2)
+    def test_no_session_overlap_same_start_end(self):
+        """Identical sessions should be detected as overlapping."""
+        sessions = [
+            (time(9, 0), time(12, 0)),
+            (time(9, 0), time(12, 0)),
+        ]
+        try:
+            ScheduleValidator.assert_no_session_overlap(sessions)
+            raise AssertionError("expected InvalidDoctorOperation")
+        except InvalidDoctorOperation:
+            pass
 
     def test_schedule_belongs_to_doctor_ok(self):
         ScheduleValidator.assert_schedule_belongs_to_doctor(
@@ -367,6 +377,14 @@ class TestScheduleValidator:
         ]
         ScheduleValidator.validate_replace_list(schedules)
 
+    def test_validate_replace_list_split_session_valid(self):
+        """Multiple non-overlapping sessions on the same day should pass."""
+        schedules = [
+            make_schedule_create(0, time(9, 0), time(12, 0)),
+            make_schedule_create(0, time(17, 0), time(21, 0)),
+        ]
+        ScheduleValidator.validate_replace_list(schedules)
+
     def test_validate_replace_list_bad_time(self):
         schedules = [make_schedule_create(0, time(17, 0), time(9, 0))]
         try:
@@ -375,16 +393,17 @@ class TestScheduleValidator:
         except InvalidDoctorOperation as exc:
             assert exc.message == ERR_SCHEDULE_END_BEFORE_START
 
-    def test_validate_replace_list_duplicate_day(self):
+    def test_validate_replace_list_overlap_same_day(self):
+        """Overlapping sessions on the same day should raise."""
         schedules = [
-            make_schedule_create(0, time(9, 0), time(12, 0)),
-            make_schedule_create(0, time(13, 0), time(17, 0)),
+            make_schedule_create(0, time(9, 0), time(13, 0)),
+            make_schedule_create(0, time(12, 0), time(17, 0)),
         ]
         try:
             ScheduleValidator.validate_replace_list(schedules)
             raise AssertionError("expected InvalidDoctorOperation")
-        except InvalidDoctorOperation as exc:
-            assert exc.message == ERR_SCHEDULE_DUPLICATE_DAY
+        except InvalidDoctorOperation:
+            pass
 
 
 # ======================================================================

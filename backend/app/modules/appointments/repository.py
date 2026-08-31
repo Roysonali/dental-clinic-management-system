@@ -5,9 +5,12 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
+from app.modules.appointments.enums import AppointmentStatus
 from app.modules.appointments.model import Appointment
+from app.modules.appointments.sequence import AppointmentSequence
+from app.modules.patients.models import Patient
 
 
 class AppointmentRepository:
@@ -41,9 +44,21 @@ class AppointmentRepository:
         appointment_id: UUID,
     ) -> Optional[Appointment]:
 
-        return self.db.get(
-            Appointment,
-            appointment_id,
+        stmt = (
+            select(Appointment)
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.dentist),
+            )
+            .where(
+                Appointment.id == appointment_id
+            )
+        )
+
+        return (
+            self.db.execute(
+                stmt
+            ).scalar_one_or_none()
         )
 
     def get_by_appointment_number(
@@ -67,29 +82,95 @@ class AppointmentRepository:
         self,
         skip: int = 0,
         limit: int = 20,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        dentist_id: Optional[int] = None,
     ) -> tuple[list[Appointment], int]:
+        """Return paginated appointments with optional server-side filters.
 
-        total = self.db.execute(
-            select(
-                func.count()
-            ).select_from(
-                Appointment
+        Filters are applied BEFORE pagination so that total counts
+        reflect the filtered dataset.
+
+        Args:
+            skip: Zero-based offset.
+            limit: Maximum rows per page.
+            search: Matches appointment_number, patient name,
+                    or patient phone (case-insensitive).
+            status: Exact status match.
+            date_from: Inclusive lower bound on appointment_date.
+            date_to: Inclusive upper bound on appointment_date.
+            dentist_id: Filter by dentist (user FK).
+        """
+
+        # ── Build base query with optional filters ──────────────────
+        base = select(Appointment)
+
+        if search:
+            pattern = f"%{search}%"
+            base = base.join(
+                Appointment.patient,
+                isouter=True,
+            ).where(
+                (
+                    Appointment.appointment_number.ilike(pattern)
+                )
+                | (
+                    Appointment.patient.has(
+                        Patient.first_name.ilike(pattern)
+                    )
+                )
+                | (
+                    Appointment.patient.has(
+                        Patient.last_name.ilike(pattern)
+                    )
+                )
+                | (
+                    Appointment.patient.has(
+                        Patient.primary_contact_number.ilike(pattern)
+                    )
+                )
             )
-        ).scalar()
 
+        if status is not None:
+            base = base.where(
+                Appointment.status == status
+            )
+
+        if date_from is not None:
+            base = base.where(
+                Appointment.appointment_date >= date_from
+            )
+
+        if date_to is not None:
+            base = base.where(
+                Appointment.appointment_date <= date_to
+            )
+
+        if dentist_id is not None:
+            base = base.where(
+                Appointment.dentist_id == dentist_id
+            )
+
+        # ── Count filtered rows ────────────────────────────────────
+        count_stmt = select(func.count()).select_from(base.subquery())
+        total = self.db.execute(count_stmt).scalar() or 0
+
+        # ── Fetch paginated rows with eager-loaded relationships ────
         stmt = (
-            select(Appointment)
-            .order_by(
-                Appointment.created_at.desc()
+            base
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.dentist),
             )
+            .order_by(Appointment.created_at.desc())
             .offset(skip)
             .limit(limit)
         )
 
         rows = (
-            self.db.execute(
-                stmt
-            )
+            self.db.execute(stmt)
             .scalars()
             .all()
         )
@@ -133,6 +214,17 @@ class AppointmentRepository:
 
         return appointment
 
+    # Statuses that occupy a time slot and block new bookings.
+    # Cancelled / No-Show free the slot; Completed is historical
+    # and still occupies the slot (the time was consumed).
+    _SLOT_OCCUPYING_STATUSES = {
+        AppointmentStatus.SCHEDULED,
+        AppointmentStatus.CONFIRMED,
+        AppointmentStatus.CHECKED_IN,
+        AppointmentStatus.IN_TREATMENT,
+        AppointmentStatus.COMPLETED,
+    }
+
     def doctor_overlap_exists(
         self,
         dentist_id: int,
@@ -153,6 +245,9 @@ class AppointmentRepository:
                 < end_time,
                 Appointment.end_time
                 > start_time,
+                Appointment.status.in_(
+                    self._SLOT_OCCUPYING_STATUSES
+                ),
             )
         )
 
@@ -226,6 +321,62 @@ class AppointmentRepository:
             ).scalar_one_or_none()
         )
 
+    def get_or_create_sequence(
+        self,
+        date_prefix: str,
+    ) -> AppointmentSequence:
+        """Atomically retrieve (with row lock) or create a per-day sequence.
+
+        Uses ``SELECT ... FOR UPDATE`` to serialize concurrent requests
+        for the same date prefix, preventing duplicate appointment numbers.
+
+        Args:
+            date_prefix: The date prefix (e.g. ``"APT-20260830"``).
+
+        Returns:
+            The locked ``AppointmentSequence`` row. The caller must
+            increment ``current_value`` and flush.
+        """
+
+        stmt = (
+            select(AppointmentSequence)
+            .where(
+                AppointmentSequence.date_prefix
+                == date_prefix
+            )
+            .with_for_update()
+        )
+
+        seq = (
+            self.db.execute(
+                stmt
+            ).scalar_one_or_none()
+        )
+
+        if seq is None:
+            seq = AppointmentSequence(
+                date_prefix=date_prefix,
+                current_value=0,
+            )
+            self.db.add(seq)
+            self.db.flush()  # assigns default, persists row
+            # Re-lock after insert to match the SELECT FOR UPDATE path
+            stmt_lock = (
+                select(AppointmentSequence)
+                .where(
+                    AppointmentSequence.date_prefix
+                    == date_prefix
+                )
+                .with_for_update()
+            )
+            seq = (
+                self.db.execute(
+                    stmt_lock
+                ).scalar_one()
+            )
+
+        return seq
+
     def patient_overlap_exists(
         self,
         patient_id: UUID,
@@ -246,6 +397,9 @@ class AppointmentRepository:
                 < end_time,
                 Appointment.end_time
                 > start_time,
+                Appointment.status.in_(
+                    self._SLOT_OCCUPYING_STATUSES
+                ),
             )
         )
 
@@ -261,4 +415,59 @@ class AppointmentRepository:
             )
             .first()
             is not None
+        )
+
+    def list_by_date_range(
+        self,
+        start: date,
+        end: date,
+        dentist_id: Optional[int] = None,
+        status: Optional[str] = None,
+    ) -> list[Appointment]:
+        """
+        Return appointments within a bounded date range.
+
+        Range semantics: [start, end) — inclusive start, exclusive end.
+
+        Uses selectinload for patient and dentist relationships to
+        avoid N+1 queries when resolving display names.
+
+        The query uses the existing ix_appointments_date index for
+        the primary range filter, and ix_appointments_dentist_schedule
+        when filtering by dentist.
+        """
+
+        stmt = (
+            select(Appointment)
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.dentist),
+            )
+            .where(
+                Appointment.appointment_date >= start,
+                Appointment.appointment_date < end,
+            )
+        )
+
+        if dentist_id is not None:
+            stmt = stmt.where(
+                Appointment.dentist_id == dentist_id,
+            )
+
+        if status is not None:
+            stmt = stmt.where(
+                Appointment.status == status,
+            )
+
+        stmt = stmt.order_by(
+            Appointment.appointment_date.asc(),
+            Appointment.start_time.asc(),
+        )
+
+        return (
+            self.db.execute(
+                stmt
+            )
+            .scalars()
+            .all()
         )
