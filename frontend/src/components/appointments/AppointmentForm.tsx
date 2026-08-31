@@ -12,6 +12,8 @@ import {
   APPOINTMENT_TYPE_OPTIONS,
 } from '../../constants/appointment';
 import type { AppointmentFormValues } from '../../types/appointment';
+import type { DoctorResponse } from '../../types/doctor';
+import { useDoctorAvailabilityCheck } from '../../hooks/doctors/useDoctorAvailabilityCheck';
 
 /* ── Zod schema — mirrors backend AppointmentCreate/Update + constants ─ */
 
@@ -123,6 +125,8 @@ interface AppointmentFormProps {
   creatingPatient?: boolean;
   /** Callback when PatientPicker enters/leaves quick-create mode */
   onCreatingPatientChange?: (creating: boolean) => void;
+  /** Full doctor records for date-specific availability checking */
+  doctorListItems?: DoctorResponse[];
 }
 
 const DURATION_OPTIONS = APPOINTMENT_DURATION_OPTIONS.map((d) => ({
@@ -158,11 +162,13 @@ export const AppointmentForm: FC<AppointmentFormProps> = ({
   patientName,
   creatingPatient = false,
   onCreatingPatientChange,
+  doctorListItems = [],
 }) => {
   const {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
   } = useForm<AppointmentFormValues>({
     resolver: zodResolver(appointmentFormSchema),
@@ -183,6 +189,17 @@ export const AppointmentForm: FC<AppointmentFormProps> = ({
   /** Merge client + server field errors for display. */
   const fieldError = (field: keyof AppointmentFormValues) =>
     errors[field]?.message ?? serverErrors[field];
+
+  // Watch dentist and date for proactive availability checking.
+  const watchedDentistId = watch('dentist_id');
+  const watchedDate = watch('appointment_date');
+
+  const { availabilityWarning, isLoading: availabilityLoading } =
+    useDoctorAvailabilityCheck(
+      watchedDentistId || null,
+      watchedDate || '',
+      doctorListItems,
+    );
 
   return (
     <div className="flex flex-col gap-4">
@@ -230,6 +247,16 @@ export const AppointmentForm: FC<AppointmentFormProps> = ({
                   The dentist list couldn&apos;t be loaded — this requires Admin or
                   Receptionist access. If you&apos;re booking for yourself, ask a
                   receptionist to schedule the appointment, or try again later.
+                </p>
+              </div>
+            )}
+            {availabilityWarning && !availabilityLoading && (
+              <div
+                role="status"
+                className="rounded-lg border border-warning/30 bg-warning/10 p-3 md:col-span-2"
+              >
+                <p className="text-body-sm text-warning">
+                  ⚠ {availabilityWarning}
                 </p>
               </div>
             )}

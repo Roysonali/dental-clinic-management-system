@@ -13,6 +13,17 @@ import { mapAppointmentsToEvents } from './calendarMapper';
 import type { AppointmentStatus } from '../../../types/appointment';
 import { apiErrorMessage } from '../../../services/apiError';
 
+/**
+ * Format a Date as YYYY-MM-DD using local (wall-clock) fields.
+ * Avoids the UTC shift introduced by toISOString().
+ */
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 interface CalendarViewProps {
   /** Optional dentist ID filter */
   dentistId?: number | null;
@@ -73,21 +84,12 @@ export const CalendarView: FC<CalendarViewProps> = ({
   // Handle date range changes from FullCalendar navigation
   const handleDatesSet = useCallback(
     (dateInfo: { startStr: string; end: Date; view: { type: string } }) => {
+      // FullCalendar provides exclusive end dates for both dayGrid and timeGrid.
+      // startStr is always "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS" — slice to date.
+      // For the end, use local Date methods to avoid UTC timezone shifts
+      // that toISOString() would introduce (e.g., UTC+8 shifting Aug 1 → Jul 31).
       const startStr = dateInfo.startStr.slice(0, 10); // YYYY-MM-DD
-      // FullCalendar's end is exclusive for dayGrid, inclusive for timeGrid
-      // We need to add 1 day for timeGrid views to match backend [start, end)
-      let endStr: string;
-      if (dateInfo.view.type === 'dayGridMonth') {
-        // dayGrid end is already exclusive (next month's 1st)
-        endStr = new Date(dateInfo.end.getTime() - 86400000)
-          .toISOString()
-          .slice(0, 10);
-      } else {
-        // timeGrid end is inclusive, so add 1 day for backend [start, end)
-        const endDate = new Date(dateInfo.end);
-        endDate.setDate(endDate.getDate() + 1);
-        endStr = endDate.toISOString().slice(0, 10);
-      }
+      const endStr = formatLocalDate(dateInfo.end);
 
       // Only update if the range actually changed
       setDateRange((prev) => {
@@ -193,11 +195,12 @@ export const CalendarView: FC<CalendarViewProps> = ({
           padding: 0.375rem 0.75rem;
           border-radius: 0.5rem;
           text-transform: capitalize;
+          transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
         }
         .calendar-container .fc-button:hover {
-          background-color: #f3f4f6;
-          border-color: #9ca3af;
-          color: #374151;
+          background-color: #f3f4f6 !important;
+          border-color: #9ca3af !important;
+          color: #374151 !important;
         }
         .calendar-container .fc-button:active,
         .calendar-container .fc-button.fc-button-active {
@@ -206,6 +209,9 @@ export const CalendarView: FC<CalendarViewProps> = ({
           color: white !important;
         }
         .calendar-container .fc-button:focus-visible {
+          background-color: #f3f4f6 !important;
+          border-color: #2563eb !important;
+          color: #374151 !important;
           box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.5);
           outline: none;
         }

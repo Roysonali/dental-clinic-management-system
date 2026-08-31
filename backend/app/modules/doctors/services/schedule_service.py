@@ -189,9 +189,17 @@ class ScheduleService:
         def _create() -> DoctorSchedule:
             self._get_doctor_and_assert_active(doctor_id)
             ScheduleValidator.assert_time_ordering(payload.start_time, payload.end_time)
-            ScheduleValidator.assert_weekday_unique(
-                self.schedule_repo, doctor_id, payload.day_of_week,
-            )
+            # Multiple sessions per day are allowed (split shifts);
+            # check for overlapping sessions on the same day.
+            existing = self.schedule_repo.get_doctor_schedule(doctor_id)
+            same_day = [
+                (s.start_time, s.end_time)
+                for s in existing
+                if s.day_of_week == payload.day_of_week
+                and s.is_active
+            ]
+            same_day.append((payload.start_time, payload.end_time))
+            ScheduleValidator.assert_no_session_overlap(same_day)
             schedule = DoctorSchedule(
                 doctor_id=doctor_id,
                 day_of_week=payload.day_of_week,
@@ -251,10 +259,18 @@ class ScheduleService:
             start = filtered.get("start_time", schedule.start_time)
             end = filtered.get("end_time", schedule.end_time)
             ScheduleValidator.assert_time_ordering(start, end)
-            ScheduleValidator.assert_weekday_unique(
-                self.schedule_repo, doctor_id, day,
-                exclude_schedule_id=schedule_id,
-            )
+            # Check for overlapping sessions on the same day,
+            # excluding the schedule being updated.
+            existing = self.schedule_repo.get_doctor_schedule(doctor_id)
+            same_day = [
+                (s.start_time, s.end_time)
+                for s in existing
+                if s.day_of_week == day
+                and s.is_active
+                and s.id != schedule_id
+            ]
+            same_day.append((start, end))
+            ScheduleValidator.assert_no_session_overlap(same_day)
             return self.schedule_repo.update(schedule, filtered)
 
         return self._run_in_transaction(

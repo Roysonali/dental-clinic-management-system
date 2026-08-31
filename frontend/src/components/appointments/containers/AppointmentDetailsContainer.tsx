@@ -1,11 +1,15 @@
 import { useMemo, useState, type FC } from 'react';
 import { useParams } from 'react-router-dom';
-import { Pencil, CalendarX2 } from 'lucide-react';
+import { Pencil, CalendarX2, ArrowRight } from 'lucide-react';
 import { useAppointment } from '../../../hooks/appointments/useAppointment';
-import { useAppointmentNames } from '../../../hooks/appointments/useAppointmentNames';
-import { useCancelAppointment } from '../../../hooks/appointments/useAppointmentMutations';
+import { useCancelAppointment, useUpdateAppointmentStatus } from '../../../hooks/appointments/useAppointmentMutations';
 import { apiErrorMessage, parseApiError } from '../../../services/apiError';
-import { canCancelAppointment } from '../../../constants/appointment';
+import {
+  canCancelAppointment,
+  isTerminalStatus,
+  getGenericNextStatuses,
+  STATUS_ACTION_LABELS,
+} from '../../../constants/appointment';
 import { AppointmentDetailsHeader } from '../AppointmentDetailsHeader';
 import { AppointmentInfoCard } from '../AppointmentInfoCard';
 import { AppointmentPartiesCard } from '../AppointmentPartiesCard';
@@ -16,7 +20,7 @@ import { Icon } from '../../common/Icon/Icon';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { ResultState } from '../../common/ResultState/ResultState';
 import { ContentContainer } from '../../../layouts/components/ContentContainer';
-import type { EnrichedAppointment } from '../../../types/appointment';
+import type { AppointmentStatus, EnrichedAppointment } from '../../../types/appointment';
 
 /**
  * AppointmentDetailsContainer — orchestrates the appointment details page.
@@ -31,28 +35,27 @@ export const AppointmentDetailsContainer: FC = () => {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const appointmentQuery = useAppointment(appointmentId);
   const cancelMutation = useCancelAppointment();
+  const statusMutation = useUpdateAppointmentStatus();
 
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const appointment = appointmentQuery.data;
 
-  const names = useAppointmentNames(
-    useMemo(() => (appointment ? [appointment.patient_id] : []), [appointment]),
-    useMemo(() => (appointment ? [appointment.dentist_id] : []), [appointment]),
-  );
-
+  // Backend now returns patient_name and dentist_name via eager-loaded
+  // relationships, eliminating the need for useAppointmentNames N+1 calls.
   const enriched = useMemo<EnrichedAppointment | null>(
     () =>
       appointment
         ? {
             ...appointment,
-            patient_name: names.data?.patientNames.get(appointment.patient_id) ?? null,
-            dentist_name: names.data?.dentistNames.get(appointment.dentist_id) ?? null,
+            patient_name: appointment.patient_name ?? null,
+            dentist_name: appointment.dentist_name ?? null,
           }
         : null,
-    [appointment, names.data],
+    [appointment],
   );
 
   const errorMessage = appointmentQuery.error
@@ -66,6 +69,17 @@ export const AppointmentDetailsContainer: FC = () => {
       onSuccess: () => setCancelOpen(false),
       onError: (error) => setCancelError(parseApiError(error).message),
     });
+  };
+
+  const handleStatusTransition = (nextStatus: AppointmentStatus) => {
+    if (!appointment) return;
+    setStatusError(null);
+    statusMutation.mutate(
+      { id: appointment.id, status: nextStatus },
+      {
+        onError: (error) => setStatusError(parseApiError(error).message),
+      },
+    );
   };
 
   if (appointmentQuery.isLoading) {
@@ -95,7 +109,8 @@ export const AppointmentDetailsContainer: FC = () => {
     );
   }
 
-  const isCompleted = appointment.status === 'Completed';
+  const canEdit = !isTerminalStatus(appointment.status);
+  const genericNextStatuses = getGenericNextStatuses(appointment.status);
 
   return (
     <ContentContainer width="wide">
@@ -104,15 +119,28 @@ export const AppointmentDetailsContainer: FC = () => {
           appointment={enriched}
           actions={
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isCompleted}
-                onClick={() => setEditOpen(true)}
-                leftIcon={<Icon icon={Pencil} size="sm" />}
-              >
-                Edit
-              </Button>
+              {genericNextStatuses.map((next) => (
+                <Button
+                  key={next}
+                  variant="primary"
+                  size="sm"
+                  disabled={statusMutation.isPending}
+                  onClick={() => handleStatusTransition(next)}
+                  leftIcon={<Icon icon={ArrowRight} size="sm" />}
+                >
+                  {STATUS_ACTION_LABELS[next]}
+                </Button>
+              ))}
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditOpen(true)}
+                  leftIcon={<Icon icon={Pencil} size="sm" />}
+                >
+                  Edit
+                </Button>
+              )}
               {canCancelAppointment(appointment.status) && (
                 <Button
                   variant="danger"
@@ -129,6 +157,12 @@ export const AppointmentDetailsContainer: FC = () => {
             </>
           }
         />
+
+        {statusError && (
+          <div className="rounded-lg border border-danger/20 bg-danger/5 p-3 text-body-sm text-danger">
+            {statusError}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">

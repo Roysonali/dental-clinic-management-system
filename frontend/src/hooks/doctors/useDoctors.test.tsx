@@ -51,7 +51,7 @@ describe('useDoctors', () => {
     renderHook(() => useDoctors(true), { wrapper: makeWrapper(queryClient) });
 
     await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
-    expect(listMock).toHaveBeenCalledWith({ page: 1, page_size: 100, is_active: true });
+    expect(listMock).toHaveBeenCalledWith({ page: 1, page_size: 100, is_available: true });
   });
 
   it('does not fetch while the legacy enabled flag is false', () => {

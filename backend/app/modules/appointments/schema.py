@@ -109,6 +109,11 @@ class AppointmentStatusUpdate(BaseModel):
 class AppointmentResponse(BaseModel):
     """
     Single appointment response.
+
+    ``patient_name`` and ``dentist_name`` are resolved from
+    eager-loaded relationships when available. They are optional
+    for backward compatibility — endpoints that do not eager-load
+    will omit them (or they will be None).
     """
 
     model_config = ConfigDict(
@@ -139,6 +144,10 @@ class AppointmentResponse(BaseModel):
     reason_for_visit: str
 
     notes: Optional[str]
+
+    patient_name: Optional[str] = None
+
+    dentist_name: Optional[str] = None
 
     created_by: Optional[int]
 

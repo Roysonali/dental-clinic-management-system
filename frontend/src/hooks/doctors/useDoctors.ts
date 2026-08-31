@@ -46,7 +46,7 @@ export const doctorQueryKeys = {
 const APPOINTMENT_DROPDOWN_PARAMS: DoctorListParams = {
   page: 1,
   page_size: 100,
-  is_active: true,
+  is_available: true,
 };
 
 type UseDoctorsArgs = [enabled?: boolean] | [params: DoctorListParams, enabled?: boolean];

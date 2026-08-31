@@ -76,6 +76,12 @@ export const appointmentService = {
     return data;
   },
 
+  /** PATCH /appointments/{id}/status — transition appointment status */
+  async updateStatus(id: string, status: string): Promise<AppointmentResponse> {
+    const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/status`, { status });
+    return data;
+  },
+
   /** GET /appointments/calendar?start=&end=&dentist_id=&status= */
   async calendar(params: CalendarAppointmentParams): Promise<CalendarAppointmentListResponse> {
     const { data } = await api.get<CalendarAppointmentListResponse>('/appointments/calendar', { params });

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import (
     date,
     datetime,
+    time,
     timedelta,
     timezone,
 )
@@ -55,6 +56,10 @@ from app.modules.patients.repository import (
     PatientRepository,
 )
 
+from app.modules.doctors.repositories import (
+    DoctorRepository,
+)
+
 
 class AppointmentService:
     """
@@ -85,6 +90,11 @@ class AppointmentService:
             )
         )
 
+        self.doctor_repository = (
+            DoctorRepository(
+                db,
+            )
+        )
 
         self.validator = (
             AppointmentValidator(
@@ -122,6 +132,18 @@ class AppointmentService:
                 dentist,
             )
 
+            # Load Doctor profile for availability/schedule checks
+            doctor_profile = (
+                self.doctor_repository
+                .get_by_user_id(
+                    dentist.id
+                )
+            )
+
+            self.validator.validate_doctor_profile(
+                doctor_profile,
+            )
+
             self.validator.validate_working_day(
                 payload.appointment_date,
             )
@@ -141,6 +163,14 @@ class AppointmentService:
             self.validator.validate_working_hours(
                 payload.start_time,
                 end_time,
+            )
+
+            # Validate doctor's schedule for the requested day/time
+            self.validator.validate_doctor_schedule(
+                doctor=doctor_profile,
+                appointment_date=payload.appointment_date,
+                start_time=payload.start_time,
+                end_time=end_time,
             )
 
             self.validator.validate_overlap(
@@ -186,12 +216,22 @@ class AppointmentService:
         self,
         skip: int = 0,
         limit: int = 20,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        dentist_id: Optional[int] = None,
     ) -> tuple[list[Appointment], int]:
 
         return (
             self.repository.list(
-                skip,
-                limit,
+                skip=skip,
+                limit=limit,
+                search=search,
+                status=status,
+                date_from=date_from,
+                date_to=date_to,
+                dentist_id=dentist_id,
             )
         )
 
@@ -224,14 +264,16 @@ class AppointmentService:
 
         try:
 
-            if (
-                appointment.status
-                ==
-                AppointmentStatus.COMPLETED
-            ):
+            # Terminal appointments cannot be edited
+            terminal_statuses = {
+                AppointmentStatus.COMPLETED,
+                AppointmentStatus.CANCELLED,
+                AppointmentStatus.NO_SHOW,
+            }
+            if appointment.status in terminal_statuses:
                 raise (
                     AppointmentValidationException(
-                        "Completed appointments cannot be edited."
+                        f"{appointment.status.value} appointments cannot be edited."
                     )
                 )
 
@@ -306,6 +348,25 @@ class AppointmentService:
                     dentist,
                 )
 
+            # Validate doctor profile and schedule for the new date/time
+            doctor_profile = (
+                self.doctor_repository
+                .get_by_user_id(
+                    new_dentist
+                )
+            )
+
+            self.validator.validate_doctor_profile(
+                doctor_profile,
+            )
+
+            self.validator.validate_doctor_schedule(
+                doctor=doctor_profile,
+                appointment_date=new_date,
+                start_time=new_start,
+                end_time=end_time,
+            )
+
             self.validator.validate_overlap(
                 patient_id=appointment.patient_id,
                 dentist_id=new_dentist,
@@ -368,6 +429,53 @@ class AppointmentService:
             appointment.updated_by = (
                 actor.id
             )
+
+            appointment = (
+                self.repository.update(
+                    appointment
+                )
+            )
+
+            self.db.commit()
+
+            return appointment
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def change_status(
+        self,
+        appointment: Appointment,
+        new_status: AppointmentStatus,
+        actor: User,
+    ) -> Appointment:
+        """Transition an appointment to a new status.
+
+        Validates the transition against the allowed transition graph,
+        updates the status, and persists the change.
+
+        Args:
+            appointment: The current appointment entity.
+            new_status: The desired new status.
+            actor: The authenticated user performing the transition.
+
+        Returns:
+            The updated appointment.
+
+        Raises:
+            InvalidAppointmentStatusTransition: If the transition is not allowed.
+        """
+
+        try:
+
+            self.validator.validate_status_transition(
+                appointment.status,
+                new_status,
+            )
+
+            appointment.status = new_status
+            appointment.updated_by = actor.id
 
             appointment = (
                 self.repository.update(
@@ -463,6 +571,7 @@ class AppointmentService:
 
         return CalendarAppointmentListResponse(items=items)
 
+    @staticmethod
     def _calculate_end_time(
         appointment_date: date,
         start_time: time,
@@ -484,15 +593,15 @@ class AppointmentService:
         self,
     ) -> str:
         """
-        Generate a unique appointment number.
+        Generate a unique appointment number atomically.
 
         Format: APT-YYYYMMDD-NNNN
         - Prefix: APT
         - Date portion: current UTC date
         - Sequence: zero-padded incrementing number
 
-        Queries the repository for the highest existing
-        sequence for today to ensure uniqueness.
+        Uses a per-day sequence row with SELECT ... FOR UPDATE
+        to prevent duplicate numbers under concurrent requests.
         """
 
         today_prefix = (
@@ -503,26 +612,19 @@ class AppointmentService:
             ).strftime(
                 "%Y%m%d"
             )
-            +
-            "-"
         )
 
-        latest = (
-            self.repository.get_latest_number_prefix(
-                today_prefix,
+        seq_row = (
+            self.repository
+            .get_or_create_sequence(
+                today_prefix
             )
         )
 
-        if latest:
-            # Extract sequence, increment
-            seq = int(
-                latest.split("-")[-1]
-            ) + 1
-        else:
-            seq = 1
+        seq_row.current_value += 1
+        self.db.flush()
 
         return (
-            today_prefix
-            +
-            f"{seq:04d}"
+            f"{today_prefix}-"
+            f"{seq_row.current_value:04d}"
         )

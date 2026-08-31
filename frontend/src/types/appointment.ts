@@ -46,6 +46,10 @@ export interface AppointmentResponse {
   status: AppointmentStatus;
   reason_for_visit: string;
   notes: string | null;
+  /** Resolved patient display name (from eager-loaded relationship). */
+  patient_name?: string | null;
+  /** Resolved dentist display name (from eager-loaded relationship). */
+  dentist_name?: string | null;
   created_by: number | null;
   updated_by: number | null;
   created_at: string;
@@ -72,6 +76,16 @@ export interface AppointmentListParams {
   skip?: number;
   /** Records per page (default 20, backend max 100) */
   limit?: number;
+  /** Search appointment number, patient name or phone */
+  search?: string;
+  /** Filter by appointment status */
+  status?: AppointmentStatus;
+  /** Inclusive start date (YYYY-MM-DD) */
+  date_from?: string;
+  /** Inclusive end date (YYYY-MM-DD) */
+  date_to?: string;
+  /** Filter by dentist user ID */
+  dentist_id?: number;
 }
 
 /**

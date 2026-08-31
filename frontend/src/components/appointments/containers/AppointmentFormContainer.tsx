@@ -172,6 +172,7 @@ export const AppointmentFormContainer: FC<AppointmentFormContainerProps> = ({
             ? `${prefillPatient.full_name} (${prefillPatient.patient_code})`
             : null
       }
+      doctorListItems={doctorsQuery.data?.items ?? []}
     />
   );
 };

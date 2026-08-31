@@ -25,7 +25,7 @@ export interface AppointmentFilters {
   setPage: (page: number) => void;
   /** Change page size (resets to page 1) */
   setPageSize: (size: number) => void;
-  /** Ready-to-send query params for GET /appointments (skip/limit only). */
+  /** Ready-to-send query params for GET /appointments (skip, limit, search, status). */
   params: AppointmentListParams;
 }
 
@@ -33,10 +33,9 @@ export interface AppointmentFilters {
  * Owns the appointment list query state: debounced search, status filter and
  * pagination. Mirrors `usePatientFilters`.
  *
- * NOTE: GET /appointments supports only `skip`/`limit` (no server-side
- * search or status params), so search/status are applied client-side over the
- * current page's enriched rows by the container — the toolbar still behaves
- * (and looks) like the Patient module.
+ * NOTE: GET /appointments supports server-side `search` and `status` params
+ * in addition to `skip`/`limit`, so the backend handles filtering before
+ * pagination — no client-side filtering is needed.
  */
 export function useAppointmentFilters(): AppointmentFilters {
   const [searchInput, setSearchInputState] = useState('');
@@ -62,8 +61,13 @@ export function useAppointmentFilters(): AppointmentFilters {
   };
 
   const params = useMemo<AppointmentListParams>(
-    () => ({ skip: (page - 1) * pageSize, limit: pageSize }),
-    [page, pageSize],
+    () => ({
+      skip: (page - 1) * pageSize,
+      limit: pageSize,
+      ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+      ...(status !== 'all' ? { status } : {}),
+    }),
+    [page, pageSize, debouncedSearch, status],
   );
 
   return {

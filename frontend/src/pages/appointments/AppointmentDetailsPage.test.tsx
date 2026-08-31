@@ -6,6 +6,7 @@ import { AppointmentDetailsPage } from './AppointmentDetailsPage';
 import { appointmentService } from '../../services/appointmentService';
 import { patientService } from '../../services/patientService';
 import { doctorService } from '../../services/doctorService';
+import { ROUTES } from '../../routes/routes';
 
 vi.mock('../../services/appointmentService', () => ({
   appointmentService: {
@@ -15,6 +16,7 @@ vi.mock('../../services/appointmentService', () => ({
     update: vi.fn(),
     cancel: vi.fn(),
     today: vi.fn(),
+    updateStatus: vi.fn(),
   },
 }));
 
@@ -49,6 +51,8 @@ describe('AppointmentDetailsPage', () => {
       status: 'Scheduled',
       reason_for_visit: 'Toothache',
       notes: null,
+      patient_name: 'Juan Dela Cruz',
+      dentist_name: 'Dr. Jose Rizal',
       created_by: 1,
       updated_by: null,
       created_at: '2026-07-07T08:00:00Z',
@@ -97,5 +101,41 @@ describe('AppointmentDetailsPage', () => {
         screen.getByRole('heading', { name: 'APT-20260707-0001' }),
       ).toBeInTheDocument();
     });
+  });
+
+  it('links back to calendar when opened from calendar (from=calendar)', async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/appointments/:appointmentId" element={<AppointmentDetailsPage />} />
+      </Routes>,
+      { route: '/appointments/a1?from=calendar' },
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'APT-20260707-0001' }),
+      ).toBeInTheDocument();
+    });
+
+    const backLink = screen.getByRole('link', { name: /back/i });
+    expect(backLink).toHaveAttribute('href', ROUTES.APPOINTMENTS_CALENDAR);
+  });
+
+  it('links back to list when opened from list (no from param)', async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/appointments/:appointmentId" element={<AppointmentDetailsPage />} />
+      </Routes>,
+      { route: '/appointments/a1' },
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'APT-20260707-0001' }),
+      ).toBeInTheDocument();
+    });
+
+    const backLink = screen.getByRole('link', { name: /back/i });
+    expect(backLink).toHaveAttribute('href', ROUTES.APPOINTMENTS);
   });
 });
