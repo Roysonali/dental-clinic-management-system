@@ -1,4 +1,4 @@
-import { useState, type FC } from 'react';
+import { useState, useCallback, type FC } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pencil, UserCheck, UserX, CalendarCheck, CalendarOff } from 'lucide-react';
 import { useDoctorProfile } from '../../../hooks/doctors/useDoctorProfile';
@@ -7,7 +7,9 @@ import {
   useDeactivateDoctor,
   useToggleAvailability,
   useToggleLeave,
+  useReplaceWeekSchedule,
 } from '../../../hooks/doctors/useDoctorMutations';
+import { usePermission } from '../../../hooks/rbac/usePermission';
 import { parseApiError } from '../../../services/apiError';
 import { DoctorHeader } from '../DoctorHeader';
 import { DoctorProfileCard } from '../DoctorProfileCard';
@@ -15,6 +17,8 @@ import { DoctorClinicalCard } from '../DoctorClinicalCard';
 import { DoctorEmergencyCard } from '../DoctorEmergencyCard';
 import { DoctorSpecializationsSection } from '../DoctorSpecializationsSection';
 import { DoctorScheduleSection } from '../DoctorScheduleSection';
+import { DoctorScheduleEditor } from '../DoctorScheduleEditor';
+import { DoctorScheduleRevertDialog } from '../DoctorScheduleRevertDialog';
 import { DoctorAppointmentList } from '../DoctorAppointmentList';
 import { DoctorTreatmentPlanList } from '../DoctorTreatmentPlanList';
 import { DoctorFormContainer } from './DoctorFormContainer';
@@ -56,10 +60,16 @@ export const DoctorDetailsContainer: FC = () => {
   const [toggleState, setToggleState] = useState<{ intent: DoctorToggleIntent } | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
+  // Schedule editor state (F-0: schedule management wiring)
+  const [scheduleEditorOpen, setScheduleEditorOpen] = useState(false);
+  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+
   const activateMutation = useActivateDoctor();
   const deactivateMutation = useDeactivateDoctor();
   const availabilityMutation = useToggleAvailability();
   const leaveMutation = useToggleLeave();
+  const replaceScheduleMutation = useReplaceWeekSchedule();
+  const permission = usePermission();
 
   const statusSubmitting = activateMutation.isPending || deactivateMutation.isPending;
   const toggleSubmitting = availabilityMutation.isPending || leaveMutation.isPending;
@@ -87,6 +97,34 @@ export const DoctorDetailsContainer: FC = () => {
       onError: (error) => setToggleError(parseApiError(error).message),
     });
   };
+
+  // ── Schedule management handlers (F-0) ──────────────────────────────────
+
+  const handleScheduleSave = useCallback(
+    (schedules: import('../../../types/doctor').ScheduleCreateRequest[]) => {
+      if (!profileQuery.data) return;
+      replaceScheduleMutation.mutate(
+        { doctorId: profileQuery.data.id, schedules },
+        {
+          onSuccess: () => setScheduleEditorOpen(false),
+          // Error is surfaced via replaceScheduleMutation.error
+        },
+      );
+    },
+    [profileQuery.data, replaceScheduleMutation],
+  );
+
+  const handleRevertConfirm = useCallback(() => {
+    if (!profileQuery.data) return;
+    replaceScheduleMutation.mutate(
+      { doctorId: profileQuery.data.id, schedules: [] },
+      {
+        onSuccess: () => setRevertDialogOpen(false),
+        // Error is surfaced via replaceScheduleMutation.error
+      },
+    );
+  },
+  [profileQuery.data, replaceScheduleMutation]);
 
   if (profileQuery.isLoading) {
     return (
@@ -181,7 +219,12 @@ export const DoctorDetailsContainer: FC = () => {
                   <DoctorClinicalCard doctor={doctor} />
                   <DoctorEmergencyCard doctor={doctor} />
                 </div>
-                <DoctorScheduleSection doctor={doctor} />
+                <DoctorScheduleSection
+                doctor={doctor}
+                isAdmin={permission.isAdmin}
+                onEditSchedule={() => setScheduleEditorOpen(true)}
+                onRevertSchedule={() => setRevertDialogOpen(true)}
+              />
               </div>
 
               {/* Right column */}
@@ -239,6 +282,27 @@ export const DoctorDetailsContainer: FC = () => {
           setToggleState(null);
           setToggleError(null);
         }}
+      />
+
+      {/* ── Schedule Editor (F-0: wired into Doctor Details) ── */}
+      <DoctorScheduleEditor
+        open={scheduleEditorOpen}
+        onClose={() => setScheduleEditorOpen(false)}
+        doctor={doctor}
+        hasCustomSchedules={doctor.schedules.length > 0}
+        onSave={handleScheduleSave}
+        saving={replaceScheduleMutation.isPending}
+        error={replaceScheduleMutation.error ? parseApiError(replaceScheduleMutation.error).message : null}
+      />
+
+      {/* ── Schedule Revert Dialog (F-0: wired into Doctor Details) ── */}
+      <DoctorScheduleRevertDialog
+        open={revertDialogOpen}
+        doctor={doctor}
+        submitting={replaceScheduleMutation.isPending}
+        error={replaceScheduleMutation.error ? parseApiError(replaceScheduleMutation.error).message : null}
+        onConfirm={handleRevertConfirm}
+        onClose={() => setRevertDialogOpen(false)}
       />
     </ContentContainer>
   );

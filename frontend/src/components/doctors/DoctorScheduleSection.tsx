@@ -1,5 +1,5 @@
 import { useMemo, type FC } from 'react';
-import { CalendarClock, Info } from 'lucide-react';
+import { CalendarClock, Info, RotateCcw } from 'lucide-react';
 import { Card } from '../common/Card/Card';
 import { Icon } from '../common/Icon/Icon';
 import { StatusBadge } from '../common/StatusBadge/StatusBadge';
@@ -19,6 +19,8 @@ interface DoctorScheduleSectionProps {
   isAdmin?: boolean;
   /** Callback when the user clicks "Create Custom Schedule" or "Edit Schedule". */
   onEditSchedule?: () => void;
+  /** Callback when the admin clicks "Revert to Clinic Default". */
+  onRevertSchedule?: () => void;
 }
 
 /**
@@ -36,6 +38,7 @@ export const DoctorScheduleSection: FC<DoctorScheduleSectionProps> = ({
   doctor,
   isAdmin = false,
   onEditSchedule,
+  onRevertSchedule,
 }) => {
   const hasCustomSchedules = doctor.schedules.length > 0;
 
@@ -63,14 +66,27 @@ export const DoctorScheduleSection: FC<DoctorScheduleSectionProps> = ({
         icon={<Icon icon={CalendarClock} size="md" className="text-success" />}
         actions={
           isAdmin && onEditSchedule ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onEditSchedule}
-              data-testid="edit-schedule-button"
-            >
-              {hasCustomSchedules ? 'Edit Schedule' : 'Create Custom Schedule'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onEditSchedule}
+                data-testid="edit-schedule-button"
+              >
+                {hasCustomSchedules ? 'Edit Schedule' : 'Create Custom Schedule'}
+              </Button>
+              {hasCustomSchedules && onRevertSchedule && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRevertSchedule}
+                  leftIcon={<Icon icon={RotateCcw} size="sm" />}
+                  data-testid="revert-schedule-button"
+                >
+                  Revert to Clinic Default
+                </Button>
+              )}
+            </div>
           ) : undefined
         }
       />

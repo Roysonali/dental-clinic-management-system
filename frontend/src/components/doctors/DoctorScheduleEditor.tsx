@@ -153,11 +153,26 @@ export const DoctorScheduleEditor: FC<DoctorScheduleEditorProps> = ({
 
   const addSession = useCallback((day: DayOfWeek) => {
     setDraft((prev) =>
-      prev.map((d) =>
-        d.day_of_week === day
-          ? { ...d, sessions: [...d.sessions, { _key: tempKey(), start_time: '09:00', end_time: '17:00' }] }
-          : d,
-      ),
+      prev.map((d) => {
+        if (d.day_of_week !== day) return d;
+        // Calculate a non-overlapping default for the new session:
+        // - If the day is empty, use the first clinic default session (10:00-13:00)
+        // - Otherwise, place it after the last session ends (or use clinic default)
+        let newStart = CLINIC_DEFAULT_SESSIONS[0].start;
+        let newEnd = CLINIC_DEFAULT_SESSIONS[0].end;
+        if (d.sessions.length > 0) {
+          const lastEnd = d.sessions[d.sessions.length - 1].end_time;
+          // Try to place after the last session; if it exceeds 21:00, fall back to 10:00-13:00
+          if (lastEnd < '21:00') {
+            newStart = lastEnd;
+            newEnd = '21:00';
+          }
+        }
+        return {
+          ...d,
+          sessions: [...d.sessions, { _key: tempKey(), start_time: newStart, end_time: newEnd }],
+        };
+      }),
     );
   }, []);
 

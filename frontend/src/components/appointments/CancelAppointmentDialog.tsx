@@ -109,10 +109,10 @@ export const CancelAppointmentDialog: FC<CancelAppointmentDialogProps> = ({
       </Modal.Body>
 
       <Modal.Footer>
-        <Button variant="secondary" size="lg" onClick={onClose} disabled={submitting}>
+        <Button variant="secondary" size="sm" onClick={onClose} disabled={submitting}>
           Keep Appointment
         </Button>
-        <Button variant="danger" size="lg" loading={submitting} onClick={onConfirm}>
+        <Button variant="danger" size="sm" loading={submitting} onClick={onConfirm}>
           Yes, Cancel Appointment
         </Button>
       </Modal.Footer>

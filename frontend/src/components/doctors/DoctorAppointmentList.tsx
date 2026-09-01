@@ -21,7 +21,14 @@ import type {
 import type { DoctorProfileResponse } from '../../types/doctor';
 
 interface DoctorAppointmentListProps {
-  /** Doctor profile — used to extract user_id for dentist_id filter */
+  /**
+   * Doctor profile.
+   *
+   * IMPORTANT — Doctor ID Invariant (F-6):
+   * Appointments are keyed by `User.id` (integer), NOT `Doctor.id` (UUID).
+   * The appointment FK is `dentist_id → users.id`, so we MUST use `doctor.user_id` here.
+   * Do NOT use `doctor.id` — that is the Doctor UUID, not the User integer PK.
+   */
   doctor: DoctorProfileResponse;
 }
 

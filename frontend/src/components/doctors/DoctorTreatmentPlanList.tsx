@@ -20,7 +20,17 @@ import type { TreatmentPlanStatus, EnrichedTreatmentPlan } from '../../types/tre
 import type { DoctorProfileResponse } from '../../types/doctor';
 
 interface DoctorTreatmentPlanListProps {
-  /** Doctor profile — doctor.id (UUID) is used for TreatmentPlan.doctor_id */
+  /**
+   * Doctor profile.
+   *
+   * IMPORTANT — Doctor ID Invariant (F-6):
+   * Treatment Plans are keyed by `Doctor.id` (UUID), NOT `User.id` (integer).
+   * The treatment plan FK is `doctor_id → doctors.id`, so we MUST use `doctor.id` here.
+   * Do NOT use `doctor.user_id` — that is the User integer PK, not the Doctor UUID.
+   *
+   * NOTE: This is the OPPOSITE of appointments (DoctorAppointmentList),
+   * which uses `doctor.user_id` because appointments reference `dentist_id → users.id`.
+   */
   doctor: DoctorProfileResponse;
 }
 
