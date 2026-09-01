@@ -9,7 +9,7 @@ import type { DoctorResponse } from '../../../types/doctor';
 
 interface MobileDoctorCardProps {
   doctor: DoctorResponse;
-  /** Opens the doctor detail/edit view. */
+  /** Navigates to the doctor detail page. */
   onClick?: () => void;
 }
 
@@ -37,10 +37,8 @@ export const MobileDoctorCard: FC<MobileDoctorCardProps> = ({ doctor, onClick })
     .filter(Boolean)
     .join(' · ');
 
-  // The doctors module has no detail page — tapping the card opens the
-  // EDIT drawer (the deepest available action), so label it accordingly.
   return (
-    <MobileCard onClick={onClick} ariaLabel={`Edit ${name}`}>
+    <MobileCard onClick={onClick} ariaLabel={`View ${name}`}>
       <span className="flex w-full items-center justify-between gap-3">
         <span className="min-w-0 truncate font-mono text-sm font-semibold tracking-tight text-neutral-900">
           {doctor.doctor_code}

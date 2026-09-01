@@ -145,6 +145,33 @@ export const DOCTOR_DAY_LABELS: Record<DayOfWeek, string> = {
   5: 'Saturday',
 };
 
+/** All configurable weekdays (Monday–Saturday). Sunday is NOT configurable. */
+export const DOCTOR_ALL_DAYS: readonly DayOfWeek[] = [0, 1, 2, 3, 4, 5] as const;
+
+/* ── Clinic Default Schedule (mirrors backend app/core/constants.py) ──── */
+
+/**
+ * Clinic default working sessions when a doctor has zero custom schedule rows.
+ * These values MUST match the backend constants exactly:
+ * - CLINIC_MORNING_START = 10:00
+ * - CLINIC_MORNING_END   = 13:00
+ * - CLINIC_EVENING_START = 17:00
+ * - CLINIC_EVENING_END   = 21:00
+ *
+ * NOTE: This is the single source of truth for clinic defaults on the frontend.
+ * If the backend changes these values, update ONLY this location.
+ */
+export const CLINIC_DEFAULT_SESSIONS: readonly { start: string; end: string }[] = [
+  { start: '10:00', end: '13:00' },
+  { start: '17:00', end: '21:00' },
+] as const;
+
+/** Human-readable label for the clinic default morning session. */
+export const CLINIC_MORNING_LABEL = '10:00 AM – 1:00 PM';
+
+/** Human-readable label for the clinic default evening session. */
+export const CLINIC_EVENING_LABEL = '5:00 PM – 9:00 PM';
+
 /* ── UserSearchSelect (shared) constants ────────────────────────────── */
 
 /**

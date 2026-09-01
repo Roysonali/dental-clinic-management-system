@@ -1,4 +1,5 @@
 import { useMemo, useState, type FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DoctorTable } from '../DoctorTable';
 import { DoctorToolbar } from '../DoctorToolbar';
 import { DoctorStatsCards, type DoctorStats } from '../DoctorStatsCards';
@@ -23,6 +24,7 @@ import { usePermission } from '../../../hooks/rbac/usePermission';
 import { ADMIN_ROLES } from '../../../constants/roles';
 import { parseApiError } from '../../../services/apiError';
 import { DOCTOR_MAX_PAGE_SIZE } from '../../../constants/doctor';
+import { ROUTES } from '../../../routes/routes';
 import type { DoctorResponse } from '../../../types/doctor';
 
 type FormState = { mode: 'create' } | { mode: 'edit'; doctor: DoctorResponse } | null;
@@ -49,6 +51,7 @@ function deriveStats(rows: DoctorResponse[] | undefined, total: number | undefin
  * filtering.
  */
 export const DoctorListContainer: FC = () => {
+  const navigate = useNavigate();
   const isMobile = useIsMobileViewport();
   const filters = useDoctorFilters();
   const doctorsQuery = useDoctors(filters.params);
@@ -96,6 +99,10 @@ export const DoctorListContainer: FC = () => {
     filters.setPage(1);
   };
 
+  const handleNavigateToDetails = (doctor: DoctorResponse) => {
+    navigate(`${ROUTES.DOCTORS}/${doctor.id}`);
+  };
+
   const openCreate = () => setFormState({ mode: 'create' });
   const openEdit = (doctor: DoctorResponse) => setFormState({ mode: 'edit', doctor });
   const closeForm = () => setFormState(null);
@@ -136,7 +143,7 @@ export const DoctorListContainer: FC = () => {
             onSpecializationChange={filters.setSpecialization}
             hasActiveFilters={hasActiveFilters}
             onClearFilters={clearFilters}
-            onView={openEdit}
+            onView={handleNavigateToDetails}
             page={filters.page}
             totalPages={totalPages}
             totalCount={doctorsQuery.data?.total}
@@ -181,6 +188,8 @@ export const DoctorListContainer: FC = () => {
         onRetry={() => void doctorsQuery.refetch()}
         columnVisibility={columnVisibility}
         onColumnVisibilityChange={setColumnVisibility}
+        onRowClick={handleNavigateToDetails}
+        onViewDetails={handleNavigateToDetails}
         onEdit={openEdit}
         onDeactivate={canManageStatus ? (doctor) => setStatusState({ doctor, intent: 'deactivate' }) : undefined}
         onReactivate={canManageStatus ? (doctor) => setStatusState({ doctor, intent: 'activate' }) : undefined}

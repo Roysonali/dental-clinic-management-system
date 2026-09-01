@@ -36,88 +36,210 @@ const baseDoctor: DoctorProfileResponse = {
 };
 
 describe('DoctorScheduleSection', () => {
-  it('renders schedule rows with day, times and active status', () => {
-    renderWithProviders(
-      <DoctorScheduleSection
-        doctor={{
-          ...baseDoctor,
-          schedules: [
-            {
-              id: 's1',
-              doctor_id: 'd1',
-              day_of_week: 0,
-              start_time: '09:00:00',
-              end_time: '12:00:00',
-              is_active: true,
-            },
-            {
-              id: 's2',
-              doctor_id: 'd1',
-              day_of_week: 2,
-              start_time: '13:00:00',
-              end_time: '17:00:00',
-              is_active: false,
-            },
-          ],
-        }}
-      />,
-    );
+  describe('Clinic Default Schedule (zero custom schedules)', () => {
+    it('displays "Using clinic default schedule" when no custom schedules', () => {
+      renderWithProviders(<DoctorScheduleSection doctor={baseDoctor} />);
+      expect(screen.getByText('Using clinic default schedule')).toBeInTheDocument();
+    });
 
-    expect(screen.getByText('Weekly Schedule')).toBeInTheDocument();
-    expect(screen.getByText('Monday')).toBeInTheDocument();
-    expect(screen.getByText('9:00 AM')).toBeInTheDocument();
-    expect(screen.getByText('12:00 PM')).toBeInTheDocument();
-    expect(screen.getByText('Wednesday')).toBeInTheDocument();
-    expect(screen.getByText('1:00 PM')).toBeInTheDocument();
-    expect(screen.getByText('5:00 PM')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    it('does NOT display "No schedule set"', () => {
+      renderWithProviders(<DoctorScheduleSection doctor={baseDoctor} />);
+      expect(screen.queryByText('No schedule set')).not.toBeInTheDocument();
+    });
+
+    it('displays all 6 weekdays (Mon–Sat)', () => {
+      renderWithProviders(<DoctorScheduleSection doctor={baseDoctor} />);
+      expect(screen.getByText('Monday')).toBeInTheDocument();
+      expect(screen.getByText('Tuesday')).toBeInTheDocument();
+      expect(screen.getByText('Wednesday')).toBeInTheDocument();
+      expect(screen.getByText('Thursday')).toBeInTheDocument();
+      expect(screen.getByText('Friday')).toBeInTheDocument();
+      expect(screen.getByText('Saturday')).toBeInTheDocument();
+    });
+
+    it('displays clinic default morning session for each day', () => {
+      renderWithProviders(<DoctorScheduleSection doctor={baseDoctor} />);
+      // Morning session label appears 6 times (once per day)
+      const morningLabels = screen.getAllByText('10:00 AM – 1:00 PM');
+      expect(morningLabels).toHaveLength(6);
+    });
+
+    it('displays clinic default evening session for each day', () => {
+      renderWithProviders(<DoctorScheduleSection doctor={baseDoctor} />);
+      const eveningLabels = screen.getAllByText('5:00 PM – 9:00 PM');
+      expect(eveningLabels).toHaveLength(6);
+    });
+
+    it('does NOT display Sunday', () => {
+      renderWithProviders(<DoctorScheduleSection doctor={baseDoctor} />);
+      expect(screen.queryByText('Sunday')).not.toBeInTheDocument();
+    });
+
+    it('shows "Create Custom Schedule" button for admins', () => {
+      renderWithProviders(
+        <DoctorScheduleSection doctor={baseDoctor} isAdmin={true} onEditSchedule={() => {}} />,
+      );
+      expect(screen.getByText('Create Custom Schedule')).toBeInTheDocument();
+    });
+
+    it('hides edit button for non-admins', () => {
+      renderWithProviders(
+        <DoctorScheduleSection doctor={baseDoctor} isAdmin={false} onEditSchedule={() => {}} />,
+      );
+      expect(screen.queryByText('Create Custom Schedule')).not.toBeInTheDocument();
+      expect(screen.queryByText('Edit Schedule')).not.toBeInTheDocument();
+    });
   });
 
-  it('sorts schedules Monday through Saturday regardless of API order', () => {
-    renderWithProviders(
-      <DoctorScheduleSection
-        doctor={{
-          ...baseDoctor,
-          schedules: [
-            { id: 's3', doctor_id: 'd1', day_of_week: 5, start_time: '09:00:00', end_time: '10:00:00', is_active: true },
-            { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '10:00:00', is_active: true },
-          ],
-        }}
-      />,
-    );
+  describe('Custom Schedule', () => {
+    it('displays "Custom schedule" when custom schedules exist', () => {
+      renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
+            ],
+          }}
+        />,
+      );
+      expect(screen.getByText('Custom schedule')).toBeInTheDocument();
+    });
 
-    const rows = screen.getAllByRole('row').slice(1); // skip header
-    expect(within(rows[0]).getByText('Monday')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('Saturday')).toBeInTheDocument();
+    it('renders all 6 weekdays even when only some have schedules', () => {
+      renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
+            ],
+          }}
+        />,
+      );
+      expect(screen.getByText('Monday')).toBeInTheDocument();
+      expect(screen.getByText('Tuesday')).toBeInTheDocument();
+      expect(screen.getByText('Wednesday')).toBeInTheDocument();
+      expect(screen.getByText('Thursday')).toBeInTheDocument();
+      expect(screen.getByText('Friday')).toBeInTheDocument();
+      expect(screen.getByText('Saturday')).toBeInTheDocument();
+    });
+
+    it('displays "Not working" for days without schedules', () => {
+      renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
+            ],
+          }}
+        />,
+      );
+      // Tuesday through Saturday should show "Not working" (5 days)
+      const notWorking = screen.getAllByText('Not working');
+      expect(notWorking.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders two sessions on the same weekday', () => {
+      renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
+              { id: 's2', doctor_id: 'd1', day_of_week: 0, start_time: '17:00:00', end_time: '21:00:00', is_active: true },
+            ],
+          }}
+        />,
+      );
+      // Sessions are rendered as "9:00 AM – 12:00 PM" and "5:00 PM – 9:00 PM" in a single span
+      expect(screen.getByText(/9:00 AM/)).toBeInTheDocument();
+      expect(screen.getByText(/12:00 PM/)).toBeInTheDocument();
+      expect(screen.getByText(/5:00 PM/)).toBeInTheDocument();
+      expect(screen.getByText(/9:00 PM/)).toBeInTheDocument();
+    });
+
+    it('displays inactive sessions with strikethrough styling', () => {
+      const { container } = renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
+              { id: 's2', doctor_id: 'd1', day_of_week: 0, start_time: '17:00:00', end_time: '21:00:00', is_active: false },
+            ],
+          }}
+        />,
+      );
+      // Both sessions render their time ranges
+      expect(screen.getByText(/9:00 AM/)).toBeInTheDocument();
+      expect(screen.getByText(/5:00 PM/)).toBeInTheDocument();
+      // Inactive session has line-through styling
+      const lineThroughElements = container.querySelectorAll('.line-through');
+      expect(lineThroughElements.length).toBeGreaterThan(0);
+    });
+
+    it('shows "Edit Schedule" button for admins with custom schedules', () => {
+      renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
+            ],
+          }}
+          isAdmin={true}
+          onEditSchedule={() => {}}
+        />,
+      );
+      expect(screen.getByText('Edit Schedule')).toBeInTheDocument();
+    });
   });
 
-  it('uses semantic table structure with column headers', () => {
-    renderWithProviders(
-      <DoctorScheduleSection
-        doctor={{
-          ...baseDoctor,
-          schedules: [
-            { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
-          ],
-        }}
-      />,
-    );
+  describe('Schedule sorting', () => {
+    it('sorts schedules Monday through Saturday regardless of API order', () => {
+      renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's3', doctor_id: 'd1', day_of_week: 5, start_time: '09:00:00', end_time: '10:00:00', is_active: true },
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '10:00:00', is_active: true },
+            ],
+          }}
+        />,
+      );
 
-    const table = screen.getByRole('table');
-    const headerRow = within(table).getAllByRole('row')[0];
-    expect(within(headerRow).getByText('Day')).toBeInTheDocument();
-    expect(within(headerRow).getByText('Start Time')).toBeInTheDocument();
-    expect(within(headerRow).getByText('End Time')).toBeInTheDocument();
-    expect(within(headerRow).getByText('Status')).toBeInTheDocument();
-
-    // Day cells use row-header scope
-    const dayHeader = within(table).getByRole('rowheader', { name: 'Monday' });
-    expect(dayHeader).toBeInTheDocument();
+      const table = screen.getByRole('table');
+      const rows = within(table).getAllByRole('row').slice(1); // skip header
+      expect(within(rows[0]).getByText('Monday')).toBeInTheDocument();
+      // Saturday should appear after Monday
+      const lastRow = rows[rows.length - 1];
+      expect(within(lastRow).getByText('Saturday')).toBeInTheDocument();
+    });
   });
 
-  it('renders the empty state when no schedule is set', () => {
-    renderWithProviders(<DoctorScheduleSection doctor={baseDoctor} />);
-    expect(screen.getByText('No schedule set')).toBeInTheDocument();
+  describe('Accessibility', () => {
+    it('uses semantic table structure with column headers', () => {
+      renderWithProviders(
+        <DoctorScheduleSection
+          doctor={{
+            ...baseDoctor,
+            schedules: [
+              { id: 's1', doctor_id: 'd1', day_of_week: 0, start_time: '09:00:00', end_time: '12:00:00', is_active: true },
+            ],
+          }}
+        />,
+      );
+
+      const table = screen.getByRole('table');
+      const headerRow = within(table).getAllByRole('row')[0];
+      expect(within(headerRow).getByText('Day')).toBeInTheDocument();
+      expect(within(headerRow).getByText('Working Hours')).toBeInTheDocument();
+
+      const dayHeader = within(table).getByRole('rowheader', { name: 'Monday' });
+      expect(dayHeader).toBeInTheDocument();
+    });
   });
 });

@@ -7,6 +7,9 @@ import type {
   DoctorResponse,
   DoctorUpdateRequest,
   DoctorUserResponse,
+  ScheduleCreateRequest,
+  ScheduleUpdateRequest,
+  ScheduleResponse,
   SpecializationListParams,
   SpecializationListResponse,
 } from '../types/doctor';
@@ -136,6 +139,47 @@ export const doctorService = {
    */
   async delete(id: string): Promise<void> {
     await api.delete(`/doctors/${id}`);
+  },
+
+  /* ── Schedule CRUD ───────────────────────────────────────────────────── */
+
+  /** GET /doctors/{id}/schedules — list all schedule entries for a doctor. */
+  async listSchedules(doctorId: string): Promise<ScheduleResponse[]> {
+    const { data } = await api.get<ScheduleResponse[]>(`/doctors/${doctorId}/schedules`);
+    return data;
+  },
+
+  /** POST /doctors/{id}/schedules — create a single schedule entry. */
+  async createSchedule(doctorId: string, payload: ScheduleCreateRequest): Promise<ScheduleResponse> {
+    const { data } = await api.post<ScheduleResponse>(`/doctors/${doctorId}/schedules`, payload);
+    return data;
+  },
+
+  /** PATCH /doctors/{id}/schedules/{sid} — partial update a schedule entry. */
+  async updateSchedule(
+    doctorId: string,
+    scheduleId: string,
+    payload: ScheduleUpdateRequest,
+  ): Promise<ScheduleResponse> {
+    const { data } = await api.patch<ScheduleResponse>(
+      `/doctors/${doctorId}/schedules/${scheduleId}`,
+      payload,
+    );
+    return data;
+  },
+
+  /** DELETE /doctors/{id}/schedules/{sid} — delete a schedule entry. */
+  async deleteSchedule(doctorId: string, scheduleId: string): Promise<void> {
+    await api.delete(`/doctors/${doctorId}/schedules/${scheduleId}`);
+  },
+
+  /** PUT /doctors/{id}/schedules — atomically replace entire weekly schedule. */
+  async replaceWeekSchedule(
+    doctorId: string,
+    schedules: ScheduleCreateRequest[],
+  ): Promise<ScheduleResponse[]> {
+    const { data } = await api.put<ScheduleResponse[]>(`/doctors/${doctorId}/schedules`, schedules);
+    return data;
   },
 
   /** GET /specializations — filter dropdown / master data. */

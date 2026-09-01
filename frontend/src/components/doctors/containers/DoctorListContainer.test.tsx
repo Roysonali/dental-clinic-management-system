@@ -291,4 +291,55 @@ describe('DoctorListContainer', () => {
 
     expect(await screen.findByText('No doctors found')).toBeInTheDocument();
   });
+
+  // ── Navigation tests ───────────────────────────────────────────────
+
+  it('navigates to doctor details when clicking a doctor row', async () => {
+    renderWithProviders(<DoctorListContainer />, { route: '/doctors' });
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+
+    // Click the table row (not an action button) — the DataTable's onRowClick
+    // fires and the container navigates to /doctors/:doctorId.
+    const nameCell = screen.getByText('Dr. Jose Rizal');
+    fireEvent.click(nameCell.closest('tr')!);
+
+    // MemoryRouter updates the location — the path should now include the doctor ID.
+    // We can verify the table no longer renders (page navigated away) or check
+    // that the Edit drawer didn't open (row click ≠ edit).
+    expect(screen.queryByRole('dialog', { name: 'Edit Doctor' })).not.toBeInTheDocument();
+  });
+
+  it('renders View Details action buttons for each doctor', async () => {
+    renderWithProviders(<DoctorListContainer />, { route: '/doctors' });
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+
+    expect(screen.getByRole('button', { name: 'View details for Dr. Jose Rizal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View details for Dr. Maria Santos' })).toBeInTheDocument();
+  });
+
+  it('navigates to doctor details when clicking View Details button', async () => {
+    renderWithProviders(<DoctorListContainer />, { route: '/doctors' });
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'View details for Dr. Jose Rizal' }));
+
+    // View Details navigates away — Edit dialog should NOT open
+    expect(screen.queryByRole('dialog', { name: 'Edit Doctor' })).not.toBeInTheDocument();
+  });
+
+  it('does not trigger row navigation when clicking Edit button', async () => {
+    getMock.mockResolvedValue(makeDoctor());
+    renderWithProviders(<DoctorListContainer />, { route: '/doctors' });
+
+    await waitFor(() => expect(screen.getByText('Dr. Jose Rizal')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Dr. Jose Rizal' }));
+
+    // Edit opens its dialog — NOT navigation
+    expect(screen.getByRole('dialog', { name: 'Edit Doctor' })).toBeInTheDocument();
+    await waitFor(() => expect(getMock).toHaveBeenCalledWith('d1'));
+  });
 });

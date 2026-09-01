@@ -12,9 +12,13 @@ import {
   useToggleAvailability,
   useToggleLeave,
   useUpdateDoctor,
+  useReplaceWeekSchedule,
+  useCreateDoctorSchedule,
+  useUpdateDoctorSchedule,
+  useDeleteDoctorSchedule,
 } from './useDoctorMutations';
 import { useDoctors } from './useDoctors';
-import type { DoctorCreateRequest, DoctorResponse } from '../../types/doctor';
+import type { DoctorCreateRequest, DoctorResponse, DayOfWeek, ScheduleResponse } from '../../types/doctor';
 
 vi.mock('../../services/doctorService', () => ({
   doctorService: {
@@ -25,6 +29,10 @@ vi.mock('../../services/doctorService', () => ({
     deactivate: vi.fn(),
     toggleLeave: vi.fn(),
     toggleAvailability: vi.fn(),
+    replaceWeekSchedule: vi.fn(),
+    createSchedule: vi.fn(),
+    updateSchedule: vi.fn(),
+    deleteSchedule: vi.fn(),
   },
 }));
 
@@ -35,6 +43,10 @@ const activateMock = vi.mocked(doctorService.activate);
 const deactivateMock = vi.mocked(doctorService.deactivate);
 const toggleLeaveMock = vi.mocked(doctorService.toggleLeave);
 const toggleAvailabilityMock = vi.mocked(doctorService.toggleAvailability);
+const replaceWeekScheduleMock = vi.mocked(doctorService.replaceWeekSchedule);
+const createScheduleMock = vi.mocked(doctorService.createSchedule);
+const updateScheduleMock = vi.mocked(doctorService.updateSchedule);
+const deleteScheduleMock = vi.mocked(doctorService.deleteSchedule);
 
 const doctor: DoctorResponse = {
   id: 'd1',
@@ -107,6 +119,10 @@ describe('useDoctorMutations', () => {
     deactivateMock.mockReset();
     toggleLeaveMock.mockReset();
     toggleAvailabilityMock.mockReset();
+    replaceWeekScheduleMock.mockReset();
+    createScheduleMock.mockReset();
+    updateScheduleMock.mockReset();
+    deleteScheduleMock.mockReset();
   });
 
   it('useCreateDoctor posts the payload and invalidates the doctor list (refetch)', async () => {
@@ -183,6 +199,82 @@ describe('useDoctorMutations', () => {
 
     const { result } = renderHook(() => useActivateDoctor(), { wrapper: makeWrapper(queryClient) });
     result.current.mutate('d1');
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(Error);
+  });
+
+  /* ── Schedule Mutations ─────────────────────────────────────────── */
+
+  const scheduleResponse: ScheduleResponse = {
+    id: 's1',
+    doctor_id: 'd1',
+    day_of_week: 0 as DayOfWeek,
+    start_time: '10:00:00',
+    end_time: '13:00:00',
+    is_active: true,
+  };
+
+  it('useReplaceWeekSchedule calls replaceWeekSchedule with doctorId and schedules', async () => {
+    replaceWeekScheduleMock.mockResolvedValue([scheduleResponse]);
+    const queryClient = createQueryClient();
+
+    const { result } = renderHook(() => useReplaceWeekSchedule(), { wrapper: makeWrapper(queryClient) });
+    const schedules = [{ day_of_week: 0 as const, start_time: '10:00', end_time: '13:00' }];
+    result.current.mutate({ doctorId: 'd1', schedules });
+
+    await waitFor(() => expect(replaceWeekScheduleMock).toHaveBeenCalledWith('d1', schedules));
+  });
+
+  it('useReplaceWeekSchedule invalidates doctor queries on success', async () => {
+    replaceWeekScheduleMock.mockResolvedValue([scheduleResponse]);
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 100 });
+    const queryClient = createQueryClient();
+
+    const { result } = renderHook(() => useReplaceWeekSchedule(), { wrapper: makeWrapper(queryClient) });
+    result.current.mutate({ doctorId: 'd1', schedules: [] });
+
+    await waitFor(() => expect(replaceWeekScheduleMock).toHaveBeenCalled());
+  });
+
+  it('useCreateDoctorSchedule calls createSchedule with doctorId and payload', async () => {
+    createScheduleMock.mockResolvedValue(scheduleResponse);
+    const queryClient = createQueryClient();
+
+    const { result } = renderHook(() => useCreateDoctorSchedule(), { wrapper: makeWrapper(queryClient) });
+    const payload = { day_of_week: 0 as const, start_time: '10:00', end_time: '13:00' };
+    result.current.mutate({ doctorId: 'd1', payload });
+
+    await waitFor(() => expect(createScheduleMock).toHaveBeenCalledWith('d1', payload));
+  });
+
+  it('useUpdateDoctorSchedule calls updateSchedule with doctorId, scheduleId, and payload', async () => {
+    updateScheduleMock.mockResolvedValue(scheduleResponse);
+    const queryClient = createQueryClient();
+
+    const { result } = renderHook(() => useUpdateDoctorSchedule(), { wrapper: makeWrapper(queryClient) });
+    const payload = { start_time: '09:00' };
+    result.current.mutate({ doctorId: 'd1', scheduleId: 's1', payload });
+
+    await waitFor(() => expect(updateScheduleMock).toHaveBeenCalledWith('d1', 's1', payload));
+  });
+
+  it('useDeleteDoctorSchedule calls deleteSchedule with doctorId and scheduleId', async () => {
+    deleteScheduleMock.mockResolvedValue(undefined);
+    const queryClient = createQueryClient();
+
+    const { result } = renderHook(() => useDeleteDoctorSchedule(), { wrapper: makeWrapper(queryClient) });
+    result.current.mutate({ doctorId: 'd1', scheduleId: 's1' });
+
+    await waitFor(() => expect(deleteScheduleMock).toHaveBeenCalledWith('d1', 's1'));
+  });
+
+  it('useReplaceWeekSchedule propagates errors', async () => {
+    replaceWeekScheduleMock.mockRejectedValue(new Error('Overlap detected'));
+    const queryClient = createQueryClient();
+
+    const { result } = renderHook(() => useReplaceWeekSchedule(), { wrapper: makeWrapper(queryClient) });
+    result.current.mutate({ doctorId: 'd1', schedules: [] });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(Error);

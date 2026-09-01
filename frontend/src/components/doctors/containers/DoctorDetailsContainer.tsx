@@ -15,6 +15,8 @@ import { DoctorClinicalCard } from '../DoctorClinicalCard';
 import { DoctorEmergencyCard } from '../DoctorEmergencyCard';
 import { DoctorSpecializationsSection } from '../DoctorSpecializationsSection';
 import { DoctorScheduleSection } from '../DoctorScheduleSection';
+import { DoctorAppointmentList } from '../DoctorAppointmentList';
+import { DoctorTreatmentPlanList } from '../DoctorTreatmentPlanList';
 import { DoctorFormContainer } from './DoctorFormContainer';
 import { DoctorStatusDialog, type DoctorStatusIntent } from '../DoctorStatusDialog';
 import { DoctorToggleDialog, type DoctorToggleIntent } from '../DoctorToggleDialog';
@@ -25,48 +27,24 @@ import { Button } from '../../common/Button/Button';
 import { Icon } from '../../common/Icon/Icon';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { ResultState } from '../../common/ResultState/ResultState';
-import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { ContentContainer } from '../../../layouts/components/ContentContainer';
 import type { DoctorProfileResponse } from '../../../types/doctor';
-
-/* ── Empty-state placeholders for tabs owned by other modules ───────── */
-
-function EmptyTab({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-8">
-      <EmptyState title={title} description={description} />
-    </div>
-  );
-}
-
-const UNWIRED_TABS = [
-  {
-    value: 'appointments',
-    label: 'Appointments',
-    title: 'No appointments',
-    description: 'Appointments for this doctor will appear here once the Appointments module is connected.',
-  },
-  {
-    value: 'treatment-plans',
-    label: 'Treatment Plans',
-    title: 'No treatment plans',
-    description: 'Treatment plans for this doctor will appear here once the Treatment module is connected.',
-  },
-  {
-    value: 'billing',
-    label: 'Billing',
-    title: 'No billing activity',
-    description: 'Invoices and payments for this doctor will appear here once the Billing module is connected.',
-  },
-] as const;
 
 /**
  * DoctorDetailsContainer — orchestrates the doctor details page.
  *
  * Loads the profile via GET /doctors/{id}/profile (the single source for
  * the header, overview cards, specializations and weekly schedule), owns
- * the edit drawer + status/toggle dialogs, and renders placeholder tabs
- * for modules that are not yet wired (Patient convention).
+ * the edit drawer + status/toggle dialogs, and renders real tab content
+ * for Appointments and Treatment Plans (consumed from their respective modules).
+ *
+ * Final tab structure:
+ *   Overview — Doctor profile, clinical info, specializations, working schedule
+ *   Appointments — Doctor-filtered appointments (doctor.user_id → dentist_id)
+ *   Treatment Plans — Doctor-filtered treatment plans (doctor.id → doctor_id)
+ *
+ * Billing tab is intentionally removed (architectural decision — Invoice.doctor_id
+ * is nullable and inconsistently populated; no reliable revenue attribution).
  */
 export const DoctorDetailsContainer: FC = () => {
   const { doctorId } = useParams<{ doctorId: string }>();
@@ -189,9 +167,8 @@ export const DoctorDetailsContainer: FC = () => {
         <Tabs defaultValue="overview">
           <Tabs.List>
             <Tabs.Trigger value="overview" label="Overview" />
-            {UNWIRED_TABS.map((tab) => (
-              <Tabs.Trigger key={tab.value} value={tab.value} label={tab.label} />
-            ))}
+            <Tabs.Trigger value="appointments" label="Appointments" />
+            <Tabs.Trigger value="treatment-plans" label="Treatment Plans" />
           </Tabs.List>
 
           {/* ── Overview (fully wired from the Doctor module) ── */}
@@ -214,12 +191,19 @@ export const DoctorDetailsContainer: FC = () => {
             </div>
           </Tabs.Content>
 
-          {/* ── Tabs owned by other modules (intentional empty states) ── */}
-          {UNWIRED_TABS.map((tab) => (
-            <Tabs.Content key={tab.value} value={tab.value} lazy className="mt-6">
-              <EmptyTab title={tab.title} description={tab.description} />
-            </Tabs.Content>
-          ))}
+          {/* ── Appointments (consumed from the Appointment module) ── */}
+          <Tabs.Content value="appointments" lazy className="mt-6">
+            <div className="rounded-xl border border-neutral-200 bg-white p-6">
+              <DoctorAppointmentList doctor={doctor} />
+            </div>
+          </Tabs.Content>
+
+          {/* ── Treatment Plans (consumed from the Treatment Plan module) ── */}
+          <Tabs.Content value="treatment-plans" lazy className="mt-6">
+            <div className="rounded-xl border border-neutral-200 bg-white p-6">
+              <DoctorTreatmentPlanList doctor={doctor} />
+            </div>
+          </Tabs.Content>
         </Tabs>
       </div>
 
