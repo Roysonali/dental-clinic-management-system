@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { Pencil, UserCheck, UserX } from 'lucide-react';
+import { Eye, Pencil, UserCheck, UserX } from 'lucide-react';
 import { DataTable } from '../common/DataTable/DataTable';
 import { IconButton } from '../common/Button/IconButton';
 import { Icon } from '../common/Icon/Icon';
@@ -47,11 +47,13 @@ function displayName(doctor: DoctorResponse): string {
 
 function DoctorCard({
   doctor,
+  onRowClick,
   onEdit,
   onDeactivate,
   onReactivate,
 }: {
   doctor: DoctorResponse;
+  onRowClick?: (doctor: DoctorResponse) => void;
   onEdit?: (doctor: DoctorResponse) => void;
   onDeactivate?: (doctor: DoctorResponse) => void;
   onReactivate?: (doctor: DoctorResponse) => void;
@@ -64,7 +66,15 @@ function DoctorCard({
         <div className="flex min-w-0 items-center gap-3">
           <DoctorAvatar fullName={doctor.user_full_name} src={doctor.profile_photo_url} size="lg" />
           <div className="min-w-0">
-            <p className="truncate font-semibold text-neutral-900">{name}</p>
+            <p className="truncate font-semibold text-neutral-900">{onRowClick ? (
+              <button
+                type="button"
+                onClick={() => onRowClick(doctor)}
+                className="cursor-pointer text-left text-inherit underline decoration-transparent transition-colors hover:text-primary-600 hover:decoration-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
+              >
+                {name}
+              </button>
+            ) : name}</p>
             <p className="truncate text-caption text-neutral-500">{doctor.doctor_code}</p>
           </div>
         </div>
@@ -180,7 +190,10 @@ interface DoctorTableProps {
   /* ── Column visibility (owned by the page-level DoctorToolbar) ── */
   columnVisibility?: ColumnVisibility;
   onColumnVisibilityChange?: (visibility: ColumnVisibility) => void;
+  /* ── Row click navigation ── */
+  onRowClick?: (doctor: DoctorResponse) => void;
   /* ── Row actions ── */
+  onViewDetails?: (doctor: DoctorResponse) => void;
   onEdit?: (doctor: DoctorResponse) => void;
   onDeactivate?: (doctor: DoctorResponse) => void;
   onReactivate?: (doctor: DoctorResponse) => void;
@@ -212,6 +225,8 @@ export const DoctorTable: FC<DoctorTableProps> = ({
   onRetry,
   columnVisibility,
   onColumnVisibilityChange,
+  onRowClick,
+  onViewDetails,
   onEdit,
   onDeactivate,
   onReactivate,
@@ -225,6 +240,17 @@ export const DoctorTable: FC<DoctorTableProps> = ({
     const name = displayName(doctor);
     return (
       <span className="inline-flex items-center justify-end gap-0.5">
+        {onViewDetails && (
+          <Tooltip content="View Details">
+            <IconButton
+              icon={<Icon icon={Eye} size="sm" />}
+              aria-label={`View details for ${name}`}
+              size="sm"
+              variant="ghost"
+              onClick={() => onViewDetails(doctor)}
+            />
+          </Tooltip>
+        )}
         {onEdit && (
           <Tooltip content="Edit">
             <IconButton
@@ -296,6 +322,7 @@ export const DoctorTable: FC<DoctorTableProps> = ({
               <DoctorCard
                 key={doctor.id}
                 doctor={doctor}
+                onRowClick={onRowClick}
                 onEdit={onEdit}
                 onDeactivate={onDeactivate}
                 onReactivate={onReactivate}
@@ -318,6 +345,7 @@ export const DoctorTable: FC<DoctorTableProps> = ({
       loading={loading}
       error={error}
       onRetry={onRetry}
+      onRowClick={onRowClick}
       zebra
       rowActionsHeader={rowActionsHeader}
       emptyTitle="No doctors found"

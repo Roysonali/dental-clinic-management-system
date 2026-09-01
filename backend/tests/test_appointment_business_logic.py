@@ -748,3 +748,411 @@ class TestWednesdaySchedule:
 
         assert AppointmentStatus.CANCELLED not in AppointmentRepository._SLOT_OCCUPYING_STATUSES
         assert AppointmentStatus.NO_SHOW not in AppointmentRepository._SLOT_OCCUPYING_STATUSES
+
+
+# ==============================================================
+# Multi-Session Schedule Tests (Phase 1A)
+# ==============================================================
+
+class TestMultiSessionSchedule:
+    """Tests for multiple sessions per weekday.
+
+    Given: Wednesday 10:00–13:00 and 17:00–21:00
+    An appointment must fit ENTIRELY inside one session.
+    """
+
+    def _make_wednesday_multi(self):
+        """Create doctor with Wednesday split sessions."""
+        s1 = make_mock_schedule(2, time(10, 0), time(13, 0))  # Wed morning
+        s2 = make_mock_schedule(2, time(17, 0), time(21, 0))  # Wed evening
+        return make_mock_doctor_profile(schedules=[s1, s2])
+
+    def test_fits_inside_morning_session(self):
+        """10:00–10:30 inside morning session → accepted."""
+        doctor = self._make_wednesday_multi()
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 2), time(10, 0), time(10, 30),
+        )
+
+    def test_fits_late_in_morning_session(self):
+        """12:30–13:00 exactly at morning end → accepted."""
+        doctor = self._make_wednesday_multi()
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 2), time(12, 30), time(13, 0),
+        )
+
+    def test_crosses_morning_boundary_rejected(self):
+        """12:45–13:15 crosses morning end → rejected."""
+        doctor = self._make_wednesday_multi()
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 2), time(12, 45), time(13, 15),
+            )
+
+    def test_lunch_gap_rejected(self):
+        """14:00–14:30 in the gap → rejected."""
+        doctor = self._make_wednesday_multi()
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 2), time(14, 0), time(14, 30),
+            )
+
+    def test_fits_inside_evening_session(self):
+        """17:00–17:30 inside evening session → accepted."""
+        doctor = self._make_wednesday_multi()
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 2), time(17, 0), time(17, 30),
+        )
+
+    def test_fits_late_in_evening_session(self):
+        """20:30–21:00 exactly at evening end → accepted."""
+        doctor = self._make_wednesday_multi()
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 2), time(20, 30), time(21, 0),
+        )
+
+    def test_crosses_evening_boundary_rejected(self):
+        """20:45–21:15 crosses evening end → rejected."""
+        doctor = self._make_wednesday_multi()
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 2), time(20, 45), time(21, 15),
+            )
+
+    def test_between_sessions_rejected(self):
+        """13:00–13:30 between sessions → rejected."""
+        doctor = self._make_wednesday_multi()
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 2), time(13, 0), time(13, 30),
+            )
+
+    def test_only_morning_session_rejected_evening(self):
+        """Doctor with only morning session, evening time → rejected."""
+        s1 = make_mock_schedule(2, time(10, 0), time(13, 0))  # Wed morning only
+        doctor = make_mock_doctor_profile(schedules=[s1])
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 2), time(17, 0), time(17, 30),
+            )
+
+    def test_weekday_with_no_sessions_rejected(self):
+        """Doctor with Wed sessions, appointment on Thu (no schedule) → rejected."""
+        doctor = self._make_wednesday_multi()
+        # 2026-09-03 is Thursday (weekday=3)
+        with pytest.raises(AppointmentValidationException, match="no working schedule.*Thursday"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 3), time(10, 0), time(10, 30),
+            )
+
+
+# ==============================================================
+# Session Overlap Detection Tests (Phase 1B)
+# ==============================================================
+
+class TestSessionOverlapDetection:
+    """Tests for the schedule overlap validator.
+
+    Verifies the boundary semantics of interval overlap detection.
+    """
+
+    def test_non_overlapping_valid(self):
+        """10:00–13:00 and 17:00–21:00 → no overlap."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        ScheduleValidator.assert_no_session_overlap([
+            (time(10, 0), time(13, 0)),
+            (time(17, 0), time(21, 0)),
+        ])
+
+    def test_adjacent_sessions_allowed(self):
+        """10:00–13:00 and 13:00–17:00 → touching boundary, no overlap."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        # Adjacent sessions sharing an endpoint are non-overlapping
+        ScheduleValidator.assert_no_session_overlap([
+            (time(10, 0), time(13, 0)),
+            (time(13, 0), time(17, 0)),
+        ])
+
+    def test_overlapping_rejected(self):
+        """10:00–14:00 and 12:00–18:00 → overlap."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        from app.modules.doctors.exceptions import InvalidDoctorOperation
+        with pytest.raises(InvalidDoctorOperation, match="overlap"):
+            ScheduleValidator.assert_no_session_overlap([
+                (time(10, 0), time(14, 0)),
+                (time(12, 0), time(18, 0)),
+            ])
+
+    def test_identical_sessions_rejected(self):
+        """10:00–13:00 and 10:00–13:00 → identical = overlap."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        from app.modules.doctors.exceptions import InvalidDoctorOperation
+        with pytest.raises(InvalidDoctorOperation, match="overlap"):
+            ScheduleValidator.assert_no_session_overlap([
+                (time(10, 0), time(13, 0)),
+                (time(10, 0), time(13, 0)),
+            ])
+
+    def test_same_start_rejected(self):
+        """10:00–12:00 and 10:00–14:00 → same start = overlap."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        from app.modules.doctors.exceptions import InvalidDoctorOperation
+        with pytest.raises(InvalidDoctorOperation, match="overlap"):
+            ScheduleValidator.assert_no_session_overlap([
+                (time(10, 0), time(12, 0)),
+                (time(10, 0), time(14, 0)),
+            ])
+
+    def test_one_inside_another_rejected(self):
+        """10:00–17:00 and 12:00–14:00 → inner inside outer = overlap."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        from app.modules.doctors.exceptions import InvalidDoctorOperation
+        with pytest.raises(InvalidDoctorOperation, match="overlap"):
+            ScheduleValidator.assert_no_session_overlap([
+                (time(10, 0), time(17, 0)),
+                (time(12, 0), time(14, 0)),
+            ])
+
+    def test_single_session_no_overlap(self):
+        """Single session → no overlap possible."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        ScheduleValidator.assert_no_session_overlap([
+            (time(10, 0), time(13, 0)),
+        ])
+
+    def test_empty_list_no_overlap(self):
+        """Empty list → no overlap possible."""
+        from app.modules.doctors.validators.schedule_validator import ScheduleValidator
+        ScheduleValidator.assert_no_session_overlap([])
+
+
+# ==============================================================
+# Clinic Fallback Tests (Phase 1D)
+# ==============================================================
+
+class TestClinicFallback:
+    """Tests for clinic default schedule fallback behavior."""
+
+    def test_zero_schedules_morning_valid(self):
+        """Doctor with no schedules, Friday 10:00–10:30 → accepted (clinic fallback)."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 4), time(10, 0), time(10, 30),
+        )
+
+    def test_zero_schedules_evening_valid(self):
+        """Doctor with no schedules, Friday 17:00–17:30 → accepted (clinic fallback)."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 4), time(17, 0), time(17, 30),
+        )
+
+    def test_zero_schedules_lunch_gap_rejected(self):
+        """Doctor with no schedules, Friday 14:00–14:30 → rejected (lunch gap)."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 4), time(14, 0), time(14, 30),
+            )
+
+    def test_zero_schedules_before_clinic_rejected(self):
+        """Doctor with no schedules, Friday 9:00–9:30 → rejected (before clinic opens)."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 4), time(9, 0), time(9, 30),
+            )
+
+    def test_zero_schedules_after_clinic_rejected(self):
+        """Doctor with no schedules, Friday 21:00–21:30 → rejected (after clinic closes)."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 4), time(21, 0), time(21, 30),
+            )
+
+    def test_zero_schedules_all_days_mon_to_sat(self):
+        """Clinic fallback works for Monday through Saturday."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        # 2026-08-31 = Monday; use timedelta to cross month boundary safely
+        from datetime import timedelta
+        base = date(2026, 8, 31)  # Monday
+        for day_offset in range(6):  # Mon=0 to Sat=5
+            test_date = base + timedelta(days=day_offset)
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, test_date, time(10, 0), time(10, 30),
+            )
+
+    def test_zero_schedules_sunday_rejected(self):
+        """Clinic fallback does NOT apply on Sunday."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        # 2026-08-30 is Sunday
+        with pytest.raises(AppointmentValidationException, match="no working schedule"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 8, 30), time(10, 0), time(10, 30),
+            )
+
+
+# ==============================================================
+# Custom Schedule Authority Tests (Phase 1E)
+# ==============================================================
+
+class TestCustomScheduleAuthority:
+    """Tests that custom schedules override clinic defaults."""
+
+    def test_custom_monday_only_friday_rejected(self):
+        """Doctor with only Monday schedule → Friday rejected (no clinic fallback)."""
+        schedule = make_mock_schedule(0, time(9, 0), time(17, 0))  # Monday only
+        doctor = make_mock_doctor_profile(schedules=[schedule])
+        with pytest.raises(AppointmentValidationException, match="no working schedule.*Friday"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 4), time(10, 0), time(10, 30),
+            )
+
+    def test_custom_tuesday_only_wednesday_rejected(self):
+        """Doctor with only Tuesday schedule → Wednesday rejected."""
+        schedule = make_mock_schedule(1, time(10, 0), time(14, 0))  # Tuesday only
+        doctor = make_mock_doctor_profile(schedules=[schedule])
+        with pytest.raises(AppointmentValidationException, match="no working schedule.*Wednesday"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 2), time(10, 0), time(10, 30),
+            )
+
+    def test_custom_saturday_only_sunday_still_rejected(self):
+        """Doctor with Saturday schedule → Sunday still rejected."""
+        schedule = make_mock_schedule(5, time(10, 0), time(14, 0))  # Saturday only
+        doctor = make_mock_doctor_profile(schedules=[schedule])
+        with pytest.raises(AppointmentValidationException, match="no working schedule.*Sunday"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 8, 30), time(10, 0), time(10, 30),
+            )
+
+    def test_custom_schedule_custom_hours(self):
+        """Doctor with custom 8:00–12:00 schedule → 8:00–12:00 accepted, clinic hours outside rejected."""
+        schedule = make_mock_schedule(4, time(8, 0), time(12, 0))  # Friday 8–12
+        doctor = make_mock_doctor_profile(schedules=[schedule])
+        # 8:00–8:30 should be accepted (inside custom schedule)
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 4), time(8, 0), time(8, 30),
+        )
+        # 14:00–14:30 should be rejected (outside custom schedule, even though within clinic hours)
+        with pytest.raises(AppointmentValidationException, match="falls outside"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 4), time(14, 0), time(14, 30),
+            )
+
+
+# ==============================================================
+# Inactive Schedule Semantics Tests (Phase 1F)
+# ==============================================================
+
+class TestInactiveScheduleSemantics:
+    """Tests for inactive schedule behavior — no clinic fallback."""
+
+    def test_single_inactive_schedule_no_fallback(self):
+        """Doctor with one inactive Monday schedule → all days unavailable."""
+        schedule = make_mock_schedule(0, time(9, 0), time(17, 0), is_active=False)
+        doctor = make_mock_doctor_profile(schedules=[schedule])
+        # Monday with inactive schedule → rejected
+        with pytest.raises(AppointmentValidationException, match="no working schedule"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 8, 31), time(10, 0), time(10, 30),
+            )
+        # Friday with inactive schedule (on Monday) → rejected (no fallback)
+        with pytest.raises(AppointmentValidationException, match="no working schedule"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 4), time(10, 0), time(10, 30),
+            )
+
+    def test_one_active_one_inactive_different_days(self):
+        """Doctor with active Mon + inactive Tue → Mon accepted, Tue rejected."""
+        s1 = make_mock_schedule(0, time(9, 0), time(17, 0), is_active=True)   # Mon active
+        s2 = make_mock_schedule(1, time(9, 0), time(17, 0), is_active=False)  # Tue inactive
+        doctor = make_mock_doctor_profile(schedules=[s1, s2])
+        # Monday 10:00 → accepted
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 8, 31), time(10, 0), time(10, 30),
+        )
+        # Tuesday 10:00 → rejected (inactive)
+        with pytest.raises(AppointmentValidationException, match="no working schedule.*Tuesday"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 9, 1), time(10, 0), time(10, 30),
+            )
+
+    def test_inactive_session_within_active_session(self):
+        """Active 9:00–17:00 and inactive 12:00–14:00 on same day → active session used."""
+        s1 = make_mock_schedule(4, time(9, 0), time(17, 0), is_active=True)
+        s2 = make_mock_schedule(4, time(12, 0), time(14, 0), is_active=False)
+        doctor = make_mock_doctor_profile(schedules=[s1, s2])
+        # 10:00–10:30 should be accepted (fits inside active session)
+        AppointmentValidator.validate_doctor_schedule(
+            doctor, date(2026, 9, 4), time(10, 0), time(10, 30),
+        )
+
+
+# ==============================================================
+# Availability Override Tests (Phase 1G)
+# ==============================================================
+
+class TestAvailabilityOverrides:
+    """Tests that availability/leave/active flags override schedule."""
+
+    def test_on_leave_overrides_valid_schedule(self):
+        """Doctor on leave with valid schedule → rejected."""
+        schedule = make_mock_schedule(4, time(9, 0), time(17, 0))
+        doctor = make_mock_doctor_profile(on_leave=True, schedules=[schedule])
+        with pytest.raises(AppointmentValidationException, match="on leave"):
+            AppointmentValidator.validate_doctor_profile(doctor)
+
+    def test_unavailable_overrides_valid_schedule(self):
+        """Doctor unavailable for appointments with valid schedule → rejected."""
+        schedule = make_mock_schedule(4, time(9, 0), time(17, 0))
+        doctor = make_mock_doctor_profile(available_for_appointment=False, schedules=[schedule])
+        with pytest.raises(AppointmentValidationException, match="not available"):
+            AppointmentValidator.validate_doctor_profile(doctor)
+
+    def test_inactive_overrides_valid_schedule(self):
+        """Inactive doctor with valid schedule → rejected."""
+        schedule = make_mock_schedule(4, time(9, 0), time(17, 0))
+        doctor = make_mock_doctor_profile(is_active=False, schedules=[schedule])
+        with pytest.raises(AppointmentValidationException, match="inactive"):
+            AppointmentValidator.validate_doctor_profile(doctor)
+
+    def test_on_leave_overrides_clinic_fallback(self):
+        """Doctor on leave with zero schedules → rejected (clinic fallback irrelevant)."""
+        doctor = make_mock_doctor_profile(on_leave=True, schedules=[])
+        with pytest.raises(AppointmentValidationException, match="on leave"):
+            AppointmentValidator.validate_doctor_profile(doctor)
+
+
+# ==============================================================
+# Sunday Contract Tests (Phase 1H)
+# ==============================================================
+
+class TestSundayContract:
+    """Tests that Sunday cannot be configured in doctor schedules."""
+
+    def test_sunday_outside_clinic_working_days(self):
+        """Sunday (weekday=6) is NOT in CLINIC_WORKING_DAYS."""
+        from app.core.constants import CLINIC_WORKING_DAYS
+        assert 6 not in CLINIC_WORKING_DAYS
+
+    def test_zero_schedules_sunday_rejected(self):
+        """Doctor with no schedules on Sunday → rejected."""
+        doctor = make_mock_doctor_profile(schedules=[])
+        with pytest.raises(AppointmentValidationException, match="no working schedule"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 8, 30), time(10, 0), time(10, 30),
+            )
+
+    def test_sunday_with_schedules_also_rejected(self):
+        """Even if a doctor has Mon–Sat schedules, Sunday is still rejected."""
+        schedules = [
+            make_mock_schedule(d, time(9, 0), time(17, 0))
+            for d in range(6)  # Mon–Sat
+        ]
+        doctor = make_mock_doctor_profile(schedules=schedules)
+        with pytest.raises(AppointmentValidationException, match="no working schedule.*Sunday"):
+            AppointmentValidator.validate_doctor_schedule(
+                doctor, date(2026, 8, 30), time(10, 0), time(10, 30),
+            )

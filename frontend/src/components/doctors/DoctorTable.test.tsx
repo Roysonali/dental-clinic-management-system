@@ -153,4 +153,91 @@ describe('DoctorTable', () => {
       expect(screen.getAllByText(expected).length).toBeGreaterThan(0);
     }
   });
+
+  // ── Navigation tests ──────────────────────────────────────────────
+
+  it('calls onRowClick when clicking a table row', () => {
+    const onRowClick = vi.fn();
+    renderWithProviders(<DoctorTable {...defaultProps} onRowClick={onRowClick} />);
+
+    // Click the first doctor's name cell — the DataTable attaches onClick to the <tr>
+    const nameCell = screen.getByText('Dr. Jose Rizal');
+    fireEvent.click(nameCell.closest('tr')!);
+
+    expect(onRowClick).toHaveBeenCalledWith(doctors[0]);
+  });
+
+  it('uses correct doctor ID in onRowClick', () => {
+    const onRowClick = vi.fn();
+    renderWithProviders(<DoctorTable {...defaultProps} onRowClick={onRowClick} />);
+
+    const nameCell = screen.getByText('Dr. Maria Santos');
+    fireEvent.click(nameCell.closest('tr')!);
+
+    expect(onRowClick).toHaveBeenCalledWith(doctors[1]);
+    expect(onRowClick).not.toHaveBeenCalledWith(doctors[0]);
+  });
+
+  it('does not trigger onRowClick when clicking a row action button', () => {
+    const onRowClick = vi.fn();
+    const onEdit = vi.fn();
+    renderWithProviders(
+      <DoctorTable {...defaultProps} onRowClick={onRowClick} onEdit={onEdit} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Dr. Jose Rizal' }));
+
+    // Row actions have stopPropagation, so onRowClick should NOT fire
+    expect(onRowClick).not.toHaveBeenCalled();
+    expect(onEdit).toHaveBeenCalledWith(doctors[0]);
+  });
+
+  it('renders View Details action button when onViewDetails is provided', () => {
+    const onViewDetails = vi.fn();
+    renderWithProviders(
+      <DoctorTable {...defaultProps} onViewDetails={onViewDetails} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'View details for Dr. Jose Rizal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View details for Dr. Maria Santos' })).toBeInTheDocument();
+  });
+
+  it('calls onViewDetails with the correct doctor when View Details button is clicked', () => {
+    const onViewDetails = vi.fn();
+    renderWithProviders(
+      <DoctorTable {...defaultProps} onViewDetails={onViewDetails} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'View details for Dr. Jose Rizal' }));
+    expect(onViewDetails).toHaveBeenCalledWith(doctors[0]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'View details for Dr. Maria Santos' }));
+    expect(onViewDetails).toHaveBeenCalledWith(doctors[1]);
+  });
+
+  it('does not render View Details button when onViewDetails is not provided', () => {
+    renderWithProviders(<DoctorTable {...defaultProps} />);
+
+    expect(screen.queryByRole('button', { name: /View details for/ })).not.toBeInTheDocument();
+  });
+
+  it('adds cursor-pointer class to rows when onRowClick is provided', () => {
+    const onRowClick = vi.fn();
+    const { container } = renderWithProviders(
+      <DoctorTable {...defaultProps} onRowClick={onRowClick} />,
+    );
+
+    // The table rows should have cursor-pointer
+    const tbody = container.querySelector('tbody');
+    const firstRow = tbody?.querySelector('tr');
+    expect(firstRow?.className).toContain('cursor-pointer');
+  });
+
+  it('does not add cursor-pointer class to rows when onRowClick is not provided', () => {
+    const { container } = renderWithProviders(<DoctorTable {...defaultProps} />);
+
+    const tbody = container.querySelector('tbody');
+    const firstRow = tbody?.querySelector('tr');
+    expect(firstRow?.className).not.toContain('cursor-pointer');
+  });
 });

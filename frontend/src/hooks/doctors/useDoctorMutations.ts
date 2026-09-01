@@ -5,6 +5,9 @@ import type {
   DoctorCreateRequest,
   DoctorResponse,
   DoctorUpdateRequest,
+  ScheduleCreateRequest,
+  ScheduleResponse,
+  ScheduleUpdateRequest,
 } from '../../types/doctor';
 
 /**
@@ -75,6 +78,62 @@ export function useToggleAvailability() {
   const queryClient = useQueryClient();
   return useMutation<DoctorResponse, Error, string>({
     mutationFn: (id) => doctorService.toggleAvailability(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: doctorQueryKeys.all });
+    },
+  });
+}
+
+/* ── Schedule Mutations ──────────────────────────────────────────────────── */
+
+/**
+ * PUT /doctors/{id}/schedules — atomically replace the entire weekly schedule.
+ *
+ * This is the PRIMARY save mechanism for the weekly schedule editor.
+ * All existing entries are deleted and replaced with the provided list.
+ */
+export function useReplaceWeekSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation<ScheduleResponse[], Error, { doctorId: string; schedules: ScheduleCreateRequest[] }>({
+    mutationFn: ({ doctorId, schedules }) => doctorService.replaceWeekSchedule(doctorId, schedules),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: doctorQueryKeys.all });
+    },
+  });
+}
+
+/** POST /doctors/{id}/schedules — create a single schedule entry. */
+export function useCreateDoctorSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation<ScheduleResponse, Error, { doctorId: string; payload: ScheduleCreateRequest }>({
+    mutationFn: ({ doctorId, payload }) => doctorService.createSchedule(doctorId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: doctorQueryKeys.all });
+    },
+  });
+}
+
+/** PATCH /doctors/{id}/schedules/{sid} — partial update a schedule entry. */
+export function useUpdateDoctorSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    ScheduleResponse,
+    Error,
+    { doctorId: string; scheduleId: string; payload: ScheduleUpdateRequest }
+  >({
+    mutationFn: ({ doctorId, scheduleId, payload }) =>
+      doctorService.updateSchedule(doctorId, scheduleId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: doctorQueryKeys.all });
+    },
+  });
+}
+
+/** DELETE /doctors/{id}/schedules/{sid} — delete a schedule entry. */
+export function useDeleteDoctorSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { doctorId: string; scheduleId: string }>({
+    mutationFn: ({ doctorId, scheduleId }) => doctorService.deleteSchedule(doctorId, scheduleId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: doctorQueryKeys.all });
     },

@@ -771,10 +771,48 @@ class TestReplaceWeekScheduleEndpoint(TestScheduleBase):
         resp = client.put(f"/doctors/{doctor.id}/schedules", json=schedules, headers=auth_header(admin_token))
         assert resp.status_code == 200
         assert len(resp.json()) == 2
-    def test_replace_duplicate_days(self, client, admin_token, doctor):
+    def test_replace_split_session_non_overlapping(self, client, admin_token, doctor):
+        """F-1 reconciliation: two non-overlapping sessions on the same day are VALID.
+
+        Split shifts (e.g. 09:00-12:00 + 13:00-17:00 on Monday) are an intended
+        feature. The validator explicitly allows multiple non-overlapping sessions
+        per weekday. This test verifies that the PUT replace endpoint accepts them.
+        """
         schedules = [
             {"day_of_week": 0, "start_time": "09:00", "end_time": "12:00"},
             {"day_of_week": 0, "start_time": "13:00", "end_time": "17:00"},
+        ]
+        resp = client.put(f"/doctors/{doctor.id}/schedules", json=schedules, headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+    def test_replace_split_session_adjacent(self, client, admin_token, doctor):
+        """F-1: adjacent non-overlapping sessions on the same day are VALID.
+
+        Sessions that end exactly when the next starts (e.g. 09:00-12:00 + 12:00-17:00)
+        do not overlap and should be accepted.
+        """
+        schedules = [
+            {"day_of_week": 0, "start_time": "09:00", "end_time": "12:00"},
+            {"day_of_week": 0, "start_time": "12:00", "end_time": "17:00"},
+        ]
+        resp = client.put(f"/doctors/{doctor.id}/schedules", json=schedules, headers=auth_header(admin_token))
+        assert resp.status_code == 200
+
+    def test_replace_overlapping_sessions_rejected(self, client, admin_token, doctor):
+        """F-1: overlapping sessions on the same day must be REJECTED (400)."""
+        schedules = [
+            {"day_of_week": 0, "start_time": "09:00", "end_time": "13:00"},
+            {"day_of_week": 0, "start_time": "12:00", "end_time": "15:00"},
+        ]
+        resp = client.put(f"/doctors/{doctor.id}/schedules", json=schedules, headers=auth_header(admin_token))
+        assert resp.status_code == 400
+
+    def test_replace_exact_duplicate_session_rejected(self, client, admin_token, doctor):
+        """F-1: exact duplicate sessions (same times) on the same day must be REJECTED (400)."""
+        schedules = [
+            {"day_of_week": 0, "start_time": "09:00", "end_time": "12:00"},
+            {"day_of_week": 0, "start_time": "09:00", "end_time": "12:00"},
         ]
         resp = client.put(f"/doctors/{doctor.id}/schedules", json=schedules, headers=auth_header(admin_token))
         assert resp.status_code == 400

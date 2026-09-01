@@ -94,6 +94,21 @@ export interface ScheduleResponse {
   is_active: boolean;
 }
 
+/** Payload for POST /doctors/{id}/schedules (ScheduleCreate schema). */
+export interface ScheduleCreateRequest {
+  day_of_week: DayOfWeek;
+  start_time: string;  // HH:MM
+  end_time: string;    // HH:MM, must be > start_time
+}
+
+/** Payload for PATCH /doctors/{id}/schedules/{sid} (ScheduleUpdate schema). */
+export interface ScheduleUpdateRequest {
+  day_of_week?: DayOfWeek;
+  start_time?: string;
+  end_time?: string;
+  is_active?: boolean;
+}
+
 /** Full doctor record (DoctorResponse) — used by list, detail, mutations. */
 export interface DoctorResponse {
   /** UUID as string */

@@ -809,7 +809,8 @@ def delete_schedule(
         "Atomically replace a doctor's entire weekly schedule. All existing "
         "entries are deleted and recreated from the provided list. The "
         "operation is validated as a whole (entry count, time ordering, and "
-        "duplicate days) before any change is committed."
+        "same-day session overlap) before any change is committed. "
+        "Multiple non-overlapping sessions per day are allowed (split shifts)."
     ),
     response_description="The newly created schedule entries.",
     responses=_COMMON_ERROR_RESPONSES,
