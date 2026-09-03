@@ -13,7 +13,6 @@ import { usePatientRecordFilters } from '../../../hooks/patientRecords/usePatien
 import { usePatientRecordNames } from '../../../hooks/patientRecords/usePatientRecordNames';
 import { useCreatePatientRecord } from '../../../hooks/patientRecords/usePatientRecordMutations';
 import { usePatient } from '../../../hooks/patients/usePatient';
-import { patientRecordService } from '../../../services/patientRecordService';
 import { recordFormValuesToCreateRequest } from '../../../utils/patientRecordFormUtils';
 import { parseApiError } from '../../../services/apiError';
 import { ROUTES, CREATE_QUERY_PARAM } from '../../../routes/routes';
@@ -42,7 +41,6 @@ export const PatientRecordListContainer: FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({});
-  const [conflictAppointmentId, setConflictAppointmentId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
 
   // Deep-link from Patient Hub: ?create=true&patientId={id}
@@ -58,7 +56,6 @@ export const PatientRecordListContainer: FC = () => {
   const openCreate = () => {
     setCreateError(null);
     setCreateFieldErrors({});
-    setConflictAppointmentId(null);
     setCreateOpen(true);
   };
 
@@ -66,7 +63,6 @@ export const PatientRecordListContainer: FC = () => {
     setCreateOpen(false);
     setCreateError(null);
     setCreateFieldErrors({});
-    setConflictAppointmentId(null);
     // Strip create intent from URL so refresh doesn't re-open the drawer.
     if (createRequested) {
       const next = new URLSearchParams(searchParams);
@@ -90,7 +86,7 @@ export const PatientRecordListContainer: FC = () => {
     [items],
   );
   const appointmentIds = useMemo(
-    () => Array.from(new Set(items.map((r) => r.appointment_id))).sort(),
+    () => Array.from(new Set(items.map((r) => r.appointment_id).filter(Boolean) as string[])).sort(),
     [items],
   );
   const names = usePatientRecordNames(patientIds, appointmentIds, []);
@@ -100,7 +96,10 @@ export const PatientRecordListContainer: FC = () => {
       items.map((record) => ({
         ...record,
         patient_name: names.patientNames.get(record.patient_id) ?? null,
-        appointment_number: names.appointmentNumbers.get(record.appointment_id) ?? null,
+        appointment_number: record.appointment_id
+          ? (names.appointmentNumbers.get(record.appointment_id) ?? null)
+          : null,
+        has_appointment: record.appointment_id !== null,
       })),
     [items, names],
   );
@@ -122,7 +121,6 @@ export const PatientRecordListContainer: FC = () => {
   const handleCreate = (values: PatientRecordFormValues) => {
     setCreateError(null);
     setCreateFieldErrors({});
-    setConflictAppointmentId(null);
     createMutation.mutate(recordFormValuesToCreateRequest(values), {
       onSuccess: (record) => {
         closeCreate();
@@ -131,30 +129,13 @@ export const PatientRecordListContainer: FC = () => {
       },
       onError: (error) => {
         const info = parseApiError(error);
-        if (info.status === 409) {
-          // Appointment already has a record (BCR §4.1) — keep the drawer
-          // open, show the server message, and offer to open the existing
-          // record (resolved via the real by-appointment endpoint).
-          setConflictAppointmentId(values.appointment_id);
-          setCreateError(info.message);
-        } else if (info.kind === 'validation' && Object.keys(info.fieldErrors).length > 0) {
+        if (info.kind === 'validation' && Object.keys(info.fieldErrors).length > 0) {
           setCreateFieldErrors(info.fieldErrors);
         } else {
           setCreateError(info.message);
         }
       },
     });
-  };
-
-  const handleViewConflictRecord = async (appointmentId: string) => {
-    try {
-      const record = await patientRecordService.getRecordByAppointment(appointmentId);
-      closeCreate();
-      navigate(`${ROUTES.PATIENT_RECORDS}/${record.id}`);
-    } catch {
-      // Best-effort: fall back to closing the drawer so the user can retry.
-      closeCreate();
-    }
   };
 
   const totalPages = Math.max(1, recordsQuery.data?.pages ?? 1);
@@ -244,8 +225,6 @@ export const PatientRecordListContainer: FC = () => {
         submitting={createMutation.isPending}
         serverErrors={createFieldErrors}
         serverMessage={createError}
-        conflictAppointmentId={conflictAppointmentId}
-        onViewConflictRecord={handleViewConflictRecord}
         initialPatientId={createPatientId ?? undefined}
         selectedPatientLabel={selectedPatientLabel ?? undefined}
       />

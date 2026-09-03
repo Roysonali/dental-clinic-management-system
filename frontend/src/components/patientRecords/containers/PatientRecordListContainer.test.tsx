@@ -10,7 +10,6 @@ import { userService } from '../../../services/userService';
 import type {
   PatientRecordListEnvelope,
   PatientRecordListItem,
-  PatientRecordResponse,
 } from '../../../types/patientRecord';
 
 const navigateMock = vi.fn();
@@ -109,6 +108,16 @@ const recordRow: PatientRecordListItem = {
   created_at: '2026-08-01T08:00:00Z',
 };
 
+const recordRowNoAppointment: PatientRecordListItem = {
+  id: 'r2',
+  patient_id: 'p1',
+  appointment_id: null,
+  status: 'DRAFT',
+  is_finalized: false,
+  chief_complaint: 'Walk-in consultation',
+  created_at: '2026-08-01T09:00:00Z',
+};
+
 const listEnvelope: PatientRecordListEnvelope<PatientRecordListItem> = {
   items: [recordRow],
   total: 1,
@@ -117,35 +126,7 @@ const listEnvelope: PatientRecordListEnvelope<PatientRecordListItem> = {
   pages: 1,
 };
 
-const detailResponse: PatientRecordResponse = {
-  id: 'r1',
-  patient_id: 'p1',
-  appointment_id: 'a1',
-  status: 'DRAFT',
-  is_finalized: false,
-  chief_complaint: 'Toothache',
-  clinical_notes: null,
-  doctor_remarks: null,
-  treatment_recommendation: null,
-  systemic_diseases: null,
-  surgeries: null,
-  medications: null,
-  habits: null,
-  medical_alerts: null,
-  allergies: null,
-  dental_history: null,
-  created_at: '2026-08-01T08:00:00Z',
-  updated_at: '2026-08-01T08:00:00Z',
-  diagnoses: [],
-  prescriptions: [],
-  followups: [],
-  attachments: [],
-  audit_logs: [],
-  diagnosis_count: 0,
-  prescription_count: 0,
-  attachment_count: 0,
-  followup_count: 0,
-};
+
 
 const patient = {
   id: 'p1',
@@ -249,40 +230,46 @@ describe('PatientRecordListContainer', () => {
     expect(navigateMock).toHaveBeenCalledWith('/patient-records/r1');
   });
 
-  it('surfaces a 409 create conflict and opens the existing record via the by-appointment endpoint', async () => {
+  it('renders appointment-less records correctly', async () => {
+    listRecordsMock.mockResolvedValue({
+      items: [recordRowNoAppointment],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    });
+
+    renderWithProviders(<PatientRecordListContainer />);
+
+    // The record should render with the patient name and chief complaint
+    expect(await screen.findByText('Juan Dela Cruz')).toBeInTheDocument();
+    expect(screen.getByText('Walk-in consultation')).toBeInTheDocument();
+  });
+
+  it('handles server errors during create', async () => {
     createRecordMock.mockRejectedValue(
-      httpError(409, {
+      httpError(400, {
         success: false,
-        message: 'A record already exists for appointment a1',
+        message: 'Patient does not exist',
       }),
     );
-    getByAppointmentMock.mockResolvedValue(detailResponse);
 
     renderWithProviders(<PatientRecordListContainer />);
     await screen.findByText('Juan Dela Cruz');
 
-    // Open the create drawer and pick a patient + appointment.
+    // Open the create drawer and pick a patient.
     fireEvent.click(screen.getByRole('button', { name: 'New Record' }));
     const dialog = screen.getByRole('dialog', { name: 'Create Patient Record' });
     expect(dialog).toBeInTheDocument();
 
-    const pickerInput = within(dialog).getByPlaceholderText('Search patient by name or code…');
+    const pickerInput = within(dialog).getByPlaceholderText('Search patient by name or phone…');
     fireEvent.change(pickerInput, { target: { value: 'juan' } });
     const patientOption = await within(dialog).findByText('Juan Dela Cruz');
     fireEvent.click(patientOption);
 
-    const appointmentSelect = await within(dialog).findByRole('combobox', {
-      name: /Appointment/,
-    });
-    fireEvent.change(appointmentSelect, { target: { value: 'a1' } });
-
     fireEvent.click(screen.getByRole('button', { name: 'Create Record' }));
 
-    // The conflict message + View existing record action appear in the drawer.
-    expect(await screen.findByText('A record already exists for appointment a1')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'View existing record' }));
-
-    await waitFor(() => expect(getByAppointmentMock).toHaveBeenCalledWith('a1'));
-    expect(navigateMock).toHaveBeenCalledWith('/patient-records/r1');
+    // The error message should appear in the drawer.
+    expect(await screen.findByText('Patient does not exist')).toBeInTheDocument();
   });
 });

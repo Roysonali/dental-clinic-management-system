@@ -42,9 +42,9 @@ from app.modules.patient_records.enums import RecordStatus
 
 
 class TestCreatePatientRecord:
-    """Covers: successful create, duplicate appointment, validation failure."""
+    """Covers: successful create (with and without appointment), duplicate appointment, validation failure."""
 
-    def test_success(self):
+    def test_success_with_appointment(self):
         db = MagicMock()
         svc = PatientRecordService(db)
         svc.record_repo = MagicMock()
@@ -59,6 +59,49 @@ class TestCreatePatientRecord:
         svc.record_repo.create_patient_record.return_value = record
 
         payload = PatientRecordCreate(patient_id=uuid4(), appointment_id=uuid4())
+        result = svc.create_patient_record(payload, actor_id=1)
+
+        assert result.id == record.id
+        svc.audit_repo.create.assert_called_once()
+        db.commit.assert_called_once()
+
+    def test_success_without_appointment(self):
+        """Records can be created without an appointment (walk-in, historical, etc.)."""
+        db = MagicMock()
+        svc = PatientRecordService(db)
+        svc.record_repo = MagicMock()
+        svc.patient_repo = MagicMock()
+        svc.appointment_repo = MagicMock()
+        svc.audit_repo = MagicMock()
+
+        record = _make_patient_record_orm(appointment_id=None)
+        svc.patient_repo.get_by_id.return_value = MagicMock()
+        svc.record_repo.create_patient_record.return_value = record
+
+        payload = PatientRecordCreate(patient_id=uuid4())
+        result = svc.create_patient_record(payload, actor_id=1)
+
+        assert result.id == record.id
+        svc.audit_repo.create.assert_called_once()
+        db.commit.assert_called_once()
+        # No appointment validation should have occurred
+        svc.appointment_repo.get_by_id.assert_not_called()
+        svc.record_repo.get_by_appointment.assert_not_called()
+
+    def test_success_with_explicit_null_appointment(self):
+        """Explicitly sending appointment_id=null should also work."""
+        db = MagicMock()
+        svc = PatientRecordService(db)
+        svc.record_repo = MagicMock()
+        svc.patient_repo = MagicMock()
+        svc.appointment_repo = MagicMock()
+        svc.audit_repo = MagicMock()
+
+        record = _make_patient_record_orm(appointment_id=None)
+        svc.patient_repo.get_by_id.return_value = MagicMock()
+        svc.record_repo.create_patient_record.return_value = record
+
+        payload = PatientRecordCreate(patient_id=uuid4(), appointment_id=None)
         result = svc.create_patient_record(payload, actor_id=1)
 
         assert result.id == record.id

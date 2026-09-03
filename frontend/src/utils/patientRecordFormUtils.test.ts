@@ -15,7 +15,6 @@ import type { PatientRecordResponse } from '../types/patientRecord';
 
 const baseValues = {
   patient_id: 'p1',
-  appointment_id: 'a1',
   chief_complaint: 'Pain',
   clinical_notes: 'Notes',
   doctor_remarks: '',
@@ -34,11 +33,21 @@ describe('recordFormValuesToCreateRequest', () => {
     const request = recordFormValuesToCreateRequest(baseValues);
 
     expect(request.patient_id).toBe('p1');
-    expect(request.appointment_id).toBe('a1');
+    expect('appointment_id' in request).toBe(false);
     expect(request.chief_complaint).toBe('Pain');
     expect(request.clinical_notes).toBe('Notes');
     expect(request.doctor_remarks).toBeNull();
     expect(request.allergies).toBeNull();
+  });
+
+  it('includes appointment_id when provided', () => {
+    const request = recordFormValuesToCreateRequest({ ...baseValues, appointment_id: 'a1' });
+    expect(request.appointment_id).toBe('a1');
+  });
+
+  it('omits appointment_id when empty string', () => {
+    const request = recordFormValuesToCreateRequest({ ...baseValues, appointment_id: '' });
+    expect('appointment_id' in request).toBe(false);
   });
 
   it('never includes status/is_finalized or server-managed fields', () => {
@@ -108,7 +117,6 @@ describe('recordFormValuesToUpdateRequest (exclude_unset semantics)', () => {
   it('never includes immutable ids or status', () => {
     const request = recordFormValuesToUpdateRequest(baseValues, original);
     expect('patient_id' in request).toBe(false);
-    expect('appointment_id' in request).toBe(false);
     expect('status' in request).toBe(false);
   });
 });

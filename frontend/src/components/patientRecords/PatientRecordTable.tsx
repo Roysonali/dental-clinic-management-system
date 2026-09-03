@@ -99,7 +99,9 @@ export const PatientRecordTable: FC<PatientRecordTableProps> = ({
       header: 'Appointment',
       render: (record) => (
         <span className="font-mono text-caption text-neutral-600">
-          {record.appointment_number ?? `APT #${record.appointment_id.slice(0, 8)}`}
+          {record.has_appointment
+            ? (record.appointment_number ?? `APT #${record.appointment_id?.slice(0, 8)}`)
+            : '—'}
         </span>
       ),
       hideable: true,
@@ -125,7 +127,7 @@ export const PatientRecordTable: FC<PatientRecordTableProps> = ({
       zebra
       ariaLabel="Patient records"
       emptyTitle="No patient records yet"
-      emptyDescription="Clinical charts appear here once a record is created for an appointment."
+      emptyDescription="Clinical charts appear here once a record is created."
       rowActionsHeader=""
       rowActions={(record) => (
         <Button variant="ghost" size="sm" onClick={() => onView(record)}>

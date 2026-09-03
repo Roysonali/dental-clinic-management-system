@@ -45,7 +45,26 @@ from app.core.constants import (
 from app.core.exception_handlers import register_exception_handlers
 from app.core.security import create_access_token, hash_password
 from app.database.base import Base
+import app.database.models  # noqa: F401 — register all FK target tables
 from app.database.session import get_db
+
+# Billing module tables use PostgreSQL-specific regex CHECK constraints
+# that SQLite cannot compile.  Exclude from test schema creation.
+_BILLING_TABLES = frozenset({
+    "document_sequences",
+    "sequence_consumption_log",
+    "invoices",
+    "invoice_line_items",
+    "invoice_status_history",
+    "payments",
+    "payment_allocations",
+    "receipts",
+    "receipt_invoices",
+    "credit_notes",
+    "patient_credits",
+    "refunds",
+    "billing_audit_logs",
+})
 from app.modules.auth.models import Role, User
 from app.modules.doctors.models import Doctor
 from app.modules.patients.models import Patient
@@ -90,7 +109,12 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 def setup_db() -> Session:
     """Create all tables, seed roles, return session."""
-    Base.metadata.create_all(bind=engine)
+    _test_tables = [
+        t
+        for name, t in Base.metadata.tables.items()
+        if name not in _BILLING_TABLES
+    ]
+    Base.metadata.create_all(bind=engine, tables=_test_tables)
     db = TestingSessionLocal()
 
     role_names = [

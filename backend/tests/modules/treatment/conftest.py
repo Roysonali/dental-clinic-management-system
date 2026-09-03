@@ -33,6 +33,26 @@ from sqlalchemy.pool import StaticPool
 from app.database.base import Base
 import app.database.models  # noqa: F401 — register all FK target tables
 
+# Billing module tables use PostgreSQL-specific regex CHECK constraints
+# (e.g. ``prefix ~ '^[A-Z-]+$'``) that SQLite cannot compile.  We
+# exclude them from ``create_all`` so the treatment test suite can run
+# on SQLite while the production PostgreSQL constraint remains untouched.
+_BILLING_TABLES = frozenset({
+    "document_sequences",
+    "sequence_consumption_log",
+    "invoices",
+    "invoice_line_items",
+    "invoice_status_history",
+    "payments",
+    "payment_allocations",
+    "receipts",
+    "receipt_invoices",
+    "credit_notes",
+    "patient_credits",
+    "refunds",
+    "billing_audit_logs",
+})
+
 # Models from other modules needed for FK stub records
 from app.modules.auth.models import Role, User
 from app.modules.doctors.models import Doctor
@@ -315,7 +335,15 @@ def db():
     Uses ``autouse=True`` so every test automatically has a clean database.
     Foreign key enforcement is enabled via ``PRAGMA foreign_keys = ON``.
     """
-    Base.metadata.create_all(bind=engine)
+    # Create all tables EXCEPT billing tables with PostgreSQL regex
+    # CHECK constraints that SQLite cannot compile (Option B: dialect-
+    # aware schema generation).
+    _test_tables = [
+        t
+        for name, t in Base.metadata.tables.items()
+        if name not in _BILLING_TABLES
+    ]
+    Base.metadata.create_all(bind=engine, tables=_test_tables)
     session = TestingSessionLocal()
     # NOTE: Foreign-key enforcement is intentionally disabled for repository
     # tests. SQLite's ``ON DELETE CASCADE`` (required by ``passive_deletes=True``

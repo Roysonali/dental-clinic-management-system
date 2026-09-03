@@ -140,7 +140,7 @@ class AddItemRequest(BaseModel):
         max_digits=10,
         decimal_places=2,
         title="Discount",
-        description="Discount amount applied to this item. Must be <= estimated_cost.",
+        description="Flat line-level discount amount. Must be <= estimated_cost * quantity (line total).",
         examples=[Decimal("0.00")],
     )
     tooth_number: Optional[int] = Field(

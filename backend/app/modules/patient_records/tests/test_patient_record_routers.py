@@ -153,6 +153,16 @@ class TestPatientRecordEndpoints:
         assert resp.status_code == 201
         assert resp.json()["id"] == str(record.id)
 
+    def test_create_without_appointment(self, client, mock_svc):
+        """Records can be created without appointment_id (walk-in, historical)."""
+        record = _make_mock_patient_record()
+        record.appointment_id = None
+        mock_svc.create_patient_record.return_value = record
+        payload = {"patient_id": str(record.patient_id), "chief_complaint": "Walk-in consultation"}
+        resp = client.post("/patient-records", json=payload)
+        assert resp.status_code == 201
+        assert resp.json()["id"] == str(record.id)
+
     def test_create_duplicate(self, client, mock_svc):
         mock_svc.create_patient_record.side_effect = PatientRecordConflict(message="A record already exists")
         resp = client.post("/patient-records", json={"patient_id": str(uuid4()), "appointment_id": str(uuid4())})

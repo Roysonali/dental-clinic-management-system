@@ -56,8 +56,11 @@ const toNullable = (value: string): string | null => {
 export function recordFormValuesToCreateRequest(values: PatientRecordFormValues): PatientRecordCreateRequest {
   const request: PatientRecordCreateRequest = {
     patient_id: values.patient_id,
-    appointment_id: values.appointment_id,
   };
+  // Only include appointment_id when a value is provided
+  if (values.appointment_id && values.appointment_id.length > 0) {
+    request.appointment_id = values.appointment_id;
+  }
   for (const field of CLINICAL_FIELDS) {
     request[field] = toNullable(values[field]);
   }

@@ -14,6 +14,7 @@ const record: EnrichedPatientRecord = {
   created_at: '2026-07-09T14:20:00Z',
   patient_name: 'Amara Okonkwo',
   appointment_number: 'APT-00142',
+  has_appointment: true,
 };
 
 function renderList() {

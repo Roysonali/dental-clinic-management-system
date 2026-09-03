@@ -51,7 +51,7 @@ export interface PatientRecordListEnvelope<T> {
 export interface PatientRecordListItem {
   id: string;
   patient_id: string;
-  appointment_id: string;
+  appointment_id: string | null;
   status: RecordStatus;
   is_finalized: boolean;
   chief_complaint: string | null;
@@ -113,7 +113,7 @@ export interface AuditNestedResponse {
 export interface PatientRecordResponse {
   id: string;
   patient_id: string;
-  appointment_id: string;
+  appointment_id: string | null;
   status: RecordStatus;
   is_finalized: boolean;
   created_at: string;
@@ -148,7 +148,7 @@ export interface PatientRecordResponse {
  */
 export interface PatientRecordCreateRequest {
   patient_id: string;
-  appointment_id: string;
+  appointment_id?: string | null;
   chief_complaint?: string | null;
   clinical_notes?: string | null;
   doctor_remarks?: string | null;
@@ -354,7 +354,7 @@ export interface ChildListParams {
 /** Create/edit record form model (presentational). */
 export interface PatientRecordFormValues {
   patient_id: string;
-  appointment_id: string;
+  appointment_id?: string;
   chief_complaint: string;
   clinical_notes: string;
   doctor_remarks: string;
@@ -404,4 +404,6 @@ export interface FollowupFormValues {
 export interface EnrichedPatientRecord extends PatientRecordListItem {
   patient_name: string | null;
   appointment_number: string | null;
+  /** True when appointment_id is null (standalone/walk-in record). */
+  has_appointment: boolean;
 }
