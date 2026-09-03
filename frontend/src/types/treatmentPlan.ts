@@ -94,6 +94,7 @@ export interface TreatmentPlanItemResponse {
   /** Nested procedure summary — display-friendly (may be null if procedure was deleted). */
   procedure: ProcedureSummary | null;
   sequence_number: number;
+  quantity: number;
   tooth_number: number | null;
   tooth_surface: string | null;
   quadrant: ToothQuadrant | null;
@@ -157,6 +158,7 @@ export interface VersionDetailResponse extends VersionListItem {
       sequence_number: number;
       procedure_id: number;
       procedure_code: string;
+      quantity: number;
       tooth_number: number | null;
       tooth_surface: string | null;
       quadrant: ToothQuadrant | null;
@@ -201,6 +203,7 @@ export interface CreatePlanRequest {
 export interface AddItemRequest {
   procedure_id: number;
   sequence_number: number;
+  quantity?: number;
   estimated_cost?: number | null;
   discount?: number;
   tooth_number?: number | null;
@@ -213,6 +216,7 @@ export interface AddItemRequest {
 export interface ItemUpdateRequest {
   procedure_id?: number;
   sequence_number?: number;
+  quantity?: number;
   estimated_cost?: number | null;
   discount?: number;
   tooth_number?: number | null;
@@ -270,6 +274,7 @@ export interface PlanFormValues {
 export interface ItemFormValues {
   procedure_id: string;
   sequence_number: string;
+  quantity: string;
   tooth_number: string;
   tooth_surface: string;
   quadrant: string;

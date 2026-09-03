@@ -1,5 +1,5 @@
 import { ROUTES } from './routes';
-import { ADMIN_ROLES } from '../constants/roles';
+import { ADMIN_ROLES, REVENUE_READ_ROLES } from '../constants/roles';
 import type { RoleName } from '../constants/roles';
 
 /**
@@ -23,6 +23,10 @@ export const ROUTE_ROLE_REQUIREMENTS: Readonly<Record<string, readonly RoleName[
   [ROUTES.USERS]: ADMIN_ROLES,
   [`${ROUTES.USERS}/:userId`]: ADMIN_ROLES,
   [ROUTES.ADMIN.PENDING_USERS]: ADMIN_ROLES,
+  // Billing dashboard — aggregate revenue/financial analytics is ADMIN-only.
+  // Operational billing routes (invoices, payments, etc.) remain accessible
+  // to all billing roles — only the dashboard summary is restricted.
+  [ROUTES.BILLING]: REVENUE_READ_ROLES,
 };
 
 /** Look up the roles required to view a route path, if any. */

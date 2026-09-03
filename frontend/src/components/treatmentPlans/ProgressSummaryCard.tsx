@@ -37,7 +37,7 @@ export const ProgressSummaryCard: FC<ProgressSummaryCardProps> = ({
             <dd className="mt-1 text-h3 font-semibold text-neutral-900 tabular-nums">{itemCount}</dd>
           </div>
           <div className="rounded-lg bg-neutral-50 p-4">
-            <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Estimated Total</dt>
+            <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Estimated Total (Gross)</dt>
             <dd className="mt-1 text-h3 font-semibold text-neutral-900 tabular-nums">
               {formatCurrency(totalEstimatedCost, TREATMENT_PLAN_CURRENCY_CODE)}
             </dd>

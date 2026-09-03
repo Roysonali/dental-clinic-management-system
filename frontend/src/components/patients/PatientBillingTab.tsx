@@ -12,6 +12,8 @@ import { formatCurrency } from '../../utils/formatting';
 import { ROUTES } from '../../routes/routes';
 import { apiErrorMessage } from '../../services/apiError';
 import { PAYMENT_CURRENCY_CODE } from '../../constants/billing';
+import { usePermission } from '../../hooks/rbac/usePermission';
+import { canViewRevenue } from '../../constants/rbac';
 import type { CreateActionType } from './PatientQuickActions';
 import type { InvoiceListItem } from '../../types/billing';
 
@@ -54,7 +56,8 @@ export const PatientBillingTab: FC<PatientBillingTabProps> = ({ patientId, onCre
     sort_order: 'desc',
   });
 
-  const dashboardQuery = useBillingDashboard(patientId);
+  const { role } = usePermission();
+  const dashboardQuery = useBillingDashboard(patientId, { enabled: canViewRevenue(role) });
 
   const items = useMemo(
     () => invoicesQuery.data?.items ?? [],

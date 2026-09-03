@@ -1,10 +1,15 @@
 """Dashboard Router — Integration Tests.
 
 Covers: authentication (401), authorization (403), success cases (200).
+
+Revenue/analytics endpoints (/billing/dashboard, /billing/summary) are
+ADMIN-only — non-admin roles receive 403.  Operational billing routes
+(invoices, payments, etc.) retain their wider access.
 """
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.modules.billing.routers.conftest import (
@@ -34,17 +39,20 @@ class TestGetDashboard:
         assert "total_outstanding" in totals
         assert "invoice_count" in totals
 
-    def test_doctor_can_access(self, client: TestClient, doctor_token: str):
+    def test_doctor_denied(self, client: TestClient, doctor_token: str):
+        """Doctors must not see aggregate revenue/financial analytics."""
         resp = client.get(DASHBOARD_URL, headers=auth_header(doctor_token))
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    def test_receptionist_can_access(self, client: TestClient, receptionist_token: str):
+    def test_receptionist_denied(self, client: TestClient, receptionist_token: str):
+        """Receptionists must not see aggregate revenue/financial analytics."""
         resp = client.get(DASHBOARD_URL, headers=auth_header(receptionist_token))
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    def test_assistant_can_access(self, client: TestClient, assistant_token: str):
+    def test_assistant_denied(self, client: TestClient, assistant_token: str):
+        """Dental assistants must not see aggregate revenue/financial analytics."""
         resp = client.get(DASHBOARD_URL, headers=auth_header(assistant_token))
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
     def test_with_patient_id(self, client: TestClient, admin_token: str):
         from tests.modules.billing.routers.conftest import STUB_PATIENT_ID
@@ -79,6 +87,21 @@ class TestGetSummary:
         assert "total_collected" in data
         assert "total_outstanding" in data
         assert "invoice_count" in data
+
+    def test_doctor_denied(self, client: TestClient, doctor_token: str):
+        """Doctors must not see aggregate revenue/financial analytics."""
+        resp = client.get(SUMMARY_URL, headers=auth_header(doctor_token))
+        assert resp.status_code == 403
+
+    def test_receptionist_denied(self, client: TestClient, receptionist_token: str):
+        """Receptionists must not see aggregate revenue/financial analytics."""
+        resp = client.get(SUMMARY_URL, headers=auth_header(receptionist_token))
+        assert resp.status_code == 403
+
+    def test_assistant_denied(self, client: TestClient, assistant_token: str):
+        """Dental assistants must not see aggregate revenue/financial analytics."""
+        resp = client.get(SUMMARY_URL, headers=auth_header(assistant_token))
+        assert resp.status_code == 403
 
     def test_invalid_token(self, client: TestClient):
         """An invalid JWT should get 401."""

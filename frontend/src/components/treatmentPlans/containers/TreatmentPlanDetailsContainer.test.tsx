@@ -76,6 +76,7 @@ const plan: TreatmentPlanResponse = {
       procedure_id: 5,
       procedure: { id: 5, code: 'RCT', name: 'Root Canal', category: 'endodontic', default_cost: 1500, is_active: true },
       sequence_number: 1,
+      quantity: 1,
       tooth_number: 46,
       tooth_surface: 'MOD',
       quadrant: 'UR',
@@ -227,5 +228,28 @@ describe('TreatmentPlanDetailsContainer', () => {
     expect(within(summaryCard as HTMLElement).getByText('₹1,500.00')).toBeInTheDocument();
     // The pre-fix defect rendered a placeholder dash for an undefined total.
     expect(screen.queryByText('₹—')).not.toBeInTheDocument();
+  });
+
+  // QTY-COST: Plan Summary must multiply estimated_cost × quantity.
+  // With quantity=3 and estimated_cost=1500, total = ₹4,500.00.
+  it('multiplies estimated_cost × quantity for Plan Summary total', async () => {
+    getPlanMock.mockResolvedValue({
+      ...plan,
+      items: [
+        {
+          ...plan.items[0],
+          quantity: 3,
+          estimated_cost: 1500,
+        },
+      ],
+    });
+    renderDetails();
+
+    await waitFor(() => expect(screen.getByText('TXN-000001')).toBeInTheDocument());
+
+    const summaryCard = screen.getByText('Plan Summary').closest('div.rounded-xl');
+    expect(summaryCard).not.toBeNull();
+    // 3 × ₹1,500 = ₹4,500
+    expect(within(summaryCard as HTMLElement).getByText('₹4,500.00')).toBeInTheDocument();
   });
 });

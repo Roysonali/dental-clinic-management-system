@@ -24,6 +24,8 @@ import { ActivityItem } from './ActivityItem';
 import { UpcomingAppointments } from '../../components/appointments/UpcomingAppointments';
 import { ActiveTreatmentPlansCard } from '../../components/treatmentPlans/ActiveTreatmentPlansCard';
 import { ROUTES, CREATE_QUERY_PARAM } from '../../routes/routes';
+import { usePermission } from '../../hooks/rbac/usePermission';
+import { canViewRevenue } from '../../constants/rbac';
 
 /**
  * DashboardPage — authenticated landing page.
@@ -47,6 +49,8 @@ import { ROUTES, CREATE_QUERY_PARAM } from '../../routes/routes';
 export const DashboardPage: FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobileViewport();
+  const { role } = usePermission();
+  const showRevenue = canViewRevenue(role);
   return (
     <ContentContainer width="wide">
       <PageWrapper>
@@ -59,7 +63,7 @@ export const DashboardPage: FC = () => {
         {/* ── Statistics Grid ───────────────────────── */}
         <section aria-labelledby="statistics-heading">
           <SectionHeader id="statistics-heading" title="Overview" />
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className={`mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 ${showRevenue ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
             <DashboardStatCard
               icon={<Icon icon={Users} size="lg" className="text-primary-500" />}
               label="Total Patients"
@@ -72,12 +76,15 @@ export const DashboardPage: FC = () => {
               value="18"
               trend={{ value: "+3", positive: true }}
             />
-            <DashboardStatCard
-              icon={<Icon icon={DollarSign} size="lg" className="text-emerald-500" />}
-              label="Revenue Today"
-              value="₹4,250"
-              trend={{ value: "+8%", positive: true }}
-            />
+            {/* Revenue Today — visible only to ADMIN users (revenue RBAC policy). */}
+            {showRevenue && (
+              <DashboardStatCard
+                icon={<Icon icon={DollarSign} size="lg" className="text-emerald-500" />}
+                label="Revenue Today"
+                value="₹4,250"
+                trend={{ value: "+8%", positive: true }}
+              />
+            )}
             <DashboardStatCard
               icon={<Icon icon={FileText} size="lg" className="text-amber-500" />}
               label="Pending Treatments"

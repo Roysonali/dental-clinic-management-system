@@ -54,6 +54,21 @@ export const ADMIN_ROLES: readonly RoleName[] = [
 ] as const;
 
 /**
+ * Revenue-visible roles — aggregate clinic financial data (billing
+ * dashboard, revenue KPIs, system-wide totals) is visible only to
+ * the ADMIN role.
+ *
+ * Mirrors `_REVENUE_READ_ROLES` in
+ * `backend/app/modules/billing/routers/dashboard.py` exactly —
+ * only ADMIN.  Chief doctors, receptionists, doctors and assistants
+ * may perform operational billing work (invoices, payments) but
+ * must not see system-wide revenue totals.
+ */
+export const REVENUE_READ_ROLES: readonly RoleName[] = [
+  ROLES.ADMIN,
+] as const;
+
+/**
  * Roles permitted to perform credit note workflow operations
  * (issue / apply / void).
  *

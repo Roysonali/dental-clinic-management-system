@@ -33,6 +33,12 @@ export const itemFormSchema = z
       .refine((v) => Number.isInteger(toNumber(v)) && toNumber(v) >= 1, {
         message: 'Sequence number must be a positive integer',
       }),
+    quantity: z
+      .string()
+      .refine(
+        (v) => v === '' || (Number.isInteger(toNumber(v)) && toNumber(v) >= 1 && toNumber(v) <= 999),
+        { message: 'Quantity must be between 1 and 999' },
+      ),
     tooth_number: z
       .string()
       .refine(
@@ -91,6 +97,7 @@ export const itemFormSchema = z
 export const defaultItemFormValues: ItemFormValues = {
   procedure_id: '',
   sequence_number: '',
+  quantity: '1',
   tooth_number: '',
   tooth_surface: '',
   quadrant: '',

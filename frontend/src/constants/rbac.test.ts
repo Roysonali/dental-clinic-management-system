@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ROLES, ADMIN_ROLES } from './roles';
-import { isRoleName, roleMeetsRequirement, RBAC_CURRENT_ROLE_STALE_TIME_MS } from './rbac';
+import { isRoleName, roleMeetsRequirement, canViewRevenue, RBAC_CURRENT_ROLE_STALE_TIME_MS } from './rbac';
 
 describe('isRoleName', () => {
   it('accepts every canonical role name', () => {
@@ -36,6 +36,29 @@ describe('roleMeetsRequirement', () => {
 
   it('returns false for an empty requirement list (nothing satisfies nothing)', () => {
     expect(roleMeetsRequirement(ROLES.ADMIN, [])).toBe(false);
+  });
+});
+
+describe('canViewRevenue', () => {
+  it('allows ADMIN to view revenue', () => {
+    expect(canViewRevenue(ROLES.ADMIN)).toBe(true);
+  });
+
+  it('denies CHIEF_DOCTOR (admin but not revenue-eligible)', () => {
+    expect(canViewRevenue(ROLES.CHIEF_DOCTOR)).toBe(false);
+  });
+
+  it('denies all non-admin roles', () => {
+    expect(canViewRevenue(ROLES.GENERAL_DOCTOR)).toBe(false);
+    expect(canViewRevenue(ROLES.SPECIALIST_DOCTOR)).toBe(false);
+    expect(canViewRevenue(ROLES.CONSULTING_DOCTOR)).toBe(false);
+    expect(canViewRevenue(ROLES.RECEPTIONIST)).toBe(false);
+    expect(canViewRevenue(ROLES.DENTAL_ASSISTANT)).toBe(false);
+  });
+
+  it('denies null and undefined (unknown / loading state)', () => {
+    expect(canViewRevenue(null)).toBe(false);
+    expect(canViewRevenue(undefined)).toBe(false);
   });
 });
 

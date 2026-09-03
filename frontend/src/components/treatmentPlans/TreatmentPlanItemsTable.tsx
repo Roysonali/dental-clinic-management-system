@@ -66,6 +66,13 @@ export const TreatmentPlanItemsTable: FC<TreatmentPlanItemsTableProps> = ({
             ),
         },
         {
+          key: 'quantity',
+          header: 'Qty',
+          width: 'w-16',
+          align: 'center',
+          render: (item) => item.quantity ?? 1,
+        },
+        {
           key: 'tooth',
           header: 'Tooth',
           render: (item) => formatToothLabel(item.tooth_number, item.tooth_surface),
@@ -78,7 +85,7 @@ export const TreatmentPlanItemsTable: FC<TreatmentPlanItemsTableProps> = ({
         },
         {
           key: 'cost',
-          header: 'Est. Cost',
+          header: 'Unit Est. Cost',
           align: 'right',
           cellClassName: 'tabular-nums',
           render: (item) => formatCurrency(item.estimated_cost, TREATMENT_PLAN_CURRENCY_CODE),
@@ -89,6 +96,16 @@ export const TreatmentPlanItemsTable: FC<TreatmentPlanItemsTableProps> = ({
           align: 'right',
           cellClassName: 'tabular-nums',
           render: (item) => (item.discount ? formatCurrency(item.discount, TREATMENT_PLAN_CURRENCY_CODE) : '—'),
+        },
+        {
+          key: 'lineTotal',
+          header: 'Line Total',
+          align: 'right',
+          cellClassName: 'tabular-nums font-medium',
+          render: (item) => {
+            const lineTotal = Number(item.estimated_cost ?? 0) * (item.quantity ?? 1) - Number(item.discount ?? 0);
+            return formatCurrency(lineTotal, TREATMENT_PLAN_CURRENCY_CODE);
+          },
         },
         {
           key: 'status',

@@ -16,7 +16,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { ROUTES } from '../../../routes/routes';
-import { ADMIN_ROLES } from '../../../constants/roles';
+import { ADMIN_ROLES, REVENUE_READ_ROLES } from '../../../constants/roles';
 import { roleMeetsRequirement } from '../../../constants/rbac';
 import type { RoleName } from '../../../constants/roles';
 import type { NavGroupConfig } from './navigation.types';
@@ -103,6 +103,9 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         icon: Receipt,
         route: ROUTES.BILLING,
         group: 'financial',
+        // Aggregate revenue/financial analytics is ADMIN-only. Operational
+        // billing items (Invoices, Payments) remain visible to all roles.
+        roles: REVENUE_READ_ROLES,
       },
       {
         // Invoice list route ships with Phase 2 (Sprint 14A.2); the backend

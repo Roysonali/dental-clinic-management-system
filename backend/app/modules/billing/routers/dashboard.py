@@ -58,6 +58,7 @@ from app.core.constants import (
     ROLE_ADMIN,
     ROLE_DENTAL_ASSISTANT,
     ROLE_RECEPTIONIST,
+    ROLE_CHIEF_DOCTOR,
 )
 from app.modules.auth.models import User
 from app.modules.billing.dependencies import (
@@ -86,11 +87,21 @@ router = APIRouter(
 )
 
 # Roles permitted to read billing reports and dashboards.
+# Operational billing (invoices, payments) retains wider access — only
+# aggregate revenue/analytics is ADMIN-only per the RBAC security policy.
 _REPORT_READ_ROLES: list[str] = [
     ROLE_ADMIN,
     ROLE_RECEPTIONIST,
     ROLE_DENTAL_ASSISTANT,
     *DOCTOR_ROLES,
+]
+
+# Revenue-sensitive roles — aggregate clinic financial data is visible
+# only to the ADMIN role.  Chief doctors, receptionists, doctors and
+# assistants may perform operational billing work (invoices, payments)
+# but must not see system-wide revenue totals.
+_REVENUE_READ_ROLES: list[str] = [
+    ROLE_ADMIN,
 ]
 
 
@@ -122,7 +133,7 @@ def get_billing_dashboard(
         description="Optional patient UUID to include a patient-level financial summary.",
     ),
     _current_user: User = Depends(
-        require_roles(_REPORT_READ_ROLES),
+        require_roles(_REVENUE_READ_ROLES),
     ),
     service: BillingOrchestrationService = Depends(get_billing_orchestration_service),
 ) -> BillingDashboardResponse:
@@ -130,6 +141,9 @@ def get_billing_dashboard(
 
     Thin handler — delegates to the service and mapper. No calculations,
     no DTO construction, no timestamp generation performed here.
+
+    Revenue visibility is restricted to ADMIN — non-admin roles receive
+    403 Forbidden per the RBAC security policy.
     """
     result = service.get_billing_dashboard(patient_id=patient_id)
     return BillingDashboardMapper.to_dashboard_response(result)
@@ -157,7 +171,7 @@ def get_billing_dashboard(
 )
 def get_billing_summary(
     _current_user: User = Depends(
-        require_roles(_REPORT_READ_ROLES),
+        require_roles(_REVENUE_READ_ROLES),
     ),
     service: BillingOrchestrationService = Depends(get_billing_orchestration_service),
 ) -> BillingTotalsResponse:
@@ -165,6 +179,9 @@ def get_billing_summary(
 
     Thin handler — delegates to the service and mapper. No calculations,
     no DTO construction performed here.
+
+    Revenue visibility is restricted to ADMIN — non-admin roles receive
+    403 Forbidden per the RBAC security policy.
     """
     result = service.get_billing_dashboard(patient_id=None)
     return BillingDashboardMapper.to_totals_response(result.totals)

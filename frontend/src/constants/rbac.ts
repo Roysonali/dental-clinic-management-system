@@ -17,7 +17,7 @@
  *   `hooks/rbac/useCurrentUserRole.ts` for how the current user's role is
  *   resolved within those constraints.
  */
-import { ROLES, type RoleName } from './roles';
+import { ROLES, REVENUE_READ_ROLES, type RoleName } from './roles';
 
 /** Every known role name value, used to validate backend-provided strings. */
 const ROLE_NAME_VALUES: readonly string[] = Object.values(ROLES);
@@ -42,6 +42,19 @@ export function roleMeetsRequirement(
   required: readonly RoleName[],
 ): boolean {
   return role != null && required.includes(role);
+}
+
+/**
+ * Can the given role view aggregate revenue / financial analytics?
+ *
+ * Centralised predicate consumed by the dashboard revenue widget, the
+ * billing-dashboard route guard and the sidebar navigation filter.
+ * The backend is the authoritative enforcement layer; this helper
+ * keeps the *client-side* rendering consistent with the backend's
+ * `_REVENUE_READ_ROLES` policy.
+ */
+export function canViewRevenue(role: RoleName | null | undefined): boolean {
+  return role != null && REVENUE_READ_ROLES.includes(role);
 }
 
 /**

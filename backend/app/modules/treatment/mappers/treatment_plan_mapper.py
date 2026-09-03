@@ -158,7 +158,7 @@ class TreatmentPlanMapper:
             items = list(plan.items)
             response.item_count = len(items)
             response.total_estimated_cost = sum(
-                (i.estimated_cost for i in items),
+                (i.estimated_cost * i.quantity for i in items),
                 type(plan.items[0].estimated_cost)(0) if items else Decimal("0.00"),
             )
         return response

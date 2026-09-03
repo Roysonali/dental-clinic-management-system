@@ -53,6 +53,8 @@ from app.modules.treatment.constants import (
     FDI_PRIMARY_MAX,
     FDI_PRIMARY_MIN,
     INITIAL_VERSION_NUMBER,
+    MAX_ITEM_QUANTITY,
+    MIN_ITEM_QUANTITY,
     PLAN_CODE_MAX_LENGTH,
     PROCEDURE_CODE_MAX_LENGTH,
     PROCEDURE_NAME_MAX_LENGTH,
@@ -367,6 +369,12 @@ class TreatmentPlanItem(Base):
     )
     arch: Mapped[str | None] = mapped_column(String(ARCH_MAX_LENGTH), nullable=True)
 
+    quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
     estimated_cost: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),
         nullable=False,
@@ -428,10 +436,14 @@ class TreatmentPlanItem(Base):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            f"quantity >= {MIN_ITEM_QUANTITY} AND quantity <= {MAX_ITEM_QUANTITY}",
+            name="ck_tpi_quantity",
+        ),
         CheckConstraint("estimated_cost >= 0", name="ck_tpi_estimated_cost"),
         CheckConstraint("discount >= 0", name="ck_tpi_discount"),
         CheckConstraint(
-            "discount <= estimated_cost",
+            "discount <= estimated_cost * quantity",
             name="ck_tpi_discount_le_cost",
         ),
         CheckConstraint(
@@ -480,6 +492,7 @@ class TreatmentPlanVersion(Base):
                     "tooth_surface": str | null,
                     "quadrant": str | null,
                     "arch": str | null,
+                    "quantity": int,
                     "estimated_cost": str,   # Decimal serialized as string
                     "discount": str,         # Decimal serialized as string
                     "item_status": str,

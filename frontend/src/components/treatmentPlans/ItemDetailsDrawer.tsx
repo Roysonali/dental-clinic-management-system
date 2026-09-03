@@ -67,6 +67,10 @@ export const ItemDetailsDrawer: FC<ItemDetailsDrawerProps> = ({
             </dd>
           </div>
           <div>
+            <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Quantity</dt>
+            <dd className="mt-0.5 text-body font-medium text-neutral-900">{item.quantity ?? 1}</dd>
+          </div>
+          <div>
             <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Tooth</dt>
             <dd className="mt-0.5 text-body text-neutral-900">{formatToothLabel(item.tooth_number, item.tooth_surface)}</dd>
           </div>
@@ -77,7 +81,7 @@ export const ItemDetailsDrawer: FC<ItemDetailsDrawerProps> = ({
             </dd>
           </div>
           <div>
-            <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Estimated Cost</dt>
+            <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Unit Cost</dt>
             <dd className="mt-0.5 text-body font-medium text-neutral-900 tabular-nums">
               {formatCurrency(item.estimated_cost, TREATMENT_PLAN_CURRENCY_CODE)}
             </dd>
@@ -86,6 +90,15 @@ export const ItemDetailsDrawer: FC<ItemDetailsDrawerProps> = ({
             <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Discount</dt>
             <dd className="mt-0.5 text-body text-neutral-900 tabular-nums">
               {item.discount ? formatCurrency(item.discount, TREATMENT_PLAN_CURRENCY_CODE) : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-caption font-medium uppercase tracking-wide text-neutral-500">Line Total</dt>
+            <dd className="mt-0.5 text-body font-medium text-neutral-900 tabular-nums">
+              {formatCurrency(
+                Number(item.estimated_cost ?? 0) * (item.quantity ?? 1) - Number(item.discount ?? 0),
+                TREATMENT_PLAN_CURRENCY_CODE,
+              )}
             </dd>
           </div>
         </dl>

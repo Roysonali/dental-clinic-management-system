@@ -224,6 +224,7 @@ class TreatmentPlanItemFactory:
             plan_id=plan_id,
             procedure_id=1,
             sequence_number=cls._next_seq(),
+            quantity=1,
             tooth_number=None,
             tooth_surface=None,
             quadrant=None,
