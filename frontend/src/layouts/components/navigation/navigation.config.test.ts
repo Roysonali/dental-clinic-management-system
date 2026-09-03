@@ -44,6 +44,28 @@ describe('getNavGroups — role-aware navigation (Sprint 11C)', () => {
     }
   });
 
+  it('hides Billing Dashboard for non-admin roles (revenue RBAC policy)', () => {
+    // Revenue/financial analytics is ADMIN-only — the billing dashboard
+    // nav item carries roles: REVENUE_READ_ROLES (ADMIN only).
+    expect(itemIds(null)).not.toContain('billing');
+    expect(itemIds(ROLES.GENERAL_DOCTOR)).not.toContain('billing');
+    expect(itemIds(ROLES.RECEPTIONIST)).not.toContain('billing');
+    expect(itemIds(ROLES.DENTAL_ASSISTANT)).not.toContain('billing');
+    expect(itemIds(ROLES.CHIEF_DOCTOR)).not.toContain('billing');
+  });
+
+  it('shows Billing Dashboard only for ADMIN', () => {
+    expect(itemIds(ROLES.ADMIN)).toContain('billing');
+  });
+
+  it('keeps Invoices and Payments visible for all roles (operational billing)', () => {
+    for (const role of [ROLES.ADMIN, ROLES.GENERAL_DOCTOR, ROLES.RECEPTIONIST]) {
+      const ids = itemIds(role);
+      expect(ids).toContain('invoices');
+      expect(ids).toContain('payments');
+    }
+  });
+
   it('never drops every group (dashboard group always survives)', () => {
     expect(itemIds(null).length).toBeGreaterThan(0);
     expect(itemIds(ROLES.ADMIN).length).toBeGreaterThan(0);

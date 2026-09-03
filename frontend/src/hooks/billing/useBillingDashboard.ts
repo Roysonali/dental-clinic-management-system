@@ -16,10 +16,14 @@ import type { BillingDashboardResponse } from '../../types/billing';
  * never retries 401/403 — the backend is the authority, and a 403 surfaces as
  * the permission-denied state instead of hammering the endpoint.
  */
-export function useBillingDashboard(patientId?: string) {
+export function useBillingDashboard(
+  patientId?: string,
+  options?: { enabled?: boolean },
+) {
   return useQuery<BillingDashboardResponse>({
     queryKey: billingQueryKeys.dashboard(patientId),
     queryFn: () => billingService.getDashboard(patientId),
     retry: shouldRetryQuery,
+    enabled: options?.enabled ?? true,
   });
 }

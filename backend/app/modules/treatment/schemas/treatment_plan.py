@@ -16,7 +16,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.modules.treatment.constants import (
     CLINICAL_NOTES_MAX_LENGTH,
     MAX_ESTIMATED_COST,
+    MAX_ITEM_QUANTITY,
     MIN_ESTIMATED_COST,
+    MIN_ITEM_QUANTITY,
     PLAN_CODE_MAX_LENGTH,
 )
 from app.modules.treatment.enums import (
@@ -115,6 +117,14 @@ class AddItemRequest(BaseModel):
         description="Ordering position within the plan (must be unique).",
         examples=[1],
     )
+    quantity: int = Field(
+        default=1,
+        ge=MIN_ITEM_QUANTITY,
+        le=MAX_ITEM_QUANTITY,
+        title="Quantity",
+        description="Number of units for this item (1–999).",
+        examples=[1],
+    )
     estimated_cost: Optional[Decimal] = Field(
         default=None,
         ge=MIN_ESTIMATED_COST,
@@ -187,6 +197,13 @@ class ItemUpdateRequest(BaseModel):
         ge=1,
         title="Sequence Number",
         description="New sequence number (must be unique per plan).",
+    )
+    quantity: Optional[int] = Field(
+        default=None,
+        ge=MIN_ITEM_QUANTITY,
+        le=MAX_ITEM_QUANTITY,
+        title="Quantity",
+        description="New quantity (1–999).",
     )
     estimated_cost: Optional[Decimal] = Field(
         default=None,
@@ -331,6 +348,13 @@ class TreatmentPlanItemResponse(BaseModel):
         ...,
         title="Sequence Number",
         description="Ordering position within the plan.",
+    )
+    quantity: int = Field(
+        default=1,
+        ge=MIN_ITEM_QUANTITY,
+        le=MAX_ITEM_QUANTITY,
+        title="Quantity",
+        description="Number of units for this item.",
     )
     tooth_number: Optional[int] = Field(
         default=None,

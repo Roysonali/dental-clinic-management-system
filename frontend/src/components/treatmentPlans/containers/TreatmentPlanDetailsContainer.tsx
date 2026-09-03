@@ -103,7 +103,7 @@ export const TreatmentPlanDetailsContainer: FC<{ planId: string }> = ({ planId }
     return {
       itemCount: planQuery.data.items.length,
       totalEstimatedCost: planQuery.data.items.reduce(
-        (sum, item) => sum + Number(item.estimated_cost ?? 0),
+        (sum, item) => sum + Number(item.estimated_cost ?? 0) * (item.quantity ?? 1),
         0,
       ),
     };

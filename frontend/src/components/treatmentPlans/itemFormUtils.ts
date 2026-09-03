@@ -38,6 +38,10 @@ export function itemFormValuesToAddRequest(values: ItemFormValues): AddItemReque
     sequence_number: toFiniteNumber(values.sequence_number),
   };
 
+  // Quantity: default to 1 when empty
+  const qty = values.quantity.trim() === '' ? 1 : Math.max(1, Math.floor(toFiniteNumber(values.quantity)));
+  request.quantity = qty;
+
   const cost = toNullableNumber(values.estimated_cost);
   if (cost !== null) request.estimated_cost = cost;
   if (values.discount.trim() !== '') request.discount = toFiniteNumber(values.discount);
@@ -70,6 +74,9 @@ export function itemFormValuesToUpdateRequest(
   const sequence = toFiniteNumber(values.sequence_number);
   if (sequence !== original.sequence_number) request.sequence_number = sequence;
 
+  const qty = values.quantity.trim() === '' ? 1 : Math.max(1, Math.floor(toFiniteNumber(values.quantity)));
+  if (qty !== original.quantity) request.quantity = qty;
+
   const cost = toNullableNumber(values.estimated_cost);
   if (cost !== (original.estimated_cost ?? null)) {
     if (cost !== null) request.estimated_cost = cost;
@@ -98,6 +105,7 @@ export function itemResponseToFormValues(item: TreatmentPlanItemResponse): ItemF
   return {
     procedure_id: String(item.procedure_id),
     sequence_number: String(item.sequence_number),
+    quantity: String(item.quantity ?? 1),
     tooth_number: item.tooth_number != null ? String(item.tooth_number) : '',
     tooth_surface: item.tooth_surface ?? '',
     quadrant: item.quadrant ?? '',

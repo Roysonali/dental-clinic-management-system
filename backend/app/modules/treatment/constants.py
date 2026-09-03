@@ -94,6 +94,9 @@ MIN_PLAN_ITEMS_FOR_SUBMISSION = 1
 INITIAL_VERSION_NUMBER = 1
 # Maximum sequence number per plan (documented upper bound for item ordering)
 MAX_SEQUENCE_NUMBER = 999
+# Item quantity bounds
+MIN_ITEM_QUANTITY = 1
+MAX_ITEM_QUANTITY = 999
 
 # ==========================================================
 # State machine configuration (single source of truth)
@@ -240,6 +243,8 @@ __all__ = [
     "MIN_PLAN_ITEMS_FOR_SUBMISSION",
     "INITIAL_VERSION_NUMBER",
     "MAX_SEQUENCE_NUMBER",
+    "MIN_ITEM_QUANTITY",
+    "MAX_ITEM_QUANTITY",
     "PLAN_TRANSITIONS",
     "ITEM_TRANSITIONS",
     "VALID_PLAN_TRANSITIONS",

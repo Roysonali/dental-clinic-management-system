@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '../../common/Modal/Modal';
-import { Form, FormActions, ValidationSummary } from '../../common/Form';
+import { Form, FormActions, FormField, ValidationSummary } from '../../common/Form';
 import { Select, Textarea } from '../../common/Input';
 import { itemFormSchema } from '../../../utils/itemFormSchema';
 import { itemResponseToFormValues } from '../itemFormUtils';
@@ -78,24 +78,34 @@ export const UpdateItemDialog: FC<UpdateItemDialogProps> = ({
             error={fieldError('procedure_id')}
             {...register('procedure_id')}
           />
-          <input
-            id="update-item-sequence"
-            type="number"
-            min={1}
-            step={1}
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
-            placeholder="Sequence number"
-            aria-invalid={!!fieldError('sequence_number')}
-            {...register('sequence_number')}
-          />
-          {fieldError('sequence_number') && (
-            <p id="update-item-sequence-error" className="mt-1 text-body-sm text-danger">
-              {fieldError('sequence_number')}
-            </p>
-          )}
+          <FormField label="Sequence Number" error={fieldError('sequence_number')}>
+            <input
+              id="update-item-sequence"
+              type="number"
+              min={1}
+              step={1}
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
+              placeholder="1"
+              aria-invalid={!!fieldError('sequence_number')}
+              {...register('sequence_number')}
+            />
+          </FormField>
 
-          <input
-            id="update-item-tooth"
+          <FormField label="Quantity" error={fieldError('quantity')} helperText="Number of procedure units">
+            <input
+              id="update-item-quantity"
+              type="number"
+              min={1}
+              step={1}
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
+              aria-invalid={!!fieldError('quantity')}
+              {...register('quantity')}
+            />
+          </FormField>
+
+          <FormField label="Tooth Number" error={fieldError('tooth_number')}>
+            <input
+              id="update-item-tooth"
             type="number"
             min={11}
             className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
@@ -103,25 +113,18 @@ export const UpdateItemDialog: FC<UpdateItemDialogProps> = ({
             aria-invalid={!!fieldError('tooth_number')}
             {...register('tooth_number')}
           />
-          {fieldError('tooth_number') && (
-            <p id="update-item-tooth-error" className="mt-1 text-body-sm text-danger">
-              {fieldError('tooth_number')}
-            </p>
-          )}
+          </FormField>
 
-          <input
-            id="update-item-surface"
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
-            placeholder="Tooth surface (e.g. MOD)"
-            maxLength={10}
-            aria-invalid={!!fieldError('tooth_surface')}
-            {...register('tooth_surface')}
-          />
-          {fieldError('tooth_surface') && (
-            <p id="update-item-surface-error" className="mt-1 text-body-sm text-danger">
-              {fieldError('tooth_surface')}
-            </p>
-          )}
+          <FormField label="Tooth Surface" error={fieldError('tooth_surface')}>
+            <input
+              id="update-item-surface"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
+              placeholder="e.g. MOD"
+              maxLength={10}
+              aria-invalid={!!fieldError('tooth_surface')}
+              {...register('tooth_surface')}
+            />
+          </FormField>
 
           <Select
             label="Quadrant"
@@ -138,37 +141,31 @@ export const UpdateItemDialog: FC<UpdateItemDialogProps> = ({
             {...register('arch')}
           />
 
-          <input
-            id="update-item-cost"
-            type="number"
-            min={0}
-            step="0.01"
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
-            placeholder="Estimated cost"
-            aria-invalid={!!fieldError('estimated_cost')}
-            {...register('estimated_cost')}
-          />
-          {fieldError('estimated_cost') && (
-            <p id="update-item-cost-error" className="mt-1 text-body-sm text-danger">
-              {fieldError('estimated_cost')}
-            </p>
-          )}
+          <FormField label="Unit Cost" error={fieldError('estimated_cost')}>
+            <input
+              id="update-item-cost"
+              type="number"
+              min={0}
+              step="0.01"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
+              placeholder="0.00"
+              aria-invalid={!!fieldError('estimated_cost')}
+              {...register('estimated_cost')}
+            />
+          </FormField>
 
-          <input
-            id="update-item-discount"
-            type="number"
-            min={0}
-            step="0.01"
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
-            placeholder="Discount"
-            aria-invalid={!!fieldError('discount')}
-            {...register('discount')}
-          />
-          {fieldError('discount') && (
-            <p id="update-item-discount-error" className="mt-1 text-body-sm text-danger">
-              {fieldError('discount')}
-            </p>
-          )}
+          <FormField label="Discount" error={fieldError('discount')}>
+            <input
+              id="update-item-discount"
+              type="number"
+              min={0}
+              step="0.01"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-body text-neutral-800 transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-neutral-400"
+              placeholder="0.00"
+              aria-invalid={!!fieldError('discount')}
+              {...register('discount')}
+            />
+          </FormField>
 
           <div className="md:col-span-2">
             <Textarea

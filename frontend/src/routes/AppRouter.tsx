@@ -258,24 +258,26 @@ const AppRouter = () => {
 
             {/* ── Billing Module (Dashboard / Invoices / Payments) ── */}
             {/*
-              Every /billing/dashboard endpoint allows ALL roles; the
-              /billing/invoices and /billing/payments READ + WRITE endpoints
-              allow ADMIN / RECEPTIONIST / DENTAL_ASSISTANT / DOCTOR roles
-              (routers/invoice.py `_INVOICE_READ_ROLES` + `_INVOICE_WRITE_ROLES`,
-              routers/payment.py `_PAYMENT_READ_ROLES` + `_PAYMENT_WRITE_ROLES`).
-              DENTAL_ASSISTANT is excluded only from WORKFLOW actions
-              (invoice issue/cancel; payment complete/fail/void/allocate) and
-              DELETE is ADMIN-only. No route carries a client-side role gate
-              because the client cannot resolve non-admin roles — the backend
-              enforces with 403, and the list/detail containers render the
-              permission-denied state in that case (workflow buttons are shown
-              but fail closed server-side). Lazy-loaded for route-level code
-              splitting.
+              The /billing/dashboard and /billing/summary endpoints are
+              ADMIN-only (revenue/financial analytics); the /billing/invoices
+              and /billing/payments READ + WRITE endpoints allow
+              ADMIN / RECEPTIONIST / DENTAL_ASSISTANT / DOCTOR roles.
+              The billing dashboard route carries a client-side RequireRole
+              guard (ADMIN only) so non-admins are redirected instead of
+              seeing a 403 page.  Invoice and payment routes remain
+              ProtectedRoute-only — the backend enforces their RBAC, and the
+              list/detail containers render the permission-denied state.
             */}
             <Route
-              path={ROUTES.BILLING}
-              element={<BillingDashboardPage />}
-            />
+              element={
+                <RequireRole requiredRoles={ROUTE_ROLE_REQUIREMENTS[ROUTES.BILLING]} />
+              }
+            >
+              <Route
+                path={ROUTES.BILLING}
+                element={<BillingDashboardPage />}
+              />
+            </Route>
             <Route
               path={ROUTES.BILLING_INVOICES}
               element={<InvoiceListPage />}

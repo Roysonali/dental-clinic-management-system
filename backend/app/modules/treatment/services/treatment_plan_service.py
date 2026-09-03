@@ -338,7 +338,7 @@ class TreatmentPlanService:
             and ``net_total`` keys.
         """
         total_estimated = sum(
-            (item.estimated_cost for item in plan.items),
+            (item.estimated_cost * item.quantity for item in plan.items),
             Decimal("0.00"),
         )
         total_discount = sum(
@@ -368,6 +368,7 @@ class TreatmentPlanService:
         procedure_id: int,
         sequence_number: int,
         *,
+        quantity: int = 1,
         estimated_cost: Decimal | None = None,
         discount: Decimal = Decimal("0.00"),
         tooth_number: int | None = None,
@@ -434,10 +435,11 @@ class TreatmentPlanService:
                 estimated_cost = procedure.default_cost if procedure else Decimal("0.00")
 
             # ── 5–7. Validate fields ──────────────────────────────
+            self._plan_validator.validate_item_quantity(quantity)
             if tooth_number is not None:
                 self._plan_validator.validate_tooth_number(tooth_number)
             self._plan_validator.validate_item_cost(estimated_cost)
-            self._plan_validator.validate_discount(discount, estimated_cost)
+            self._plan_validator.validate_discount(discount, estimated_cost, quantity)
             self._plan_validator.validate_item_sequence(
                 plan, sequence_number,
             )
@@ -447,6 +449,7 @@ class TreatmentPlanService:
                 plan_id=plan_id,
                 procedure_id=procedure_id,
                 sequence_number=sequence_number,
+                quantity=quantity,
                 tooth_number=tooth_number,
                 tooth_surface=tooth_surface,
                 quadrant=quadrant,
@@ -497,6 +500,7 @@ class TreatmentPlanService:
         *,
         procedure_id: int | None = None,
         sequence_number: int | None = None,
+        quantity: int | None = None,
         estimated_cost: Decimal | None = None,
         discount: Decimal | None = None,
         tooth_number: int | None | object = _UNSET,
@@ -562,6 +566,7 @@ class TreatmentPlanService:
 
             # ── 4. Resolve current values for cross-field validation ──
             new_procedure_id = procedure_id if procedure_id is not None else item.procedure_id
+            new_quantity = quantity if quantity is not None else item.quantity
             new_cost = estimated_cost if estimated_cost is not None else item.estimated_cost
             new_discount = discount if discount is not None else item.discount
             new_sequence = sequence_number if sequence_number is not None else item.sequence_number
@@ -570,6 +575,9 @@ class TreatmentPlanService:
             if procedure_id is not None:
                 self._plan_validator.validate_procedure_exists(procedure_id)
 
+            if quantity is not None:
+                self._plan_validator.validate_item_quantity(quantity)
+
             if tooth_number is not _UNSET and tooth_number is not None:
                 self._plan_validator.validate_tooth_number(tooth_number)
 
@@ -577,7 +585,7 @@ class TreatmentPlanService:
                 self._plan_validator.validate_item_cost(estimated_cost)
 
             if discount is not None:
-                self._plan_validator.validate_discount(new_discount, new_cost)
+                self._plan_validator.validate_discount(new_discount, new_cost, new_quantity)
 
             if sequence_number is not None:
                 self._plan_validator.validate_item_sequence(
@@ -589,6 +597,8 @@ class TreatmentPlanService:
                 item.procedure_id = procedure_id
             if sequence_number is not None:
                 item.sequence_number = sequence_number
+            if quantity is not None:
+                item.quantity = quantity
             if estimated_cost is not None:
                 item.estimated_cost = estimated_cost
             if discount is not None:
@@ -1176,6 +1186,7 @@ class TreatmentPlanService:
                         if item.procedure is not None
                         else str(item.procedure_id)
                     ),
+                    "quantity": item.quantity,
                     "tooth_number": item.tooth_number,
                     "tooth_surface": item.tooth_surface,
                     "quadrant": item.quadrant,
@@ -1414,6 +1425,7 @@ class TreatmentPlanService:
                     plan_id=plan_id,
                     procedure_id=item_data["procedure_id"],
                     sequence_number=item_data["sequence_number"],
+                    quantity=item_data.get("quantity", 1),
                     tooth_number=item_data.get("tooth_number"),
                     tooth_surface=item_data.get("tooth_surface"),
                     quadrant=item_data.get("quadrant"),

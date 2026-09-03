@@ -49,7 +49,9 @@ from app.modules.treatment.constants import (
     FDI_PRIMARY_MAX,
     FDI_PRIMARY_MIN,
     MAX_ESTIMATED_COST,
+    MAX_ITEM_QUANTITY,
     MIN_ESTIMATED_COST,
+    MIN_ITEM_QUANTITY,
     MIN_PLAN_ITEMS_FOR_SUBMISSION,
 )
 from app.modules.treatment.enums import (
@@ -326,6 +328,30 @@ class TreatmentPlanValidator:
 
         raise InvalidToothNumber(tooth_number=tooth_number)
 
+    def validate_item_quantity(self, quantity: int) -> None:
+        """Validate item quantity is within ``[MIN_ITEM_QUANTITY, MAX_ITEM_QUANTITY]``.
+
+        Raises:
+            PlanValidationFailed: If quantity is invalid or out of range.
+        """
+        if not isinstance(quantity, int) or isinstance(quantity, bool):
+            raise PlanValidationFailed(
+                f"Invalid quantity: {quantity!r}. Must be an integer.",
+                details={"quantity": str(quantity)},
+            )
+
+        if quantity < MIN_ITEM_QUANTITY:
+            raise PlanValidationFailed(
+                f"Quantity must be >= {MIN_ITEM_QUANTITY}. Got {quantity}.",
+                details={"quantity": str(quantity), "min": MIN_ITEM_QUANTITY},
+            )
+
+        if quantity > MAX_ITEM_QUANTITY:
+            raise PlanValidationFailed(
+                f"Quantity must be <= {MAX_ITEM_QUANTITY}. Got {quantity}.",
+                details={"quantity": str(quantity), "max": MAX_ITEM_QUANTITY},
+            )
+
     def validate_item_cost(self, cost: Decimal) -> None:
         """Validate item estimated cost is within ``[MIN_ESTIMATED_COST, MAX_ESTIMATED_COST]``.
 
@@ -356,19 +382,21 @@ class TreatmentPlanValidator:
         self,
         discount: Decimal,
         estimated_cost: Decimal | None = None,
+        quantity: int = 1,
     ) -> None:
-        """Validate item discount is non-negative and optionally <= estimated cost.
+        """Validate item discount is non-negative and optionally <= line total.
 
         Args:
             discount: The discount amount to validate.
             estimated_cost: Optional. When provided, validates that the
-                discount does not exceed the estimated cost. This check is
-                also enforced at the DB level via the ``ck_tpi_discount_le_cost``
-                CHECK constraint.
+                discount does not exceed the line total (estimated_cost * quantity).
+                This check is also enforced at the DB level via the
+                ``ck_tpi_discount_le_cost`` CHECK constraint.
+            quantity: The item quantity (default 1).
 
         Raises:
             PlanValidationFailed: If discount is negative, or if
-                ``estimated_cost`` is provided and discount exceeds it.
+                ``estimated_cost`` is provided and discount exceeds the line total.
         """
         try:
             discount = Decimal(str(discount))
@@ -384,14 +412,18 @@ class TreatmentPlanValidator:
                 details={"discount": str(discount), "min": str(MIN_ESTIMATED_COST)},
             )
 
-        if estimated_cost is not None and discount > Decimal(str(estimated_cost)):
-            raise PlanValidationFailed(
-                f"Discount ({discount}) exceeds estimated cost ({estimated_cost}).",
-                details={
-                    "discount": str(discount),
-                    "estimated_cost": str(estimated_cost),
-                },
-            )
+        if estimated_cost is not None:
+            line_total = Decimal(str(estimated_cost)) * quantity
+            if discount > line_total:
+                raise PlanValidationFailed(
+                    f"Discount ({discount}) exceeds line total ({line_total}).",
+                    details={
+                        "discount": str(discount),
+                        "estimated_cost": str(estimated_cost),
+                        "quantity": quantity,
+                        "line_total": str(line_total),
+                    },
+                )
 
     # ==================================================================
     # Versioning

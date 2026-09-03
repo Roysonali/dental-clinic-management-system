@@ -12,6 +12,7 @@ const item: TreatmentPlanItemResponse = {
   procedure_id: 5,
   procedure: null,
   sequence_number: 1,
+  quantity: 2,
   tooth_number: 46,
   tooth_surface: 'MOD',
   quadrant: 'UR',
@@ -29,6 +30,7 @@ describe('itemFormValuesToAddRequest', () => {
     const request = itemFormValuesToAddRequest({
       procedure_id: '5',
       sequence_number: '1',
+      quantity: '2',
       tooth_number: '46',
       tooth_surface: 'MOD',
       quadrant: 'UR',
@@ -40,6 +42,7 @@ describe('itemFormValuesToAddRequest', () => {
     expect(request).toEqual({
       procedure_id: 5,
       sequence_number: 1,
+      quantity: 2,
       estimated_cost: 1500,
       discount: 100,
       tooth_number: 46,
@@ -54,6 +57,7 @@ describe('itemFormValuesToAddRequest', () => {
     const request = itemFormValuesToAddRequest({
       procedure_id: '5',
       sequence_number: '1',
+      quantity: '',
       tooth_number: '',
       tooth_surface: '',
       quadrant: '',
@@ -62,9 +66,42 @@ describe('itemFormValuesToAddRequest', () => {
       discount: '',
       notes: '',
     });
+    expect(request.quantity).toBe(1);
     expect(request.tooth_number).toBeNull();
     expect(request.quadrant).toBeNull();
     expect(request.notes).toBeNull();
+  });
+
+  it('defaults quantity to 1 when omitted', () => {
+    const request = itemFormValuesToAddRequest({
+      procedure_id: '5',
+      sequence_number: '1',
+      quantity: '',
+      tooth_number: '',
+      tooth_surface: '',
+      quadrant: '',
+      arch: '',
+      estimated_cost: '',
+      discount: '',
+      notes: '',
+    });
+    expect(request.quantity).toBe(1);
+  });
+
+  it('floors decimal quantity to integer', () => {
+    const request = itemFormValuesToAddRequest({
+      procedure_id: '5',
+      sequence_number: '1',
+      quantity: '2.7',
+      tooth_number: '',
+      tooth_surface: '',
+      quadrant: '',
+      arch: '',
+      estimated_cost: '',
+      discount: '',
+      notes: '',
+    });
+    expect(request.quantity).toBe(2);
   });
 });
 
@@ -75,6 +112,14 @@ describe('itemFormValuesToUpdateRequest', () => {
       item,
     );
     expect(request).toEqual({ estimated_cost: 1700 });
+  });
+
+  it('sends quantity when changed', () => {
+    const request = itemFormValuesToUpdateRequest(
+      { ...itemResponseToFormValues(item), quantity: '5' },
+      item,
+    );
+    expect(request).toEqual({ quantity: 5 });
   });
 
   it('omits notes when unchanged or blank (R14: "" invalid, null ignored)', () => {
@@ -111,6 +156,7 @@ describe('itemResponseToFormValues', () => {
     expect(values).toEqual({
       procedure_id: '5',
       sequence_number: '1',
+      quantity: '2',
       tooth_number: '46',
       tooth_surface: 'MOD',
       quadrant: 'UR',
