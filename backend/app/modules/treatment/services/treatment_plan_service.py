@@ -584,7 +584,12 @@ class TreatmentPlanService:
             if estimated_cost is not None:
                 self._plan_validator.validate_item_cost(estimated_cost)
 
-            if discount is not None:
+            # Validate discount whenever any field affecting the line
+            # total changes (quantity, estimated_cost, or discount).
+            # This catches cases like: existing discount=1000 was valid
+            # at qty=5 (line=1000), but qty-only update to 2 makes
+            # the discount exceed the new line total (400).
+            if discount is not None or quantity is not None or estimated_cost is not None:
                 self._plan_validator.validate_discount(new_discount, new_cost, new_quantity)
 
             if sequence_number is not None:
