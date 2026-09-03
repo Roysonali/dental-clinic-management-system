@@ -19,7 +19,9 @@ interface MobilePatientRecordCardProps {
  */
 export const MobilePatientRecordCard: FC<MobilePatientRecordCardProps> = ({ record, onClick }) => {
   const patientName = record.patient_name ?? `Patient #${record.patient_id}`;
-  const appointmentLabel = record.appointment_number ?? `APT #${record.appointment_id.slice(0, 8)}`;
+  const appointmentLabel = record.has_appointment
+    ? (record.appointment_number ?? `APT #${record.appointment_id?.slice(0, 8)}`)
+    : '—';
 
   return (
     <MobileCard onClick={onClick} ariaLabel={`View record for ${patientName}`}>

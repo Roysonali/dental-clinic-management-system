@@ -171,10 +171,10 @@ class PatientRecordCreate(
         description="Associated patient identifier",
     )
 
-    appointment_id: UUID = Field(
-        ...,
+    appointment_id: Optional[UUID] = Field(
+        default=None,
         title="Appointment ID",
-        description="Associated appointment identifier",
+        description="Associated appointment identifier. Optional — records can be created without an appointment.",
     )
 
 # ==========================================================
@@ -410,10 +410,10 @@ class PatientRecordResponse(
         description="Associated patient identifier",
     )
 
-    appointment_id: UUID = Field(
-        ...,
+    appointment_id: Optional[UUID] = Field(
+        default=None,
         title="Appointment ID",
-        description="Associated appointment identifier",
+        description="Associated appointment identifier. Null if the record has no linked appointment.",
     )
 
     status: RecordStatus = Field(
@@ -435,9 +435,9 @@ class PatientRecordResponse(
     )
 
     updated_at: datetime = Field(
-        ...,
-        title="Updated At",
-        description="Last update timestamp",
+    ...,
+    title="Updated At",
+    description="Last update timestamp",
     )
 
     diagnoses: list[
@@ -526,10 +526,10 @@ class PatientRecordListItem(BaseModel):
         description="Associated patient identifier",
     )
 
-    appointment_id: UUID = Field(
-        ...,
+    appointment_id: Optional[UUID] = Field(
+        default=None,
         title="Appointment ID",
-        description="Associated appointment identifier",
+        description="Associated appointment identifier. Null if no linked appointment.",
     )
 
     status: RecordStatus = Field(

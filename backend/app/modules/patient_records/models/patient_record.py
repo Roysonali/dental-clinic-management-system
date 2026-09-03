@@ -25,8 +25,11 @@ if TYPE_CHECKING:
 
 class PatientRecord(Base):
     """
-    Stores the complete clinical record
-    associated with a patient appointment.
+    Stores the complete clinical record for a patient.
+
+    An optional ``appointment_id`` links the record to an appointment
+    when one exists. Records may also be created without an appointment
+    (walk-in notes, historical entry, etc.).
     """
 
     __tablename__ = "patient_records"
@@ -44,10 +47,10 @@ class PatientRecord(Base):
         index=True,
     )
 
-    appointment_id: Mapped[UUID] = mapped_column(
+    appointment_id: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("appointments.id"),
-        nullable=False,
+        nullable=True,
         unique=True,
         index=True,
     )

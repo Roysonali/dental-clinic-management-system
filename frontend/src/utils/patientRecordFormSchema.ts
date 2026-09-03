@@ -66,7 +66,7 @@ const requiredText = (min: number, max: number, label: string) =>
 
 export const patientRecordFormSchema = z.object({
   patient_id: z.string().min(1, 'Patient is required'),
-  appointment_id: z.string().min(1, 'Appointment is required'),
+  appointment_id: z.string().optional(),
   chief_complaint: optionalText(PATIENT_RECORD_TEXT_MAX, 'Chief complaint'),
   clinical_notes: optionalText(PATIENT_RECORD_CLINICAL_NOTES_MAX, 'Clinical notes'),
   doctor_remarks: optionalText(PATIENT_RECORD_TEXT_MAX, 'Doctor remarks'),
@@ -85,7 +85,6 @@ export type PatientRecordFormSchema = z.infer<typeof patientRecordFormSchema>;
 /** Default (empty) values for the create-record form. */
 export const defaultPatientRecordFormValues: PatientRecordFormValues = {
   patient_id: '',
-  appointment_id: '',
   chief_complaint: '',
   clinical_notes: '',
   doctor_remarks: '',

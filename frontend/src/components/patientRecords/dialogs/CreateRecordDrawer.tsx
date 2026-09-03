@@ -1,15 +1,13 @@
 import { useEffect, type FC } from 'react';
-import { X, ExternalLink } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Drawer } from '../../common/Drawer/Drawer';
 import { IconButton } from '../../common/Button/IconButton';
 import { Icon } from '../../common/Icon/Icon';
-import { Button } from '../../common/Button/Button';
 import { Form, FormActions, ValidationSummary } from '../../common/Form';
-import { Select, Textarea } from '../../common/Input';
+import { Textarea } from '../../common/Input';
 import { PatientPicker } from '../../appointments/PatientPicker';
-import { useAppointmentOptions } from '../../../hooks/patientRecords/useAppointmentOptions';
 import {
   defaultPatientRecordFormValues,
   patientRecordFormSchema,
@@ -27,9 +25,6 @@ interface CreateRecordDrawerProps {
   submitting?: boolean;
   serverErrors?: Record<string, string>;
   serverMessage?: string | null;
-  /** Set when the backend rejected creation with 409 (appointment already has a record). */
-  conflictAppointmentId?: string | null;
-  onViewConflictRecord?: (appointmentId: string) => void;
   /** Pre-fill the patient when opened from the patient profile. */
   initialPatientId?: string;
   /** Human-readable patient label to display in the picker (e.g. "Juan Dela Cruz (PAT-000001)"). */
@@ -39,13 +34,10 @@ interface CreateRecordDrawerProps {
 /**
  * CreateRecordDrawer — S-03 create-record workflow ([UI spec S-03]).
  *
- * 640px drawer: Record details (PatientPicker → Appointment selector
- * enabled only after a patient is chosen) · Clinical (chief complaint,
+ * 640px drawer: Record details (PatientPicker) · Clinical (chief complaint,
  * clinical notes, doctor remarks, treatment recommendation) · Medical
  * history (7 free-text fields). Every textarea carries a character counter
- * matching the backend limits. A 409 create conflict surfaces the server
- * message with a "View existing record" action (resolved via the real
- * by-appointment endpoint in the container).
+ * matching the backend limits.
  */
 export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
   open,
@@ -54,8 +46,6 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
   submitting = false,
   serverErrors = {},
   serverMessage = null,
-  conflictAppointmentId = null,
-  onViewConflictRecord,
   initialPatientId = '',
   selectedPatientLabel,
 }) => {
@@ -63,7 +53,6 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
     register,
     handleSubmit,
     control,
-    watch,
     setValue,
     reset,
     formState: { errors },
@@ -75,8 +64,7 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
 
   // M-1: the drawer stays mounted while closed, so React Hook Form keeps the
   // previous session's values. Re-seed a completely clean form on every open
-  // (values, validation errors, dirty + touched flags — including the
-  // selected patient so the appointment selector starts disabled).
+  // (values, validation errors, dirty + touched flags).
   useEffect(() => {
     if (open) {
       reset(
@@ -87,20 +75,11 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
     }
   }, [open, reset, initialPatientId]);
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form's watch() is safe for gating the appointment selector on patient selection; the rule is intentionally conservative.
-  const selectedPatientId = watch('patient_id');
-  // M-2: the appointment directory is only fetched once the drawer is open
-  // AND a patient is chosen (and then cached) — no eager request on page mount.
-  const { options: appointmentOptions, loading: appointmentsLoading, loaded: appointmentsLoaded } =
-    useAppointmentOptions(selectedPatientId, open && selectedPatientId.length > 0);
-
   const fieldError = (field: keyof PatientRecordFormValues) =>
     errors[field]?.message ?? serverErrors[field];
 
   const handlePatientChange = (patientId: string) => {
     setValue('patient_id', patientId, { shouldValidate: true, shouldDirty: true });
-    // Appointment belongs to the patient — clear when the patient changes.
-    setValue('appointment_id', '', { shouldValidate: true, shouldDirty: true });
   };
 
   return (
@@ -119,7 +98,7 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
               Create Patient Record
             </h2>
             <p className="text-caption text-neutral-500">
-              One clinical record per appointment. Records are created as drafts.
+              Create a clinical record. Records are created as drafts.
             </p>
           </div>
           <IconButton
@@ -139,16 +118,6 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
             className="mb-4 flex flex-col gap-2 rounded-lg border border-danger/25 bg-danger/10 p-4"
           >
             <p className="text-body-sm text-danger">{serverMessage}</p>
-            {conflictAppointmentId && onViewConflictRecord && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => onViewConflictRecord(conflictAppointmentId)}
-                leftIcon={<Icon icon={ExternalLink} size="xs" />}
-              >
-                View existing record
-              </Button>
-            )}
           </div>
         )}
 
@@ -173,31 +142,6 @@ export const CreateRecordDrawer: FC<CreateRecordDrawerProps> = ({
                 />
               )}
             />
-            <Select
-              label="Appointment"
-              required
-              placeholder={
-                selectedPatientId
-                  ? appointmentsLoading
-                    ? 'Loading appointments…'
-                    : 'Select appointment for this patient'
-                  : 'Select a patient first'
-              }
-              disabled={!selectedPatientId || appointmentsLoading}
-              options={appointmentOptions}
-              error={fieldError('appointment_id')}
-              {...register('appointment_id')}
-            />
-            {selectedPatientId &&
-              appointmentsLoaded &&
-              !appointmentsLoading &&
-              appointmentOptions.length === 0 && (
-                <p className="text-body-sm text-warning">
-                  No appointments found for this patient — creating a record requires an existing
-                  appointment (one record per appointment). The full appointment list has been
-                  checked, not just the most recent 100.
-                </p>
-              )}
           </fieldset>
 
           {/* ── Clinical ───────────────────────────────────────── */}

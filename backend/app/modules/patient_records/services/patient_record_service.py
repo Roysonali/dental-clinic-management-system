@@ -107,21 +107,25 @@ class PatientRecordService:
         try:
             # ── Pre-conditions ──────────────────────────────────────
             self._assert_patient_exists(payload.patient_id)
-            self._assert_appointment_exists(payload.appointment_id)
 
-            # Defensive check: see if a record already exists for this
-            # appointment before hitting the DB constraint.
-            existing = self.record_repo.get_by_appointment(
-                payload.appointment_id,
-            )
-            if existing is not None:
-                raise PatientRecordConflict(
-                    message=(
-                        f"A record already exists for appointment "
-                        f"{payload.appointment_id}"
-                    ),
-                    details={"appointment_id": str(payload.appointment_id)},
+            # Appointment is optional. When provided, validate its
+            # existence and enforce the one-record-per-appointment rule.
+            if payload.appointment_id is not None:
+                self._assert_appointment_exists(payload.appointment_id)
+
+                # Defensive check: see if a record already exists for this
+                # appointment before hitting the DB constraint.
+                existing = self.record_repo.get_by_appointment(
+                    payload.appointment_id,
                 )
+                if existing is not None:
+                    raise PatientRecordConflict(
+                        message=(
+                            f"A record already exists for appointment "
+                            f"{payload.appointment_id}"
+                        ),
+                        details={"appointment_id": str(payload.appointment_id)},
+                    )
 
             # ── Build the ORM instance ──────────────────────────────
             record = PatientRecord(
@@ -157,7 +161,7 @@ class PatientRecordService:
                 "PatientRecord created: id=%s, patient=%s, appointment=%s",
                 record.id,
                 record.patient_id,
-                record.appointment_id,
+                record.appointment_id or "(none)",
             )
 
             return record
@@ -171,7 +175,7 @@ class PatientRecordService:
             logger.exception(
                 "Failed to create patient record: patient=%s, appointment=%s",
                 payload.patient_id,
-                payload.appointment_id,
+                payload.appointment_id or "(none)",
             )
             raise
 

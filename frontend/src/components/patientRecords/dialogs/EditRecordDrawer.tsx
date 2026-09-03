@@ -33,7 +33,7 @@ interface EditRecordDrawerProps {
 function recordToFormValues(record: PatientRecordResponse): PatientRecordFormValues {
   return {
     patient_id: record.patient_id,
-    appointment_id: record.appointment_id,
+    appointment_id: record.appointment_id ?? undefined,
     chief_complaint: record.chief_complaint ?? '',
     clinical_notes: record.clinical_notes ?? '',
     doctor_remarks: record.doctor_remarks ?? '',
@@ -104,7 +104,9 @@ export const EditRecordDrawer: FC<EditRecordDrawerProps> = ({
             </h2>
             <p className="text-caption text-neutral-500">
               {patientName ?? `Patient #${record.patient_id.slice(0, 8)}`} ·{' '}
-              {appointmentNumber ?? `Appointment #${record.appointment_id.slice(0, 8)}`}
+              {record.appointment_id
+                ? (appointmentNumber ?? `Appointment #${record.appointment_id.slice(0, 8)}`)
+                : 'No linked appointment'}
             </p>
           </div>
           <IconButton

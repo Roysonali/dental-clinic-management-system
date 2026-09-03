@@ -12,7 +12,6 @@ import { todayLocalISO } from './date';
 describe('patientRecordFormSchema', () => {
   const validBase = {
     patient_id: 'p1',
-    appointment_id: 'a1',
     chief_complaint: '',
     clinical_notes: '',
     doctor_remarks: '',
@@ -30,12 +29,14 @@ describe('patientRecordFormSchema', () => {
     expect(patientRecordFormSchema.safeParse(validBase).success).toBe(true);
   });
 
-  it('requires patient and appointment', () => {
+  it('requires patient', () => {
     const { error } = patientRecordFormSchema.safeParse({ ...validBase, patient_id: '' });
     expect(error?.issues.some((i) => i.path[0] === 'patient_id')).toBe(true);
+  });
 
-    const { error: error2 } = patientRecordFormSchema.safeParse({ ...validBase, appointment_id: '' });
-    expect(error2?.issues.some((i) => i.path[0] === 'appointment_id')).toBe(true);
+  it('accepts optional appointment_id', () => {
+    expect(patientRecordFormSchema.safeParse({ ...validBase, appointment_id: 'a1' }).success).toBe(true);
+    expect(patientRecordFormSchema.safeParse({ ...validBase }).success).toBe(true);
   });
 
   it('enforces the 5000-char limit on non-clinical-notes fields', () => {

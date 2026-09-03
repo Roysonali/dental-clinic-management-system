@@ -199,15 +199,21 @@ class PatientRecordRepository:
         try:
             self.db.flush()
         except IntegrityError as exc:
-            # The unique constraint on appointment_id is the most likely
-            # failure.  Re-raise with a domain-specific exception.
-            raise PatientRecordConflict(
-                message=(
-                    f"A record already exists for appointment "
-                    f"{patient_record.appointment_id}"
-                ),
-                details={"appointment_id": str(patient_record.appointment_id)},
-            ) from exc
+            # Only convert UNIQUE constraint violations into a domain
+            # PatientRecordConflict (409).  Other IntegrityErrors (NOT NULL,
+            # FK violations, etc.) must propagate as-is so they surface
+            # the real database error rather than a misleading 409.
+            diag = getattr(exc.orig, 'diag', None)
+            constraint_name = getattr(diag, 'constraint_name', None) if diag else None
+            if constraint_name and 'appointment_id' in str(constraint_name):
+                raise PatientRecordConflict(
+                    message=(
+                        f"A record already exists for appointment "
+                        f"{patient_record.appointment_id}"
+                    ),
+                    details={"appointment_id": str(patient_record.appointment_id)},
+                ) from exc
+            raise
 
         self.db.refresh(patient_record)
 

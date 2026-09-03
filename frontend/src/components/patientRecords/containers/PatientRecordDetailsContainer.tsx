@@ -76,14 +76,14 @@ export const PatientRecordDetailsContainer: FC<{ recordId: string }> = ({ record
   const nameIds = useMemo(
     () => ({
       patientIds: record ? [record.patient_id] : [],
-      appointmentIds: record ? [record.appointment_id] : [],
+      appointmentIds: record?.appointment_id ? [record.appointment_id] : [],
       userIds: actorIds,
     }),
     [record, actorIds],
   );
   const names = usePatientRecordNames(nameIds.patientIds, nameIds.appointmentIds, nameIds.userIds);
   const patientName = record ? (names.patientNames.get(record.patient_id) ?? null) : null;
-  const appointmentNumber = record
+  const appointmentNumber = record?.appointment_id
     ? (names.appointmentNumbers.get(record.appointment_id) ?? null)
     : null;
 
@@ -224,7 +224,9 @@ export const PatientRecordDetailsContainer: FC<{ recordId: string }> = ({ record
                 <PatientRecordStatusBadge status={record.status} isFinalized={record.is_finalized} />
               </div>
               <p className="mt-2 text-body-sm text-neutral-500">
-                {appointmentNumber ?? `Appointment #${record.appointment_id.slice(0, 8)}`}
+                {record.appointment_id
+                  ? (appointmentNumber ?? `Appointment #${record.appointment_id.slice(0, 8)}`)
+                  : 'No linked appointment'}
               </p>
               <p className="mt-0.5 text-caption text-neutral-400">
                 Created {formatISODate(record.created_at)} · Updated {formatISODate(record.updated_at)}
