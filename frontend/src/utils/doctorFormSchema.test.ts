@@ -172,10 +172,10 @@ describe('doctorFormSchema', () => {
   });
 
   describe('profile_photo_url', () => {
-    it('is optional and must be a valid URL when present', () => {
+    it('is optional and accepts any string when present', () => {
       expect(parse({ profile_photo_url: '' }).success).toBe(true);
       expect(parse({ profile_photo_url: 'https://cdn.example.com/photo.jpg' }).success).toBe(true);
-      expect(parse({ profile_photo_url: 'not-a-url' }).success).toBe(false);
+      expect(parse({ profile_photo_url: 'not-a-url' }).success).toBe(true);
     });
   });
 

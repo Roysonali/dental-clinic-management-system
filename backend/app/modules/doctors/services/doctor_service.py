@@ -37,6 +37,7 @@ from app.modules.doctors.exceptions import (
     DoctorUserNotFound,
     SpecializationNotFound,
 )
+from app.core.storage import get_local_storage
 from app.modules.doctors.models import Doctor, DoctorSpecialization
 from app.modules.doctors.repositories import (
     DoctorRepository,
@@ -292,13 +293,7 @@ class DoctorService:
                 consultation_fee=payload.consultation_fee,
                 consultation_duration=payload.consultation_duration,
                 languages_known=payload.languages_known,
-                # Convert Pydantic HttpUrl → str for psycopg2 compatibility.
-                # HttpUrl is not a str subclass, so passing the object directly
-                # causes a "can't adapt type 'HttpUrl'" ProgrammingError from
-                # PostgreSQL during Session.flush(). The service layer owns this
-                # boundary between application domain types and persistence types.
-                profile_photo_url=str(payload.profile_photo_url)
-                    if payload.profile_photo_url is not None else None,
+                profile_photo_url=payload.profile_photo_url,
                 biography=payload.biography,
                 emergency_contact_name=payload.emergency_contact_name,
                 emergency_contact_phone=payload.emergency_contact_phone,
@@ -348,12 +343,6 @@ class DoctorService:
                     self.doctor_repo, registration_number,
                     exclude_doctor_id=doctor_id,
                 )
-            # Convert Pydantic HttpUrl → str for psycopg2 compatibility.
-            # The filter dict values come from model_dump(), which preserves
-            # Pydantic wrapper objects like HttpUrl. PostgreSQL cannot adapt
-            # these, so we eagerly convert them here at the service boundary.
-            if "profile_photo_url" in filtered and filtered["profile_photo_url"] is not None:
-                filtered["profile_photo_url"] = str(filtered["profile_photo_url"])
             for field, value in filtered.items():
                 setattr(doctor, field, value)
             doctor.updated_by = actor_id
@@ -582,6 +571,8 @@ class DoctorService:
     def delete_doctor(self, doctor_id: UUID, *, actor_id: int) -> None:
         """Permanently remove a doctor profile.
 
+        Also cleans up the stored profile photo (best-effort).
+
         .. caution::
            This performs a hard (permanent) delete. The ADR does not
            specify soft-delete for the Doctor aggregate. If future
@@ -598,7 +589,20 @@ class DoctorService:
         """
         def _delete() -> None:
             doctor = self._get_doctor_or_raise(doctor_id)
+            # Capture photo key before deletion
+            photo_key = doctor.profile_photo_url
             self.doctor_repo.delete(doctor)
+            # Best-effort photo file cleanup (after DB delete succeeds)
+            if photo_key:
+                try:
+                    storage = get_local_storage()
+                    storage.delete(photo_key)
+                except Exception:
+                    logger.warning(
+                        "Failed to delete stored profile photo on doctor delete: "
+                        "doctor=%s key=%s",
+                        doctor_id, photo_key,
+                    )
 
         return self._run_in_transaction(
             "delete_doctor", _delete,

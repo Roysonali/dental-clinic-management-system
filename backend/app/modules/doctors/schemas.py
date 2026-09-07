@@ -14,7 +14,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    HttpUrl,
     field_validator,
     model_validator,
 )
@@ -236,7 +235,7 @@ class DoctorCreate(DoctorValidators, BaseModel):
         examples=[["Filipino", "English"]],
     )
 
-    profile_photo_url: Optional[HttpUrl] = Field(
+    profile_photo_url: Optional[str] = Field(
         default=None,
         title="Profile Photo URL",
         description="URL to the doctor's profile photograph.",
@@ -361,7 +360,7 @@ class DoctorUpdate(DoctorValidators, BaseModel):
         examples=[["Filipino", "English"]],
     )
 
-    profile_photo_url: Optional[HttpUrl] = Field(
+    profile_photo_url: Optional[str] = Field(
         default=None,
         title="Profile Photo URL",
         description="URL to the doctor's profile photograph.",
@@ -854,10 +853,10 @@ class DoctorResponse(BaseModel):
         examples=[["Filipino", "English"]],
     )
 
-    profile_photo_url: Optional[HttpUrl] = Field(
+    profile_photo_url: Optional[str] = Field(
         default=None,
         title="Profile Photo URL",
-        description="URL to the doctor's profile photograph.",
+        description="Storage reference for the doctor's profile photograph.",
     )
 
     biography: Optional[str] = Field(

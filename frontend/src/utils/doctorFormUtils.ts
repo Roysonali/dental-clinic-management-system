@@ -78,6 +78,8 @@ export function responseToFormValues(doctor: DoctorResponse): DoctorFormValues {
     consultation_duration: doctor.consultation_duration == null ? '' : String(doctor.consultation_duration),
     languages_known: doctor.languages_known ?? [],
     profile_photo_url: doctor.profile_photo_url ?? '',
+    profile_photo_file: null,
+    profile_photo_removed: false,
     biography: doctor.biography ?? '',
     emergency_contact_name: doctor.emergency_contact_name ?? '',
     emergency_contact_phone: doctor.emergency_contact_phone ?? '',
@@ -102,7 +104,6 @@ export function createPayloadFromForm(values: DoctorFormValues): DoctorCreateReq
     consultation_fee: parseOptionalNumber(values.consultation_fee),
     consultation_duration: parseOptionalNumber(values.consultation_duration),
     languages_known: languages.length > 0 ? languages : null,
-    profile_photo_url: optional(values.profile_photo_url),
     biography: optional(values.biography),
     emergency_contact_name: optional(values.emergency_contact_name),
     emergency_contact_phone: normalizePhone(optional(values.emergency_contact_phone)),
@@ -202,11 +203,6 @@ export function updatePayloadFromForm(
     'languages_known',
     normalizeLanguages(values.languages_known),
     normalizeLanguages(original?.languages_known ?? []),
-  );
-  setOptional(
-    'profile_photo_url',
-    optional(values.profile_photo_url),
-    original?.profile_photo_url ?? null,
   );
   setOptional('biography', optional(values.biography), original?.biography ?? null);
   setOptional(

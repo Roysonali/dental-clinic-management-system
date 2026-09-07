@@ -46,7 +46,9 @@ describe('DoctorForm', () => {
     expect(screen.getByText('Date of Birth')).toBeInTheDocument();
     expect(screen.getByLabelText('Gender')).toBeInTheDocument();
     expect(screen.getByLabelText(/primary phone/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('Profile Photo URL')).toBeInTheDocument();
+    // Profile photo field with proper label and optional indicator
+    expect(screen.getByText('Profile Photo')).toBeInTheDocument();
+    expect(screen.getByText('Upload Photo')).toBeInTheDocument();
     expect(screen.getByLabelText('Address')).toBeInTheDocument();
     expect(screen.getByLabelText('Qualification')).toBeInTheDocument();
     expect(screen.getByLabelText('Registration Number')).toBeInTheDocument();
