@@ -106,6 +106,22 @@ export const doctorService = {
     return normalizeDoctor(data);
   },
 
+  /** POST /doctors/{id}/profile-photo — upload profile photo (multipart). */
+  async uploadProfilePhoto(id: string, file: File): Promise<DoctorResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post<DoctorResponse>(`/doctors/${id}/profile-photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return normalizeDoctor(data);
+  },
+
+  /** DELETE /doctors/{id}/profile-photo — remove profile photo. */
+  async removeProfilePhoto(id: string): Promise<DoctorResponse> {
+    const { data } = await api.delete<DoctorResponse>(`/doctors/${id}/profile-photo`);
+    return normalizeDoctor(data);
+  },
+
   /** PATCH /doctors/{id}/activate — admin only. */
   async activate(id: string): Promise<DoctorResponse> {
     const { data } = await api.patch<DoctorResponse>(`/doctors/${id}/activate`);

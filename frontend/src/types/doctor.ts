@@ -234,7 +234,12 @@ export interface DoctorFormValues {
   consultation_fee: string;
   consultation_duration: string;
   languages_known: string[];
+  /** Existing photo reference (storage key or URL) — used for display */
   profile_photo_url: string;
+  /** Newly selected photo file — null when no new file is chosen */
+  profile_photo_file?: File | null;
+  /** Whether the existing photo was explicitly removed by the user */
+  profile_photo_removed?: boolean;
   biography: string;
   emergency_contact_name: string;
   emergency_contact_phone: string;

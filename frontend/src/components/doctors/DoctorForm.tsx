@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormActions, ValidationSummary } from '../common/Form';
 import { Input, Select, Textarea, DatePicker } from '../common/Input';
 import { UserSearchSelect } from '../common/UserSearchSelect/UserSearchSelect';
+import { ProfilePhotoUpload } from '../common/ProfilePhotoUpload';
 import {
   DOCTOR_CURRENCY_SYMBOL,
   DOCTOR_GENDERS,
@@ -15,6 +16,10 @@ import {
 } from '../../constants/doctor';
 import { doctorFormSchema } from '../../utils/doctorFormSchema';
 import type { DoctorFormValues } from '../../types/doctor';
+
+/** Base URL for serving profile photos from the backend. */
+const PROFILE_PHOTO_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000') + '/doctors';
 
 interface DoctorFormProps {
   /** Create vs edit mode (the user picker only renders in create) */
@@ -35,6 +40,8 @@ interface DoctorFormProps {
   serverMessage?: string | null;
   /** Disable the entire form (e.g. while initial data loads) */
   disabled?: boolean;
+  /** Doctor ID — used for photo URL construction in edit mode */
+  doctorId?: string | null;
 }
 
 const GENDER_OPTIONS = DOCTOR_GENDERS.map((g) => ({
@@ -74,11 +81,14 @@ export const DoctorForm: FC<DoctorFormProps> = ({
   serverErrors = {},
   serverMessage = null,
   disabled = false,
+  doctorId,
 }) => {
   const {
     register,
     handleSubmit,
     control,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<DoctorFormValues>({
     resolver: zodResolver(doctorFormSchema),
@@ -96,12 +106,28 @@ export const DoctorForm: FC<DoctorFormProps> = ({
       consultation_duration: '',
       languages_known: [],
       profile_photo_url: '',
+      profile_photo_file: null,
+      profile_photo_removed: false,
       biography: '',
       emergency_contact_name: '',
       emergency_contact_phone: '',
       ...initialValues,
     },
   });
+
+  // Watch the photo fields for display
+  const profilePhotoUrl = watch('profile_photo_url');
+  const profilePhotoRemoved = watch('profile_photo_removed');
+
+  /** Build the full photo URL for display. */
+  const getPhotoDisplayUrl = () => {
+    if (profilePhotoRemoved || !profilePhotoUrl) return null;
+    // If it's a full URL (legacy), use it directly
+    if (profilePhotoUrl.startsWith('http')) return profilePhotoUrl;
+    // Otherwise it's a storage key — construct the serve URL
+    if (doctorId) return `${PROFILE_PHOTO_BASE_URL}/${doctorId}/profile-photo`;
+    return null;
+  };
 
   /** Merge client + server field errors for display. */
   const fieldError = (field: string) =>
@@ -168,14 +194,20 @@ export const DoctorForm: FC<DoctorFormProps> = ({
           error={fieldError('primary_phone')}
           {...register('primary_phone')}
         />
-        <Input
-          label="Profile Photo URL"
-          placeholder="https://…"
-          type="url"
+        <ProfilePhotoUpload
+          existingPhotoUrl={getPhotoDisplayUrl()}
           disabled={disabled}
-          inputMode="url"
           error={fieldError('profile_photo_url')}
-          {...register('profile_photo_url')}
+          onFileSelected={(file) => {
+            setValue('profile_photo_file', file, { shouldValidate: false });
+            setValue('profile_photo_removed', false, { shouldValidate: false });
+          }}
+          onRemove={() => {
+            setValue('profile_photo_file', null, { shouldValidate: false });
+            setValue('profile_photo_url', '', { shouldValidate: true });
+            setValue('profile_photo_removed', true, { shouldValidate: false });
+          }}
+          className="md:col-span-2"
         />
         <Textarea
           label="Address"

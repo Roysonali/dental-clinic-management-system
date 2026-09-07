@@ -122,6 +122,8 @@ describe('doctorFormUtils', () => {
         consultation_duration: '30',
         languages_known: ['English', 'Filipino'],
         profile_photo_url: '',
+        profile_photo_file: null,
+        profile_photo_removed: false,
         biography: 'Experienced dentist.',
         emergency_contact_name: 'Maria Dela Cruz',
         emergency_contact_phone: '+639177654321',
@@ -152,7 +154,6 @@ describe('doctorFormUtils', () => {
         consultation_fee: 800,
         consultation_duration: 30,
         languages_known: ['English', 'Filipino'],
-        profile_photo_url: null,
         biography: 'Experienced dentist.',
         emergency_contact_name: 'Maria Dela Cruz',
         emergency_contact_phone: '+639177654321',
@@ -189,7 +190,6 @@ describe('doctorFormUtils', () => {
         consultation_fee: null,
         consultation_duration: null,
         languages_known: null,
-        profile_photo_url: null,
         biography: null,
         emergency_contact_name: null,
         emergency_contact_phone: null,
@@ -288,23 +288,18 @@ describe('doctorFormUtils', () => {
       expect(payload.emergency_contact_phone).toBeNull();
     });
 
-    it('clearing languages / DOB / gender / photo / fee / numbers sends null', () => {
-      // Baseline has a populated photo URL so clearing it must send null
-      // (the default fixture has profile_photo_url null → clearing is a no-op).
-      const withPhoto = { ...baseline, profile_photo_url: 'https://example.com/photo.jpg' };
-      const values = responseToFormValues(withPhoto);
+    it('clearing languages / DOB / gender / fee / numbers sends null', () => {
+      const values = responseToFormValues(baseline);
       values.languages_known = [];
       values.date_of_birth = '';
       values.gender = '';
-      values.profile_photo_url = '';
       values.consultation_fee = '';
       values.years_of_experience = '';
       values.consultation_duration = '';
-      const payload = updatePayloadFromForm(values, withPhoto);
+      const payload = updatePayloadFromForm(values, baseline);
       expect(payload.languages_known).toBeNull();
       expect(payload.date_of_birth).toBeNull();
       expect(payload.gender).toBeNull();
-      expect(payload.profile_photo_url).toBeNull();
       expect(payload.consultation_fee).toBeNull();
       expect(payload.years_of_experience).toBeNull();
       expect(payload.consultation_duration).toBeNull();

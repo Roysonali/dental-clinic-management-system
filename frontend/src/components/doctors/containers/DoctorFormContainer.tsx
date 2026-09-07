@@ -11,6 +11,7 @@ import {
   updatePayloadFromForm,
 } from '../../../utils/doctorFormUtils';
 import { parseApiError } from '../../../services/apiError';
+import { doctorService } from '../../../services/doctorService';
 import type { DoctorFormValues, DoctorResponse } from '../../../types/doctor';
 
 interface DoctorFormContainerProps {
@@ -74,7 +75,23 @@ export const DoctorFormContainer: FC<DoctorFormContainerProps> = ({
           payload: updatePayloadFromForm(values, doctorQuery.data),
         },
         {
-          onSuccess: () => onClose(),
+          onSuccess: async () => {
+            // Handle photo upload/replace/remove
+            if (values.profile_photo_file) {
+              try {
+                await doctorService.uploadProfilePhoto(doctorId, values.profile_photo_file);
+              } catch {
+                console.error('Failed to upload profile photo');
+              }
+            } else if (values.profile_photo_removed) {
+              try {
+                await doctorService.removeProfilePhoto(doctorId);
+              } catch {
+                console.error('Failed to remove profile photo');
+              }
+            }
+            onClose();
+          },
           onError: (error) => {
             const info = parseApiError(error);
             setServerMessage(info.message);
@@ -86,7 +103,16 @@ export const DoctorFormContainer: FC<DoctorFormContainerProps> = ({
     }
 
     createMutation.mutate(createPayloadFromForm(values), {
-      onSuccess: (doctor) => {
+      onSuccess: async (doctor) => {
+        // Upload photo if one was selected
+        if (values.profile_photo_file) {
+          try {
+            await doctorService.uploadProfilePhoto(doctor.id, values.profile_photo_file);
+          } catch {
+            // Photo upload failed but doctor was created — log and continue
+            console.error('Failed to upload profile photo after doctor creation');
+          }
+        }
         onClose();
         onCreated?.(doctor);
       },
@@ -113,6 +139,7 @@ export const DoctorFormContainer: FC<DoctorFormContainerProps> = ({
       initialValues={doctorQuery.data ? responseToFormValues(doctorQuery.data) : undefined}
       serverMessage={serverMessage}
       serverErrors={serverErrors}
+      doctorId={doctorId}
     />
   );
 };

@@ -145,7 +145,7 @@ const languagesRule = z
 
 const optionalUrlRule = z.union([
   z.literal(''),
-  z.string().trim().url('Profile photo URL is invalid'),
+  z.string().trim(),
 ]);
 
 /* ── Doctor form schema (create + edit share one schema) ─────────────── */

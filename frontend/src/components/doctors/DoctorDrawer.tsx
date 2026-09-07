@@ -32,6 +32,8 @@ interface DoctorDrawerProps {
   submitText?: string;
   /** Disable the form (e.g. while initial data loads) */
   disabled?: boolean;
+  /** Doctor ID — used for photo URL construction in edit mode */
+  doctorId?: string | null;
 }
 
 /**
@@ -52,6 +54,7 @@ export const DoctorDrawer: FC<DoctorDrawerProps> = ({
   title = mode === 'edit' ? 'Edit Doctor' : 'Register Doctor',
   submitText = mode === 'edit' ? 'Save Changes' : 'Register Doctor',
   disabled = false,
+  doctorId,
 }) => {
   return (
     <Drawer open={open} onClose={onClose} position="right" size="xl" ariaLabel={title}>
@@ -90,6 +93,7 @@ export const DoctorDrawer: FC<DoctorDrawerProps> = ({
             serverErrors={serverErrors}
             serverMessage={serverMessage}
             disabled={disabled}
+            doctorId={doctorId}
           />
         )}
       </Drawer.Body>
