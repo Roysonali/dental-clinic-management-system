@@ -472,3 +472,218 @@ class DoctorSchedule(Base):
             f"day={self.day_of_week}, "
             f"active={self.is_active})>"
         )
+
+
+# ====================================================================
+# Doctor Application — Self-Registration Workflow
+# ====================================================================
+
+
+class DoctorApplication(Base):
+    """
+    Doctor self-registration application.
+
+    Stores the professional and personal details submitted by a doctor
+    applicant during public registration.  The application goes through
+    a lifecycle: PENDING -> APPROVED | REJECTED.
+
+    On APPROVAL the service layer atomically:
+      1. Assigns the selected RBAC role to the linked User.
+      2. Creates a Doctor profile copying approved fields.
+      3. Marks the application APPROVED.
+
+    The real Doctor table represents an APPROVED clinic doctor; the
+    application table is a staging area that keeps pending applicants
+    out of the active doctor workflow.
+    """
+
+    __tablename__ = "doctor_applications"
+
+    # ── Status constants (duplicated as strings for SQLite compat) ──
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # ── Professional Information ──────────────────────────────────
+    qualification = Column(
+        String(500),
+        nullable=True,
+    )
+
+    registration_number = Column(
+        String(100),
+        nullable=True,
+        unique=True,
+    )
+
+    years_of_experience = Column(
+        Integer,
+        nullable=True,
+    )
+
+    # ── Personal Information ──────────────────────────────────────
+    date_of_birth = Column(
+        Date,
+        nullable=True,
+    )
+
+    gender = Column(
+        String(10),
+        nullable=True,
+    )
+
+    primary_phone = Column(
+        String(20),
+        nullable=True,
+    )
+
+    address = Column(
+        Text,
+        nullable=True,
+    )
+
+    # ── Profile Photo ─────────────────────────────────────────────
+    profile_photo_url = Column(
+        String(500),
+        nullable=True,
+    )
+
+    # ── Specialization Request ────────────────────────────────────
+    # Stores the list of specialization IDs the applicant selected.
+    # On approval these are transferred to DoctorSpecialization.
+    requested_specialization_ids = Column(
+        JSONB(none_as_null=True),
+        nullable=True,
+        default=list,
+        comment="List of specialization IDs requested by the applicant",
+    )
+
+    primary_specialization_id = Column(
+        Integer,
+        nullable=True,
+        comment="ID of the requested primary specialization",
+    )
+
+    # ── Application Lifecycle ─────────────────────────────────────
+    status = Column(
+        String(20),
+        nullable=False,
+        default=STATUS_PENDING,
+        index=True,
+    )
+
+    # ── Audit Fields ──────────────────────────────────────────────
+    submitted_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    reviewed_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    reviewed_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    rejection_reason = Column(
+        Text,
+        nullable=True,
+    )
+
+    # The RBAC role selected by the admin during approval.
+    # Stored for audit; the actual role is assigned to the User.
+    approved_role_id = Column(
+        Integer,
+        ForeignKey("roles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Link to the created Doctor profile after approval (for audit trail).
+    doctor_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("doctors.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    # ── Relationships ─────────────────────────────────────────────
+    user = relationship(
+        "User",
+        foreign_keys=[user_id],
+        passive_deletes=True,
+        lazy="selectin",
+    )
+
+    reviewer = relationship(
+        "User",
+        foreign_keys=[reviewed_by],
+        passive_deletes=True,
+        lazy="selectin",
+    )
+
+    approved_role = relationship(
+        "Role",
+        foreign_keys=[approved_role_id],
+        passive_deletes=True,
+        lazy="selectin",
+    )
+
+    doctor = relationship(
+        "Doctor",
+        foreign_keys=[doctor_id],
+        passive_deletes=True,
+        lazy="selectin",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_doctor_applications_user_status",
+            "user_id",
+            "status",
+        ),
+        CheckConstraint(
+            f"status IN ('{STATUS_PENDING}', '{STATUS_APPROVED}', '{STATUS_REJECTED}')",
+            name="ck_doctor_applications_status_valid",
+        ),
+        CheckConstraint(
+            "years_of_experience >= 0",
+            name="ck_doctor_app_years_experience",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DoctorApplication(id={self.id}, "
+            f"user_id={self.user_id}, "
+            f"status={self.status!r})>"
+        )

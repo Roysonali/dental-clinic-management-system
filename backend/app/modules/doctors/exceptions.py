@@ -225,3 +225,85 @@ class SelfServiceNotAllowed(DoctorException):
             code="SELF_SERVICE_NOT_ALLOWED",
             message="Self-service modification of this field is not allowed",
         )
+
+
+# ====================================================================
+# Doctor Application Exceptions
+# ====================================================================
+
+
+class DoctorApplicationNotFound(DoctorException):
+    """Raised when a doctor application ID is not found."""
+
+    def __init__(self, message=None, details=None):
+        super().__init__(
+            code="DOCTOR_APPLICATION_NOT_FOUND",
+            message=message or "Doctor application does not exist",
+            details=details,
+        )
+
+
+class DoctorApplicationAlreadyProcessed(DoctorException):
+    """Raised when attempting to approve/reject an already processed application."""
+
+    def __init__(self, message=None, details=None):
+        super().__init__(
+            code="DOCTOR_APPLICATION_ALREADY_PROCESSED",
+            message=message or "Doctor application has already been processed",
+            details=details,
+        )
+
+
+class DoctorApplicationCreationFailed(DoctorException):
+    """Raised when doctor application creation fails unexpectedly."""
+
+    def __init__(self, details: Any = None):
+        super().__init__(
+            code="DOCTOR_APPLICATION_CREATION_FAILED",
+            message="Doctor application creation failed",
+            details=details,
+        )
+
+
+class DoctorApplicationApprovalFailed(DoctorException):
+    """Raised when doctor application approval fails unexpectedly."""
+
+    def __init__(self, details: Any = None):
+        super().__init__(
+            code="DOCTOR_APPLICATION_APPROVAL_FAILED",
+            message="Doctor application approval failed",
+            details=details,
+        )
+
+
+class DuplicateRegistrationNumber(DoctorException):
+    """Raised when the registration number is already in use by another doctor."""
+
+    def __init__(self, message=None, details=None):
+        super().__init__(
+            code="DUPLICATE_REGISTRATION_NUMBER",
+            message=message or "Registration number is already in use",
+            details=details,
+        )
+
+
+class InvalidDoctorRole(DoctorException):
+    """Raised when the selected role is not an allowed doctor role."""
+
+    def __init__(self, message=None, details=None):
+        super().__init__(
+            code="INVALID_DOCTOR_ROLE",
+            message=message or "Selected role is not an allowed doctor role",
+            details=details,
+        )
+
+
+class SpecializationInvalid(DoctorException):
+    """Raised when one or more specialization IDs are invalid."""
+
+    def __init__(self, message=None, details=None):
+        super().__init__(
+            code="SPECIALIZATION_INVALID",
+            message=message or "One or more specializations are invalid",
+            details=details,
+        )

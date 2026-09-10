@@ -13,6 +13,7 @@ from uuid import UUID
 from pydantic import (
     BaseModel,
     ConfigDict,
+    EmailStr,
     Field,
     field_validator,
     model_validator,
@@ -26,6 +27,7 @@ from app.modules.doctors.constants import (
     PHONE_PATTERN,
 )
 from app.modules.doctors.enums import GenderEnum
+from app.modules.auth.schemas import validate_password_complexity
 
 
 # ======================================================================
@@ -1127,4 +1129,529 @@ class ScheduleResponse(BaseModel):
         title="Is Active",
         description="Whether this schedule entry is active.",
         examples=[True],
+    )
+
+
+# ======================================================================
+# Doctor Application Schemas
+# ======================================================================
+
+
+class DoctorApplicationCreate(BaseModel):
+    """Request body for POST /auth/doctor-application (public registration).
+
+    Captures the doctor applicant's professional and personal details.
+    The linked User account is created separately via POST /auth/register.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    qualification: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        title="Qualification",
+        description="Professional qualifications (e.g. DMD, specialty training).",
+        examples=["DMD, University of the Philippines"],
+    )
+
+    registration_number: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        title="Registration Number",
+        description="Professional license / registration ID.",
+        examples=["DEN-2020-12345"],
+    )
+
+    years_of_experience: Optional[int] = Field(
+        default=None,
+        ge=MIN_YEARS_EXPERIENCE,
+        le=MAX_YEARS_EXPERIENCE,
+        title="Years of Experience",
+        description=f"Years in practice ({MIN_YEARS_EXPERIENCE}-{MAX_YEARS_EXPERIENCE}).",
+        examples=[10],
+    )
+
+    date_of_birth: Optional[date] = Field(
+        default=None,
+        title="Date of Birth",
+        description="Doctor's date of birth.",
+        examples=["1985-06-15"],
+    )
+
+    gender: Optional[GenderEnum] = Field(
+        default=None,
+        title="Gender",
+        description="Doctor's gender.",
+        examples=["male"],
+    )
+
+    primary_phone: Optional[str] = Field(
+        default=None,
+        min_length=10,
+        max_length=20,
+        title="Primary Phone",
+        description="Primary contact number.",
+        examples=["+639171234567"],
+    )
+
+    address: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        title="Address",
+        description="Residential or clinic address.",
+        examples=["123 Rizal St., Manila"],
+    )
+
+    profile_photo_url: Optional[str] = Field(
+        default=None,
+        title="Profile Photo URL",
+        description="Storage reference for the doctor's profile photograph.",
+    )
+
+    requested_specialization_ids: Optional[list[int]] = Field(
+        default=None,
+        title="Requested Specialization IDs",
+        description="List of specialization IDs the applicant wishes to be assigned.",
+        examples=[[1, 3]],
+    )
+
+    primary_specialization_id: Optional[int] = Field(
+        default=None,
+        title="Primary Specialization ID",
+        description="ID of the requested primary specialization (must be in the list).",
+        examples=[1],
+    )
+
+    @field_validator("primary_phone", mode="before")
+    @classmethod
+    def normalize_phone(cls, value: str | None) -> str | None:
+        """Strip whitespace/dashes and validate phone format."""
+        if value is None:
+            return None
+        cleaned = re.sub(r"[\s\-\(\)]", "", str(value))
+        if not re.match(PHONE_PATTERN, cleaned):
+            raise ValueError(
+                "Phone must be 10-15 digits, optionally starting with '+' "
+                "(e.g. +639171234567)"
+            )
+        return cleaned
+
+    @field_validator("registration_number", mode="before")
+    @classmethod
+    def normalize_registration_number(cls, value: str | None) -> str | None:
+        """Strip whitespace, uppercase, and validate format."""
+        if value is None:
+            return None
+        cleaned = str(value).strip().upper()
+        if not re.match(r"^[A-Z0-9\-]+$", cleaned):
+            raise ValueError(
+                "Registration number may only contain uppercase letters, digits, and hyphens"
+            )
+        return cleaned
+
+    @field_validator("date_of_birth", mode="before")
+    @classmethod
+    def validate_date_of_birth(cls, value: date | str | None) -> date | None:
+        """Reject future dates and implausibly old dates."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                value = date.fromisoformat(value)
+            except (ValueError, TypeError):
+                raise ValueError(
+                    "Date of birth must be a valid ISO date string (YYYY-MM-DD)"
+                )
+        today = date.today()
+        if value > today:
+            raise ValueError("Date of birth cannot be in the future")
+        if value.year < 1900:
+            raise ValueError("Invalid date of birth - year must be >= 1900")
+        return value
+
+
+# ======================================================================
+# Doctor Application Registration (combined account + application)
+# ======================================================================
+
+
+class DoctorApplicationRegistration(BaseModel):
+    """Combined registration payload for POST /auth/register-doctor.
+
+    Contains both account information (full_name, email, password) and
+    doctor-specific professional/personal details.  The backend creates
+    a pending User AND a pending DoctorApplication atomically.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # ── Account Information ───────────────────────────────────────
+    full_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        title="Full Name",
+        description="Doctor applicant's full display name.",
+        examples=["Juan Dela Cruz"],
+    )
+
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="Valid email address used for login.",
+        examples=["juan@example.com"],
+    )
+
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        title="Password",
+        description="8-128 characters with upper, lower, digit, and special char.",
+        examples=["Secure@Pass1"],
+    )
+
+    # ── Doctor-Specific Information ───────────────────────────────
+    qualification: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        title="Qualification",
+        description="Professional qualifications.",
+        examples=["DMD, University of the Philippines"],
+    )
+
+    registration_number: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        title="Registration Number",
+        description="Professional license / registration ID.",
+        examples=["DEN-2020-12345"],
+    )
+
+    years_of_experience: Optional[int] = Field(
+        default=None,
+        ge=MIN_YEARS_EXPERIENCE,
+        le=MAX_YEARS_EXPERIENCE,
+        title="Years of Experience",
+        description=f"Years in practice ({MIN_YEARS_EXPERIENCE}-{MAX_YEARS_EXPERIENCE}).",
+        examples=[10],
+    )
+
+    date_of_birth: Optional[date] = Field(
+        default=None,
+        title="Date of Birth",
+        description="Doctor's date of birth.",
+        examples=["1985-06-15"],
+    )
+
+    gender: Optional[GenderEnum] = Field(
+        default=None,
+        title="Gender",
+        description="Doctor's gender.",
+        examples=["male"],
+    )
+
+    primary_phone: Optional[str] = Field(
+        default=None,
+        min_length=10,
+        max_length=20,
+        title="Primary Phone",
+        description="Primary contact number.",
+        examples=["+639171234567"],
+    )
+
+    address: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        title="Address",
+        description="Residential or clinic address.",
+        examples=["123 Rizal St., Manila"],
+    )
+
+    profile_photo_url: Optional[str] = Field(
+        default=None,
+        title="Profile Photo URL",
+        description="Storage reference for the doctor's profile photograph.",
+    )
+
+    requested_specialization_ids: Optional[list[int]] = Field(
+        default=None,
+        title="Requested Specialization IDs",
+        description="List of specialization IDs the applicant wishes to be assigned.",
+        examples=[[1, 3]],
+    )
+
+    primary_specialization_id: Optional[int] = Field(
+        default=None,
+        title="Primary Specialization ID",
+        description="ID of the requested primary specialization.",
+        examples=[1],
+    )
+
+    @field_validator("full_name")
+    @classmethod
+    def normalize_full_name(cls, value: str) -> str:
+        return " ".join(value.strip().split())
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, value: str) -> str:
+        return validate_password_complexity(value)
+
+    @field_validator("primary_phone", mode="before")
+    @classmethod
+    def normalize_phone(cls, value: str | None) -> str | None:
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return None
+        cleaned = re.sub(r"[\s\-\(\)]", "", str(value))
+        if not re.match(PHONE_PATTERN, cleaned):
+            raise ValueError(
+                "Phone must be 10-15 digits, optionally starting with '+'"
+            )
+        return cleaned
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def normalize_gender(cls, value: str | None) -> str | None:
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return None
+        return value
+
+    @field_validator("registration_number", mode="before")
+    @classmethod
+    def normalize_registration_number(cls, value: str | None) -> str | None:
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return None
+        cleaned = str(value).strip().upper()
+        if not re.match(r"^[A-Z0-9\-]+$", cleaned):
+            raise ValueError(
+                "Registration number may only contain uppercase letters, digits, and hyphens"
+            )
+        return cleaned
+
+    @field_validator("date_of_birth", mode="before")
+    @classmethod
+    def validate_date_of_birth(cls, value: date | str | None) -> date | None:
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return None
+        if isinstance(value, str):
+            try:
+                value = date.fromisoformat(value)
+            except (ValueError, TypeError):
+                raise ValueError(
+                    "Date of birth must be a valid ISO date string (YYYY-MM-DD)"
+                )
+        today = date.today()
+        if value > today:
+            raise ValueError("Date of birth cannot be in the future")
+        if value.year < 1900:
+            raise ValueError("Invalid date of birth - year must be >= 1900")
+        return value
+
+
+# ======================================================================
+# Doctor Application Response Schemas
+# ======================================================================
+
+
+class DoctorApplicationResponse(BaseModel):
+    """Full doctor application detail returned in admin API responses."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(
+        title="Application ID",
+        description="Unique numeric identifier.",
+        examples=[1],
+    )
+
+    user_id: int = Field(
+        title="User ID",
+        description="Foreign key to the linked User account.",
+        examples=[1],
+    )
+
+    user_full_name: Optional[str] = Field(
+        default=None,
+        title="Applicant Full Name",
+        description="Full name resolved from the User relationship.",
+        examples=["Juan Dela Cruz"],
+    )
+
+    user_email: Optional[str] = Field(
+        default=None,
+        title="Applicant Email",
+        description="Email resolved from the User relationship.",
+        examples=["juan@example.com"],
+    )
+
+    qualification: Optional[str] = Field(
+        default=None,
+        title="Qualification",
+        examples=["DMD"],
+    )
+
+    registration_number: Optional[str] = Field(
+        default=None,
+        title="Registration Number",
+        examples=["DEN-2020-12345"],
+    )
+
+    years_of_experience: Optional[int] = Field(
+        default=None,
+        title="Years of Experience",
+        examples=[10],
+    )
+
+    date_of_birth: Optional[date] = Field(
+        default=None,
+        title="Date of Birth",
+        examples=["1985-06-15"],
+    )
+
+    gender: Optional[str] = Field(
+        default=None,
+        title="Gender",
+        examples=["male"],
+    )
+
+    primary_phone: Optional[str] = Field(
+        default=None,
+        title="Primary Phone",
+        examples=["+639171234567"],
+    )
+
+    address: Optional[str] = Field(
+        default=None,
+        title="Address",
+        examples=["123 Rizal St., Manila"],
+    )
+
+    profile_photo_url: Optional[str] = Field(
+        default=None,
+        title="Profile Photo URL",
+    )
+
+    requested_specialization_ids: Optional[list[int]] = Field(
+        default=None,
+        title="Requested Specialization IDs",
+    )
+
+    primary_specialization_id: Optional[int] = Field(
+        default=None,
+        title="Primary Specialization ID",
+    )
+
+    specialization_names: Optional[list[str]] = Field(
+        default=None,
+        title="Specialization Names",
+        description="Resolved names of requested specializations.",
+    )
+
+    status: str = Field(
+        title="Application Status",
+        examples=["pending"],
+    )
+
+    submitted_at: datetime = Field(
+        title="Submitted At",
+        examples=["2026-08-01T10:00:00Z"],
+    )
+
+    reviewed_at: Optional[datetime] = Field(
+        default=None,
+        title="Reviewed At",
+    )
+
+    reviewed_by: Optional[int] = Field(
+        default=None,
+        title="Reviewed By",
+    )
+
+    rejection_reason: Optional[str] = Field(
+        default=None,
+        title="Rejection Reason",
+    )
+
+    doctor_id: Optional[str] = Field(
+        default=None,
+        title="Created Doctor ID",
+        description="UUID of the created Doctor profile (after approval).",
+    )
+
+
+# ======================================================================
+# Admin Doctor Application Actions
+# ======================================================================
+
+
+class DoctorApplicationApprove(BaseModel):
+    """Request body for PATCH /doctor-applications/{id}/approve."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role_id: int = Field(
+        ...,
+        gt=0,
+        title="Doctor Role ID",
+        description="Numeric ID of the doctor role to assign (e.g. GENERAL_DOCTOR).",
+        examples=[3],
+    )
+
+
+class DoctorApplicationReject(BaseModel):
+    """Request body for PATCH /doctor-applications/{id}/reject."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rejection_reason: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        title="Rejection Reason",
+        description="Optional reason for rejecting the application.",
+        examples=["Insufficient qualifications for the requested role."],
+    )
+
+
+class DoctorApplicationActionResponse(BaseModel):
+    """Response for approve/reject actions."""
+
+    model_config = ConfigDict(frozen=True)
+
+    message: str = Field(
+        ...,
+        title="Response Message",
+        examples=["Doctor application approved successfully."],
+    )
+
+
+# ======================================================================
+# Extended Pending User Response
+# ======================================================================
+
+
+class PendingUserWithApplicationResponse(BaseModel):
+    """Extended pending user summary with optional doctor application info."""
+
+    model_config = ConfigDict(from_attributes=True, frozen=True)
+
+    id: int = Field(..., title="User ID", examples=[1])
+    full_name: str = Field(..., title="Full Name", examples=["Juan Dela Cruz"])
+    email: EmailStr = Field(..., title="Email", examples=["juan@example.com"])
+    status: str = Field(..., title="Account Status", examples=["pending"])
+    application_type: str = Field(
+        ...,
+        title="Application Type",
+        description="'staff' for normal registration, 'doctor' for doctor self-registration.",
+        examples=["doctor"],
+    )
+    doctor_application_id: Optional[int] = Field(
+        default=None,
+        title="Doctor Application ID",
+        description="ID of the linked doctor application (if application_type is 'doctor').",
     )

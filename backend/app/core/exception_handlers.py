@@ -46,6 +46,13 @@ from app.modules.doctors.exceptions import (
     ScheduleNotFound as ScheduleNotFoundEx,
     SpecializationNotFound as SpecializationNotFoundEx,
     SpecializationValidationFailed as SpecializationValidationFailedEx,
+    DoctorApplicationNotFound as DoctorApplicationNotFoundEx,
+    DoctorApplicationAlreadyProcessed as DoctorApplicationAlreadyProcessedEx,
+    DoctorApplicationCreationFailed as DoctorApplicationCreationFailedEx,
+    DoctorApplicationApprovalFailed as DoctorApplicationApprovalFailedEx,
+    DuplicateRegistrationNumber as DuplicateRegistrationNumberEx,
+    InvalidDoctorRole as InvalidDoctorRoleEx,
+    SpecializationInvalid as SpecializationInvalidEx,
 )
 from app.modules.appointments.exceptions import (
     AppointmentException,
@@ -156,11 +163,18 @@ _DOCTOR_EXCEPTION_MAP: dict[type[DoctorException], int] = {
     DoctorUserNotFoundEx: status.HTTP_404_NOT_FOUND,
     ScheduleNotFoundEx: status.HTTP_404_NOT_FOUND,
     SpecializationNotFoundEx: status.HTTP_404_NOT_FOUND,
+    DoctorApplicationNotFoundEx: status.HTTP_404_NOT_FOUND,
     DuplicateDoctorDetectedEx: status.HTTP_409_CONFLICT,
+    DuplicateRegistrationNumberEx: status.HTTP_409_CONFLICT,
+    DoctorApplicationAlreadyProcessedEx: status.HTTP_400_BAD_REQUEST,
+    InvalidDoctorRoleEx: status.HTTP_400_BAD_REQUEST,
     DoctorValidationFailedEx: status.HTTP_422_UNPROCESSABLE_CONTENT,
     SpecializationValidationFailedEx: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    SpecializationInvalidEx: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidDoctorOperationEx: status.HTTP_400_BAD_REQUEST,
     NotADoctorUserEx: status.HTTP_400_BAD_REQUEST,
+    DoctorApplicationCreationFailedEx: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    DoctorApplicationApprovalFailedEx: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
 _PATIENT_EXCEPTION_MAP: dict[type[PatientException], int] = {

@@ -22,28 +22,25 @@ from app.modules.doctors.exceptions import (
 from app.modules.doctors.constants import ERR_DOCTOR_NOT_FOUND
 from app.core.constants import USER_STATUS_ACTIVE
 
-from pydantic import HttpUrl
 
 
 # ======================================================================
-# Regression: Pydantic HttpUrl → str for psycopg2 compatibility
+# Regression: profile_photo_url is now str | None (storage key)
 # ======================================================================
 
 
 class TestDoctorCreateWithPhotoUrl:
-    """Regression: verify profile_photo_url (Pydantic HttpUrl) is converted to
-    str before reaching the ORM model / psycopg2.
+    """Verify profile_photo_url is stored as a plain string.
 
-    In production, passing an HttpUrl object to PostgreSQL via psycopg2
-    raises "can't adapt type 'HttpUrl'". The service layer is responsible
-    for converting HttpUrl → str at the domain-to-persistence boundary.
+    The field changed from HttpUrl to str | None to support opaque
+    storage keys (uuid4 hex) instead of external URLs.
     """
 
     def test_create_with_valid_profile_photo_url(
         self, db, doctor_user, admin_user
     ):
         """Creating a doctor with a profile_photo_url should succeed, and the
-        value stored in the database should be a plain string (not HttpUrl)."""
+        value stored in the database should be a plain string."""
         from app.modules.doctors.services.doctor_service import DoctorService
         from app.modules.doctors.schemas import DoctorCreate
 
@@ -51,11 +48,11 @@ class TestDoctorCreateWithPhotoUrl:
         payload = DoctorCreate(
             user_id=doctor_user.id,
             primary_phone="+639171234567",
-            profile_photo_url=HttpUrl("https://example.com/photo.jpg"),
+            profile_photo_url="https://example.com/photo.jpg",
         )
         doctor = service.create_doctor(payload, actor_id=admin_user.id)
 
-        # Verify the ORM attribute is a plain string, not an HttpUrl
+        # Verify the ORM attribute is a plain string
         assert isinstance(doctor.profile_photo_url, str), (
             f"Expected str, got {type(doctor.profile_photo_url)}"
         )
@@ -66,6 +63,23 @@ class TestDoctorCreateWithPhotoUrl:
         reloaded = db.get(type(doctor), doctor.id)
         assert isinstance(reloaded.profile_photo_url, str)
         assert reloaded.profile_photo_url == "https://example.com/photo.jpg"
+
+    def test_create_with_storage_key(
+        self, db, doctor_user, admin_user
+    ):
+        """Creating a doctor with an opaque storage key (hex string) should succeed."""
+        from app.modules.doctors.services.doctor_service import DoctorService
+        from app.modules.doctors.schemas import DoctorCreate
+
+        service = DoctorService(db)
+        storage_key = uuid.uuid4().hex
+        payload = DoctorCreate(
+            user_id=doctor_user.id,
+            primary_phone="+639171234567",
+            profile_photo_url=storage_key,
+        )
+        doctor = service.create_doctor(payload, actor_id=admin_user.id)
+        assert doctor.profile_photo_url == storage_key
 
     def test_create_without_profile_photo_url(
         self, db, doctor_user, admin_user
@@ -101,9 +115,9 @@ class TestDoctorCreateWithPhotoUrl:
     def test_update_profile_photo_url(
         self, db, doctor_user, admin_user
     ):
-        """Updating profile_photo_url should convert HttpUrl → str."""
+        """Updating profile_photo_url should store the string value."""
         from app.modules.doctors.services.doctor_service import DoctorService
-        from app.modules.doctors.schemas import DoctorCreate, DoctorUpdate
+        from app.modules.doctors.schemas import DoctorUpdate
         from tests.modules.doctors.conftest import DoctorFactory
 
         # Create a doctor first without photo
@@ -112,7 +126,7 @@ class TestDoctorCreateWithPhotoUrl:
 
         # Now update the profile_photo_url
         update_payload = DoctorUpdate(
-            profile_photo_url=HttpUrl("https://example.com/updated.jpg"),
+            profile_photo_url="https://example.com/updated.jpg",
         )
         updated = service.update_doctor(
             doctor.id, update_payload, actor_id=admin_user.id

@@ -128,12 +128,14 @@ class TestCreateDoctorEndpoint:
         # profile_photo_url is excluded because response_model_exclude_none=True
         assert "profile_photo_url" not in resp.json()
 
-    def test_create_with_invalid_profile_photo_url(self, client, doctor_user, admin_token):
-        """Creating a doctor with an invalid URL should be rejected at validation."""
+    def test_create_with_arbitrary_profile_photo_url_string(self, client, doctor_user, admin_token):
+        """profile_photo_url is now a plain string (storage key), so any
+        string value should be accepted — including non-URL values."""
         payload = self._payload(doctor_user.id)
         payload["profile_photo_url"] = "not-a-valid-url"
         resp = client.post("/doctors", json=payload, headers=auth_header(admin_token))
-        assert resp.status_code == 422
+        # Now accepts any string (storage keys are opaque hex, not URLs)
+        assert resp.status_code == 201
 
 
 # ======================================================================

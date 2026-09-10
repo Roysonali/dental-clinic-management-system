@@ -1,6 +1,11 @@
 import { api } from './api';
 import type {
   CurrentUserResponse,
+  DoctorApplicationActionResponse,
+  DoctorApplicationApproveRequest,
+  DoctorApplicationRegistrationRequest,
+  DoctorApplicationRejectRequest,
+  DoctorApplicationResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   LoginResponse,
@@ -125,6 +130,65 @@ export const authService = {
   async deactivateUser(userId: number): Promise<UserApprovalResponse> {
     const { data } = await api.patch<UserApprovalResponse>(
       `/auth/users/${userId}/deactivate`,
+    );
+    return data;
+  },
+
+  /** POST /auth/register-doctor — public doctor self-registration. */
+  async registerDoctor(
+    payload: DoctorApplicationRegistrationRequest,
+  ): Promise<RegisterResponse> {
+    const { data } = await api.post<RegisterResponse>(
+      '/auth/register-doctor',
+      payload,
+    );
+    return data;
+  },
+
+  // ── Doctor Application Admin Endpoints ────────────────────────────
+
+  /** GET /doctor-applications — list pending doctor applications (admin). */
+  async fetchDoctorApplications(): Promise<DoctorApplicationResponse[]> {
+    const { data } = await api.get<DoctorApplicationResponse[]>(
+      '/doctor-applications',
+    );
+    return data;
+  },
+
+  /** GET /doctor-applications/{id} — get application detail (admin). */
+  async getDoctorApplication(
+    applicationId: number,
+  ): Promise<DoctorApplicationResponse> {
+    const { data } = await api.get<DoctorApplicationResponse>(
+      `/doctor-applications/${applicationId}`,
+    );
+    return data;
+  },
+
+  /** PATCH /doctor-applications/{id}/approve — approve application (admin). */
+  async approveDoctorApplication(
+    applicationId: number,
+    roleId: number,
+  ): Promise<DoctorApplicationActionResponse> {
+    const payload: DoctorApplicationApproveRequest = { role_id: roleId };
+    const { data } = await api.patch<DoctorApplicationActionResponse>(
+      `/doctor-applications/${applicationId}/approve`,
+      payload,
+    );
+    return data;
+  },
+
+  /** PATCH /doctor-applications/{id}/reject — reject application (admin). */
+  async rejectDoctorApplication(
+    applicationId: number,
+    reason?: string,
+  ): Promise<DoctorApplicationActionResponse> {
+    const payload: DoctorApplicationRejectRequest = {
+      rejection_reason: reason,
+    };
+    const { data } = await api.patch<DoctorApplicationActionResponse>(
+      `/doctor-applications/${applicationId}/reject`,
+      payload,
     );
     return data;
   },

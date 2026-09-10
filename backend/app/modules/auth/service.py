@@ -124,6 +124,130 @@ def register_user(
         raise RegistrationFailed()
 
 
+def register_doctor_user(
+    db: Session,
+    user_data: "DoctorApplicationRegistration",
+) -> User:
+    """Register a new doctor user with pending status AND create a doctor application.
+
+    Creates a pending user account AND a DoctorApplication in a single
+    transaction. This is the atomic entry point for doctor self-registration.
+
+    The applicant MUST NOT be able to self-assign any privileged RBAC role.
+    The User is created with role_id=None and status=pending.
+
+    Args:
+        db: Active database session.
+        user_data: The combined registration + doctor application payload.
+
+    Returns:
+        The newly created User ORM instance.
+
+    Raises:
+        EmailAlreadyRegistered: If the email is already registered.
+        RegistrationFailed: If an unexpected error occurs.
+    """
+    from app.modules.doctors.models import DoctorApplication
+    from app.modules.doctors.repositories import (
+        DoctorApplicationRepository,
+        DoctorRepository,
+        SpecializationRepository,
+    )
+    from app.modules.doctors.schemas import DoctorApplicationRegistration
+
+    try:
+        existing_user = get_user_by_email(db, user_data.email)
+        if existing_user:
+            logger.warning(
+                "Duplicate doctor registration attempt: email=%s",
+                user_data.email,
+            )
+            raise EmailAlreadyRegistered()
+
+        # 1. Create the pending user account
+        hashed_password = hash_password(user_data.password)
+        user = User(
+            full_name=user_data.full_name,
+            email=user_data.email,
+            password_hash=hashed_password,
+            status=USER_STATUS_PENDING,
+            is_active=False,
+            # CRITICAL: No role assigned. The applicant MUST NOT self-assign
+            # any privileged RBAC role. Role is assigned by admin on approval.
+        )
+        created_user = create_user(db, user)
+        db.flush()  # Get the user.id without committing yet
+
+        # 2. Create the doctor application
+        app_repo = DoctorApplicationRepository(db)
+        doctor_repo = DoctorRepository(db)
+        spec_repo = SpecializationRepository(db)
+
+        # Validate registration number uniqueness
+        if user_data.registration_number:
+            if app_repo.registration_number_exists(user_data.registration_number):
+                db.rollback()
+                raise RegistrationFailed()
+            if doctor_repo.registration_number_exists(user_data.registration_number):
+                db.rollback()
+                raise RegistrationFailed()
+
+        # Validate specialization IDs
+        requested_spec_ids = user_data.requested_specialization_ids or []
+        primary_spec_id = user_data.primary_specialization_id
+
+        if primary_spec_id is not None and primary_spec_id not in requested_spec_ids:
+            db.rollback()
+            raise RegistrationFailed()
+
+        if requested_spec_ids:
+            existing_specs = spec_repo.get_by_ids(requested_spec_ids)
+            existing_ids = {s.id for s in existing_specs}
+            missing = set(requested_spec_ids) - existing_ids
+            if missing:
+                db.rollback()
+                raise RegistrationFailed()
+
+        application = DoctorApplication(
+            user_id=created_user.id,
+            qualification=user_data.qualification,
+            registration_number=user_data.registration_number,
+            years_of_experience=user_data.years_of_experience,
+            date_of_birth=user_data.date_of_birth,
+            gender=user_data.gender,
+            primary_phone=user_data.primary_phone,
+            address=user_data.address,
+            profile_photo_url=user_data.profile_photo_url,
+            requested_specialization_ids=requested_spec_ids,
+            primary_specialization_id=primary_spec_id,
+            status=DoctorApplication.STATUS_PENDING,
+        )
+        app_repo.add(application)
+        db.flush()
+
+        db.commit()
+
+        logger.info(
+            "Doctor application registered: user_id=%s, email=%s, app_id=%s",
+            created_user.id,
+            created_user.email,
+            application.id,
+        )
+
+        return created_user
+
+    except EmailAlreadyRegistered:
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error during doctor registration: email=%s",
+            user_data.email,
+        )
+        raise RegistrationFailed()
+
+
 def fetch_pending_users(
     db: Session,
 ) -> list[User]:
