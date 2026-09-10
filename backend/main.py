@@ -40,6 +40,9 @@ from app.modules.doctors.routes import (
 from app.modules.doctors.routers.photo_router import (
     router as doctor_photo_router,
 )
+from app.modules.doctors.routers.doctor_application_router import (
+    router as doctor_application_router,
+)
 from app.modules.treatment.routers import (
     procedure_router,
     treatment_plan_router,
@@ -74,6 +77,7 @@ app.include_router(doctor_router)
 app.include_router(specialization_router)
 app.include_router(schedule_router)
 app.include_router(doctor_photo_router)
+app.include_router(doctor_application_router)
 app.include_router(procedure_router)
 app.include_router(treatment_plan_router)
 app.include_router(billing_router)

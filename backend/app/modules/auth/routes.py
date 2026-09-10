@@ -36,8 +36,12 @@ from app.modules.auth.service import (
     fetch_pending_users,
     refresh_access_token,
     register_user,
+    register_doctor_user,
     request_password_reset,
     reset_password,
+)
+from app.modules.doctors.schemas import (
+    DoctorApplicationRegistration,
 )
 
 
@@ -75,6 +79,41 @@ def register(
 
     return {
         "message": "Registration submitted. Waiting for admin approval.",
+    }
+
+
+@router.post(
+    "/register-doctor",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register as Doctor",
+    description=(
+        "Submit a new doctor application. Creates a pending user account "
+        "AND a doctor application with professional details. "
+        "The application must be approved by an admin before the doctor "
+        "can log in. Returns a confirmation message."
+    ),
+    response_description="Registration confirmation message.",
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "description": "Email already registered",
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": "Validation error",
+        },
+    },
+)
+def register_doctor(
+    payload: DoctorApplicationRegistration,
+    db: Session = Depends(get_db),
+) -> RegisterResponse:
+    register_doctor_user(db, payload)
+
+    return {
+        "message": (
+            "Your doctor application has been submitted and is awaiting "
+            "clinic approval. You will be notified once a decision is made."
+        ),
     }
 
 
