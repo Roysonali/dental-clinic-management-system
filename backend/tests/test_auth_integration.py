@@ -88,6 +88,30 @@ def test_pending_as_admin(auth_client, pending_user):
     assert any(u["email"] == "pending@example.com" for u in r.json())
 
 
+def test_roles_as_admin(auth_client, seed_roles):
+    """F-03: GET /auth/roles returns the seeded roles with stable name codes."""
+    r = auth_client.get("/auth/roles")
+    assert r.status_code == 200
+    roles = r.json()
+    names = {role["name"] for role in roles}
+    assert "ADMIN" in names
+    assert "GENERAL_DOCTOR" in names
+    assert "RECEPTIONIST" in names
+    # Every role carries a numeric id and its stable name code
+    for role in roles:
+        assert isinstance(role["id"], int)
+        assert isinstance(role["name"], str)
+
+
+def test_roles_no_auth(client):
+    assert client.get("/auth/roles").status_code == 401
+
+
+def test_roles_non_admin(client, active_token):
+    r = client.get("/auth/roles", headers={"Authorization": f"Bearer {active_token}"})
+    assert r.status_code == 403
+
+
 def test_pending_no_auth(client):
     assert client.get("/auth/users/pending").status_code == 401
 

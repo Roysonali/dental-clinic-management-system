@@ -352,3 +352,30 @@ class CurrentUserResponse(BaseModel):
         description="Current account lifecycle status.",
         examples=["active"],
     )
+
+
+class RoleResponse(BaseModel):
+    """A single RBAC role exposed to the admin role-selection UI.
+
+    Replaces hardcoded frontend role-id mappings (F-03): the frontend
+    should build approval dropdowns from this server-provided list rather
+    than assuming seeded numeric ids.
+    """
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        frozen=True,
+    )
+
+    id: int = Field(
+        ...,
+        title="Role ID",
+        description="Numeric role identifier used by approval endpoints.",
+        examples=[3],
+    )
+    name: str = Field(
+        ...,
+        title="Role Name",
+        description="Stable role code (e.g. 'GENERAL_DOCTOR').",
+        examples=["GENERAL_DOCTOR"],
+    )

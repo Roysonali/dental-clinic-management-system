@@ -14,6 +14,7 @@ import type {
   RegisterRequest,
   RegisterResponse,
   ResetPasswordRequest,
+  RoleResponse,
   ResetPasswordResponse,
   UserApprovalRequest,
   UserApprovalResponse,
@@ -131,6 +132,17 @@ export const authService = {
     const { data } = await api.patch<UserApprovalResponse>(
       `/auth/users/${userId}/deactivate`,
     );
+    return data;
+  },
+
+  /**
+   * GET /auth/roles — list RBAC roles (admin).
+   *
+   * F-03: lets approval screens build role dropdowns from server data
+   * instead of hardcoded numeric id maps.
+   */
+  async fetchRoles(): Promise<RoleResponse[]> {
+    const { data } = await api.get<RoleResponse[]>('/auth/roles');
     return data;
   },
 

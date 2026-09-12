@@ -365,7 +365,8 @@ class TestDoctorApplicationRegistration:
         assert resp.status_code == 409
 
     def test_doctor_register_duplicate_reg_number_rejected(self, client):
-        """Duplicate registration number should be rejected."""
+        """Duplicate registration number should be rejected as 409 CONFLICT
+        (F-02: an expected business conflict must never surface as 500)."""
         client.post("/auth/register-doctor", json={
             "full_name": "Dr. One",
             "email": "dr.one@test.com",
@@ -380,10 +381,13 @@ class TestDoctorApplicationRegistration:
             "registration_number": "DUP-REG-001",
             "primary_phone": "+639171234567",
         })
-        assert resp.status_code in (409, 500)
+        assert resp.status_code == 409
+        body = resp.json()
+        assert body["message"] == "Registration number is already in use"
 
     def test_doctor_register_invalid_specialization_rejected(self, client):
-        """Invalid specialization IDs should be rejected."""
+        """Invalid specialization IDs should be rejected with a domain 422,
+        not a generic 500 (F-02 companion fix)."""
         resp = client.post("/auth/register-doctor", json={
             "full_name": "Dr. Bad",
             "email": "dr.bad@test.com",
@@ -391,7 +395,9 @@ class TestDoctorApplicationRegistration:
             "primary_phone": "+639171234567",
             "requested_specialization_ids": [99999],
         })
-        assert resp.status_code in (400, 422, 500)
+        assert resp.status_code == 422
+        body = resp.json()
+        assert "Invalid specialization IDs" in body["message"]
 
 
 # ====================================================================
@@ -734,6 +740,172 @@ class TestDoubleApprovalProtection:
         # Verify only ONE doctor profile exists
         doctors = db.query(Doctor).filter(Doctor.user_id == user.id).all()
         assert len(doctors) == 1
+
+
+class TestDuplicateRegistrationRaceCondition:
+    """F-02: duplicate registration number during approval must be a clean
+    409 business conflict — never a generic HTTP 500.
+
+    The pre-check in the service covers the common path. This test forces the
+    race path: the uniqueness pre-check passes (a concurrent approval commits
+    the same license number between check and flush), so the DB UNIQUE
+    constraint fires an IntegrityError at flush time. The service must
+    translate it into DuplicateRegistrationNumber → 409 and roll back fully.
+    """
+
+    def test_duplicate_reg_number_race_maps_to_409_not_500(
+        self, client, admin_user, admin_token, db, monkeypatch
+    ):
+        from tests.modules.doctors.conftest import DoctorFactory
+
+        # 1. Doctor B registers with a UNIQUE registration number (no doctor
+        #    rows exist yet, so both pre-checks pass).
+        client.post("/auth/register-doctor", json={
+            "full_name": "Dr. Loser",
+            "email": "dr.race.loser@test.com",
+            "password": "Doctor@Pass1",
+            "registration_number": "RACE-2024-001",
+            "primary_phone": "+639171234568",
+        })
+        loser_user = db.query(User).filter(
+            User.email == "dr.race.loser@test.com"
+        ).first()
+        loser_app = db.query(DoctorApplication).filter(
+            DoctorApplication.user_id == loser_user.id
+        ).first()
+        gen_doc_role = db.query(Role).filter(
+            Role.name == ROLE_GENERAL_DOCTOR
+        ).first()
+
+        # 2. Simulate the concurrent approval committing between B's
+        #    registration and B's approval: a doctor row now owns the same
+        #    licence number. (Direct ORM insert — applications and doctors
+        #    have separate UNIQUE indexes, so this is legal.)
+        rival = User(
+            full_name="Rival Doctor",
+            email="dr.race.rival@test.com",
+            password_hash=hash_password("Doctor@Pass1"),
+            status=USER_STATUS_ACTIVE,
+            is_active=True,
+            role_id=gen_doc_role.id,
+        )
+        db.add(rival)
+        db.commit()
+        db.refresh(rival)
+        DoctorFactory.create(
+            db, user_id=rival.id, registration_number="RACE-2024-001"
+        )
+        db.commit()
+
+        # 3. Simulate the stale pre-check: the service's uniqueness query ran
+        #    before the concurrent commit became visible, so it misses the
+        #    conflict and the Doctor INSERT hits the UNIQUE constraint at
+        #    flush time.
+        from unittest.mock import patch as mock_patch
+        from app.modules.doctors.repositories import DoctorRepository
+
+        with mock_patch.object(
+            DoctorRepository,
+            "registration_number_exists",
+            lambda self, registration_number, exclude_doctor_id=None: False,
+        ):
+            resp = client.patch(
+                f"/doctor-applications/{loser_app.id}/approve",
+                json={"role_id": gen_doc_role.id},
+                headers=auth_header(admin_token),
+            )
+
+        # 4. Must be a clean domain conflict, NOT a 500.
+        assert resp.status_code == 409
+        body = resp.json()
+        assert "registration number" in body["message"].lower()
+
+        # 5. Transaction rolled back fully: no Doctor profile for the loser,
+        #    application still PENDING, user still pending with no doctor role.
+        db.expire_all()
+        loser_doctor = db.query(Doctor).filter(
+            Doctor.user_id == loser_user.id
+        ).all()
+        assert len(loser_doctor) == 0
+        db.refresh(loser_app)
+        assert loser_app.status == DoctorApplication.STATUS_PENDING
+        db.refresh(loser_user)
+        assert loser_user.status == USER_STATUS_PENDING
+        assert loser_user.role_id is None
+
+    def test_non_registration_integrity_error_still_500(
+        self, client, admin_user, admin_token, db, monkeypatch
+    ):
+        """Only registration_number violations map to 409; other integrity
+        failures remain unexpected (500) — the mapping must not over-reach."""
+        client.post("/auth/register-doctor", json={
+            "full_name": "Dr. Integrity",
+            "email": "dr.integrity@test.com",
+            "password": "Doctor@Pass1",
+            "registration_number": "INT-2024-001",
+            "primary_phone": "+639171234569",
+        })
+        user = db.query(User).filter(User.email == "dr.integrity@test.com").first()
+        app = db.query(DoctorApplication).filter(
+            DoctorApplication.user_id == user.id
+        ).first()
+        gen_doc_role = db.query(Role).filter(
+            Role.name == ROLE_GENERAL_DOCTOR
+        ).first()
+
+        from unittest.mock import patch as mock_patch
+        from app.modules.doctors.services.doctor_application_service import (
+            DoctorApplicationService,
+        )
+
+        # Simulate an integrity error that is NOT about registration_number.
+        orig_violation = DoctorApplicationService._is_registration_number_violation
+        with mock_patch.object(
+            DoctorApplicationService,
+            "_is_registration_number_violation",
+            staticmethod(lambda exc: False),
+        ):
+            # Force the flush-time UNIQUE violation by making the pre-check
+            # miss an existing conflicting doctor.
+            from app.modules.doctors.repositories import DoctorRepository
+            with mock_patch.object(
+                DoctorRepository,
+                "registration_number_exists",
+                lambda self, registration_number, exclude_doctor_id=None: False,
+            ):
+                # But insert the conflicting doctor right before the approve
+                # request executes, so the flush fails on the UNIQUE.
+                conflicting_user = User(
+                    full_name="Existing Doc",
+                    email="dr.integrity.existing@test.com",
+                    password_hash=hash_password("Doctor@Pass1"),
+                    status=USER_STATUS_ACTIVE,
+                    is_active=True,
+                    role_id=gen_doc_role.id,
+                )
+                db.add(conflicting_user)
+                db.commit()
+                db.refresh(conflicting_user)
+                from tests.modules.doctors.conftest import DoctorFactory
+                DoctorFactory.create(
+                    db,
+                    user_id=conflicting_user.id,
+                    registration_number="INT-2024-001",
+                )
+                db.commit()
+
+                resp = client.patch(
+                    f"/doctor-applications/{app.id}/approve",
+                    json={"role_id": gen_doc_role.id},
+                    headers=auth_header(admin_token),
+                )
+
+        # Unexpected integrity failure → 500 (DoctorApplicationApprovalFailed)
+        assert resp.status_code == 500
+        # And the application must remain untouched (rolled back).
+        db.expire_all()
+        db.refresh(app)
+        assert app.status == DoctorApplication.STATUS_PENDING
 
 
 # ====================================================================

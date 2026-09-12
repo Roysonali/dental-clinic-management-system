@@ -5,9 +5,20 @@ import {
   useDeactivatePendingUser,
   usePendingUsers,
 } from '../../../hooks/auth/usePendingUsers';
-import { useDoctorApplications, useApproveDoctorApplication, useRejectDoctorApplication } from '../../../hooks/auth/useDoctorApplications';
+import {
+  useDoctorApplications,
+  useApproveDoctorApplication,
+  useRejectDoctorApplication,
+  useRoles,
+} from '../../../hooks/auth/useDoctorApplications';
 import { parseApiError } from '../../../services/apiError';
-import { ROLES, ROLE_LABELS, ROLE_IDS, DOCTOR_ROLES } from '../../../constants/roles';
+import {
+  ROLES,
+  ROLE_LABELS,
+  ROLE_IDS,
+  DOCTOR_ROLES,
+  type RoleName,
+} from '../../../constants/roles';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { Alert } from '../../common/Alert/Alert';
 import { Button } from '../../common/Button/Button';
@@ -18,20 +29,42 @@ import { StatusBadge } from '../../common/StatusBadge/StatusBadge';
 import type { PendingUserResponse, DoctorApplicationResponse } from '../../../types/auth';
 
 /**
- * Role options for staff approval dropdown.
+ * Fallback role options (seeded id map) — used only while the server role
+ * list is unavailable. Kept in sync with `backend/app/database/seed_roles.py`.
  */
-const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({
+const FALLBACK_ROLE_OPTIONS = Object.values(ROLES).map((role) => ({
+  value: String(ROLE_IDS[role]),
+  label: ROLE_LABELS[role],
+}));
+
+const FALLBACK_DOCTOR_ROLE_OPTIONS = DOCTOR_ROLES.map((role) => ({
   value: String(ROLE_IDS[role]),
   label: ROLE_LABELS[role],
 }));
 
 /**
- * Role options for doctor approval dropdown (only doctor roles).
+ * Build role options from the server-provided role list (F-03).
+ *
+ * Prefers stable role *name* codes over database ids: the dropdown value is
+ * the role name when the backend role list is available, resolved to the
+ * matching server id at approve time. Falls back to the seeded id map when
+ * the role list query fails.
  */
-const DOCTOR_ROLE_OPTIONS = DOCTOR_ROLES.map((role) => ({
-  value: String(ROLE_IDS[role]),
-  label: ROLE_LABELS[role],
-}));
+function buildRoleOptions(
+  roles: { id: number; name: string }[] | undefined,
+  allowedNames: readonly RoleName[] | null,
+) {
+  if (!roles || roles.length === 0) {
+    return allowedNames ? FALLBACK_DOCTOR_ROLE_OPTIONS : FALLBACK_ROLE_OPTIONS;
+  }
+  return roles
+    .filter((r) => allowedNames === null || allowedNames.includes(r.name as RoleName))
+    .map((r) => ({
+      value: r.name,
+      label: ROLE_LABELS[r.name as RoleName] ?? r.name,
+      id: r.id,
+    }));
+}
 
 /**
  * PendingUsersContainer — admin approval queue.
@@ -48,10 +81,19 @@ const DOCTOR_ROLE_OPTIONS = DOCTOR_ROLES.map((role) => ({
 export const PendingUsersContainer: FC = () => {
   const { data: pendingUsers, isLoading, isError, error, refetch } = usePendingUsers();
   const { data: doctorApplications, refetch: refetchApps } = useDoctorApplications();
+  const { data: serverRoles } = useRoles();
   const approveMutation = useApproveUser();
   const deactivateMutation = useDeactivatePendingUser();
   const approveDoctorMutation = useApproveDoctorApplication();
   const rejectDoctorMutation = useRejectDoctorApplication();
+
+  /* F-03: role options come from the server role list; the value is the
+   * stable role NAME code, resolved to the server id on submit. */
+  const roleOptions = buildRoleOptions(serverRoles, null);
+  const doctorRoleOptions = buildRoleOptions(serverRoles, DOCTOR_ROLES);
+  const roleIdByName = new Map(
+    (serverRoles ?? []).map((r) => [r.name, r.id] as const),
+  );
 
   const [roleSelections, setRoleSelections] = useState<Record<number, string>>({});
   const [doctorRoleSelections, setDoctorRoleSelections] = useState<Record<number, string>>({});
@@ -71,7 +113,9 @@ export const PendingUsersContainer: FC = () => {
           : null;
 
   const handleApprove = (userId: number) => {
-    const roleId = Number(roleSelections[userId]);
+    const selected = roleSelections[userId];
+    // Server role list available → value is a role NAME; resolve to id.
+    const roleId = roleIdByName.get(selected) ?? Number(selected);
     if (!Number.isInteger(roleId) || roleId <= 0) return;
     approveMutation.mutate({ userId, roleId });
   };
@@ -123,7 +167,9 @@ export const PendingUsersContainer: FC = () => {
   }
 
   const handleApproveDoctor = (applicationId: number) => {
-    const roleId = Number(doctorRoleSelections[applicationId]);
+    const selected = doctorRoleSelections[applicationId];
+    // Server role list available → value is a role NAME; resolve to id.
+    const roleId = roleIdByName.get(selected) ?? Number(selected);
     if (!Number.isInteger(roleId) || roleId <= 0) return;
     approveDoctorMutation.mutate(
       { applicationId, roleId },
@@ -262,7 +308,7 @@ export const PendingUsersContainer: FC = () => {
                       <td className="px-4 py-3">
                         <Select
                           aria-label={`Role to assign to ${user.full_name}`}
-                          options={ROLE_OPTIONS}
+                          options={roleOptions}
                           placeholder="Select a role"
                           value={selectedRole}
                           disabled={busy}
@@ -321,17 +367,38 @@ export const PendingUsersContainer: FC = () => {
         <Modal.Body>
           {selectedApplication && (
             <div className="space-y-4">
-              {/* Applicant Info */}
+              {/* Applicant Info (P2: show submitted photo so admin can review it) */}
               <div className="rounded-lg bg-neutral-50 p-4">
                 <h3 className="text-body font-semibold text-neutral-900 mb-2">Applicant</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-caption text-neutral-500">Name</p>
-                    <p className="text-body text-neutral-900">{selectedApplication.user_full_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-caption text-neutral-500">Email</p>
-                    <p className="text-body text-neutral-900">{selectedApplication.user_email}</p>
+                <div className="flex items-start gap-4">
+                  {selectedApplication.profile_photo_url ? (
+                    <img
+                      src={selectedApplication.profile_photo_url}
+                      alt={`${selectedApplication.user_full_name ?? 'Applicant'} profile photo`}
+                      className="h-16 w-16 shrink-0 rounded-full border border-neutral-200 object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-neutral-100 text-h4 font-semibold text-neutral-400"
+                      aria-label="No profile photo submitted"
+                    >
+                      {(selectedApplication.user_full_name ?? '?')
+                        .split(' ')
+                        .map((p) => p[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase()}
+                    </div>
+                  )}
+                  <div className="grid flex-1 grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-caption text-neutral-500">Name</p>
+                      <p className="text-body text-neutral-900">{selectedApplication.user_full_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-caption text-neutral-500">Email</p>
+                      <p className="text-body text-neutral-900">{selectedApplication.user_email}</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -392,13 +459,35 @@ export const PendingUsersContainer: FC = () => {
                 </div>
               </div>
 
-              {/* Role Selection for Approval */}
+              {/* Specializations (master-data names from the backend) */}
+              {selectedApplication.specialization_names && selectedApplication.specialization_names.length > 0 && (
+                <div className="rounded-lg bg-neutral-50 p-4">
+                  <h3 className="text-body font-semibold text-neutral-900 mb-2">Specializations</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedApplication.specialization_names.map((name) => (
+                      <span
+                        key={name}
+                        className="rounded-full bg-primary-50 px-3 py-1 text-caption font-medium text-primary-700"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Role Selection for Approval — P2: explicit a11y label */}
               <div>
-                <label className="text-body font-medium text-neutral-900 block mb-1">
+                <label
+                  htmlFor="doctor-role-select"
+                  className="text-body font-medium text-neutral-900 block mb-1"
+                >
                   Assign Doctor Role
                 </label>
                 <Select
-                  options={DOCTOR_ROLE_OPTIONS}
+                  id="doctor-role-select"
+                  aria-label="Assign Doctor Role"
+                  options={doctorRoleOptions}
                   placeholder="Select a doctor role"
                   value={doctorRoleSelections[selectedApplication.id] ?? ''}
                   onChange={(e) =>

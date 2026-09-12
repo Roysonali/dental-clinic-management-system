@@ -258,6 +258,25 @@ def get_role_by_id(
     )
 
 
+def get_all_roles(
+    db: Session,
+) -> list[Role]:
+    """Return every RBAC role ordered by id (seed order).
+
+    Used by ``GET /auth/roles`` so the admin role-selection UI can build
+    its dropdown from server data instead of hardcoded frontend id maps
+    (F-03 hardening).
+
+    Args:
+        db: Active database session.
+
+    Returns:
+        All roles ordered by primary key.
+    """
+    stmt = select(Role).order_by(Role.id.asc())
+    return list(db.execute(stmt).scalars().all())
+
+
 def create_refresh_token(
     db: Session,
     refresh_token: RefreshToken,

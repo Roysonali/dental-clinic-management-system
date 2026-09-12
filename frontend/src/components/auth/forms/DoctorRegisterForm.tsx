@@ -178,11 +178,13 @@ export const DoctorRegisterForm: FC<DoctorRegisterFormProps> = ({
       noValidate
       className="flex flex-col gap-5"
     >
-      {/* ── Progress Steps ─────────────────────────────── */}
+      {/* ── Progress Steps (P2: aria-current exposes the active step) ── */}
       <div className="flex items-center justify-between">
         {steps.map((step, index) => (
           <div key={step.key} className="flex items-center">
             <div
+              aria-current={index === currentStepIndex ? 'step' : undefined}
+              aria-label={`Step ${step.number}: ${step.label}`}
               className={`flex h-8 w-8 items-center justify-center rounded-full text-caption font-medium ${
                 index <= currentStepIndex
                   ? 'bg-primary-600 text-white'

@@ -25,6 +25,7 @@ from app.modules.auth.schemas import (
     RegisterResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
+    RoleResponse,
     UserApprovalRequest,
     UserApprovalResponse,
     UserRegister,
@@ -33,6 +34,7 @@ from app.modules.auth.service import (
     approve_user,
     authenticate_user,
     deactivate_user,
+    fetch_all_roles,
     fetch_pending_users,
     refresh_access_token,
     register_user,
@@ -347,6 +349,33 @@ def login(
         "refresh_token": refresh_token,
         "token_type": "bearer",
     }
+
+
+@router.get(
+    "/roles",
+    response_model=List[RoleResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List RBAC Roles",
+    description=(
+        "Return every RBAC role with its numeric id and stable name code. "
+        "Admin screens build their role-selection dropdowns from this "
+        "server-provided list instead of hardcoded frontend id mappings."
+    ),
+    response_description="All RBAC roles ordered by id.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing or invalid JWT token",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "description": "Authenticated user is not an administrator",
+        },
+    },
+)
+def list_roles(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+) -> List[RoleResponse]:
+    return fetch_all_roles(db)
 
 
 @router.get(

@@ -111,6 +111,22 @@ class DoctorApplicationService:
             raise
         except IntegrityError as exc:
             self.db.rollback()
+            # F-02: a UNIQUE-constraint violation on registration_number is an
+            # *expected business conflict* (e.g. two admins approving competing
+            # applications for the same license number concurrently, or an
+            # applicant racing an approved doctor). It must surface as 409,
+            # never as a generic 500. Only unrecognised integrity violations
+            # fall through to the unexpected-error mapping.
+            if self._is_registration_number_violation(exc):
+                logger.warning(
+                    "Registration number uniqueness violated during %s "
+                    "(race condition or concurrent approval): %s",
+                    operation,
+                    exc,
+                )
+                raise DuplicateRegistrationNumber(
+                    "Registration number is already assigned to another doctor"
+                ) from exc
             logger.error("Integrity violation during %s: %s", operation, exc)
             raise on_unexpected(
                 f"Operation '{operation}' failed: integrity violation"
@@ -123,6 +139,17 @@ class DoctorApplicationService:
             raise on_unexpected(
                 f"Operation '{operation}' failed unexpectedly: {exc}"
             ) from exc
+
+    @staticmethod
+    def _is_registration_number_violation(exc: IntegrityError) -> bool:
+        """Detect whether an IntegrityError is a registration_number UNIQUE violation.
+
+        Works across drivers (psycopg2 reports constraint/index names and the
+        column in the diagnostic message; SQLite repeats the column name).
+        Only a safe boolean is inspected — raw SQL is never leaked to clients.
+        """
+        text = str(getattr(exc, "orig", None) or exc).lower()
+        return "registration_number" in text
 
     # ------------------------------------------------------------------
     # Create Application
@@ -352,7 +379,12 @@ class DoctorApplicationService:
                     f"Allowed: {', '.join(DOCTOR_ROLES)}"
                 )
 
-            # 4. Validate registration number uniqueness against existing doctors
+            # 4. Validate registration number uniqueness against existing doctors.
+            # Race-condition defence-in-depth: the DB UNIQUE constraint on
+            # doctors.registration_number is the final authority; a violation
+            # at flush/commit time is translated to DuplicateRegistrationNumber
+            # by _run_in_transaction (F-02), so this pre-check only covers the
+            # common, non-concurrent path.
             if application.registration_number:
                 if self.doctor_repo.registration_number_exists(
                     application.registration_number

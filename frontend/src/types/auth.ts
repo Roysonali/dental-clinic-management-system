@@ -177,6 +177,12 @@ export interface DoctorApplicationActionResponse {
   message: string;
 }
 
+/** A single RBAC role from GET /auth/roles (F-03: replaces hardcoded id maps) */
+export interface RoleResponse {
+  id: number;
+  name: string;
+}
+
 /* ── Form Types (UI-specific, not sent to API) ──────────────────────── */
 
 /** Login form values (before transforming to API format) */

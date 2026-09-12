@@ -41,6 +41,7 @@ from app.modules.users.repository import count_admin_users
 from app.modules.users.exceptions import LastAdminCannotBeModified
 from app.modules.auth.models import PasswordResetToken
 from app.modules.auth.models import RefreshToken
+from app.modules.auth.models import Role
 from app.modules.auth.models import User
 from app.modules.auth.repository import create_password_reset_token
 from app.modules.auth.repository import create_refresh_token
@@ -48,6 +49,7 @@ from app.modules.auth.repository import create_user
 from app.modules.auth.repository import get_password_reset_token_by_hash
 from app.modules.auth.repository import get_pending_users
 from app.modules.auth.repository import get_refresh_token_by_hash
+from app.modules.auth.repository import get_all_roles
 from app.modules.auth.repository import get_role_by_id
 from app.modules.auth.repository import get_user_by_email
 from app.modules.auth.repository import get_user_by_id
@@ -147,6 +149,11 @@ def register_doctor_user(
         EmailAlreadyRegistered: If the email is already registered.
         RegistrationFailed: If an unexpected error occurs.
     """
+    from app.modules.doctors.exceptions import (
+        DuplicateRegistrationNumber,
+        SpecializationInvalid,
+        DoctorValidationFailed,
+    )
     from app.modules.doctors.models import DoctorApplication
     from app.modules.doctors.repositories import (
         DoctorApplicationRepository,
@@ -183,22 +190,31 @@ def register_doctor_user(
         doctor_repo = DoctorRepository(db)
         spec_repo = SpecializationRepository(db)
 
-        # Validate registration number uniqueness
+        # F-02: duplicate registration number is an expected business conflict,
+        # not a server failure — raise the domain 409 exception instead of the
+        # generic RegistrationFailed (which mapped to HTTP 500).
         if user_data.registration_number:
             if app_repo.registration_number_exists(user_data.registration_number):
                 db.rollback()
-                raise RegistrationFailed()
+                raise DuplicateRegistrationNumber(
+                    "Registration number is already in use"
+                )
             if doctor_repo.registration_number_exists(user_data.registration_number):
                 db.rollback()
-                raise RegistrationFailed()
+                raise DuplicateRegistrationNumber(
+                    "Registration number is already assigned to another doctor"
+                )
 
-        # Validate specialization IDs
+        # Validate specialization IDs — expected client errors → 422 domain
+        # exceptions (previously leaked as HTTP 500 via RegistrationFailed).
         requested_spec_ids = user_data.requested_specialization_ids or []
         primary_spec_id = user_data.primary_specialization_id
 
         if primary_spec_id is not None and primary_spec_id not in requested_spec_ids:
             db.rollback()
-            raise RegistrationFailed()
+            raise DoctorValidationFailed(
+                "Primary specialization must be in the requested specialization list"
+            )
 
         if requested_spec_ids:
             existing_specs = spec_repo.get_by_ids(requested_spec_ids)
@@ -206,7 +222,9 @@ def register_doctor_user(
             missing = set(requested_spec_ids) - existing_ids
             if missing:
                 db.rollback()
-                raise RegistrationFailed()
+                raise SpecializationInvalid(
+                    f"Invalid specialization IDs: {sorted(missing)}"
+                )
 
         application = DoctorApplication(
             user_id=created_user.id,
@@ -239,6 +257,16 @@ def register_doctor_user(
     except EmailAlreadyRegistered:
         raise
 
+    # F-02: expected domain errors raised inside the transaction block must
+    # propagate with their real HTTP mapping (409 / 422) — the generic
+    # catch-all below would otherwise re-wrap them as RegistrationFailed (500).
+    except DoctorValidationFailed:
+        raise
+    except SpecializationInvalid:
+        raise
+    except DuplicateRegistrationNumber:
+        raise
+
     except Exception:
         db.rollback()
         logger.exception(
@@ -246,6 +274,18 @@ def register_doctor_user(
             user_data.email,
         )
         raise RegistrationFailed()
+
+
+def fetch_all_roles(db: Session) -> list[Role]:
+    """Return all RBAC roles for the admin role-selection UI (F-03).
+
+    Args:
+        db: Active database session.
+
+    Returns:
+        All roles ordered by id.
+    """
+    return get_all_roles(db)
 
 
 def fetch_pending_users(
